@@ -335,6 +335,14 @@ def admin_required(f):
     return decorated_function
 
 
+def is_direct_video_url(url):
+    """Check if URL is a direct video file."""
+    if not url:
+        return False
+    video_extensions = ('.mp4', '.webm', '.ogg', '.mov')
+    return any(url.lower().endswith(ext) or f'{ext}?' in url.lower() for ext in video_extensions)
+
+
 def get_video_embed_url(url):
     """Convert video URL to embeddable format."""
     if not url:
@@ -458,9 +466,15 @@ def video(video_id):
     if video.get('video_type') == 'local' and video.get('local_file'):
         video['video_src'] = f'/static/videos/{video["local_file"]}'
         video['is_local'] = True
+        video['is_direct_url'] = False
+    elif is_direct_video_url(video.get('url', '')):
+        video['video_src'] = video['url']
+        video['is_local'] = False
+        video['is_direct_url'] = True
     else:
         video['embed_url'] = get_video_embed_url(video.get('url', ''))
         video['is_local'] = False
+        video['is_direct_url'] = False
 
     # Increment view count
     increment_views(video_id)

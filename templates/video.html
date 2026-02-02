@@ -40,8 +40,8 @@
             <div class="lg:col-span-2">
                 <!-- Video Player -->
                 <div class="aspect-video bg-black rounded-lg overflow-hidden mb-4">
-                    {% if video.is_local %}
-                    <video controls class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer">
+                    {% if video.is_local or video.is_direct_url %}
+                    <video controls class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" crossorigin="anonymous">
                         <source src="{{ video.video_src }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
@@ -55,7 +55,7 @@
                     {% endif %}
                 </div>
 
-                {% if video.is_local %}
+                {% if video.is_local or video.is_direct_url %}
                 <!-- Playback Controls -->
                 <div class="bg-gray-800 rounded-lg p-4 mb-6">
                     <div class="flex items-center justify-between flex-wrap gap-4">
@@ -145,13 +145,13 @@
     <footer class="bg-gray-800 mt-12 py-8">
         <div class="container mx-auto px-4 text-center text-gray-400">
             <p>USPA Video Library - Competition footage for judges and competitors</p>
-            {% if video.is_local %}
+            {% if video.is_local or video.is_direct_url %}
             <p class="text-sm mt-2 text-gray-500">Keyboard: Space = Play/Pause | Left/Right = Frame by frame | 1-4 = Speed (25%-100%)</p>
             {% endif %}
         </div>
     </footer>
 
-    {% if video.is_local %}
+    {% if video.is_local or video.is_direct_url %}
     <script>
         const video = document.getElementById('videoPlayer');
         const frameTime = 1/30; // Assuming 30fps, adjust if needed
