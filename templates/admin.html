@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - USPA Video Library</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    {% if dropbox_app_key %}
+    <script src="https://www.dropbox.com/static/api/2/dropins.js" id="dropboxjs" data-app-key="{{ dropbox_app_key }}"></script>
+    {% endif %}
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
     <nav class="bg-purple-800 p-4 sticky top-0 z-10">
@@ -85,10 +88,18 @@
                             placeholder="Video title">
                     </div>
                     <div>
-                        <label class="block text-gray-300 mb-2">Video URL * (YouTube or Vimeo)</label>
-                        <input type="url" id="videoUrl" required
-                            class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            placeholder="https://youtube.com/watch?v=...">
+                        <label class="block text-gray-300 mb-2">Video URL * (YouTube, Vimeo, Dropbox, or direct MP4)</label>
+                        <div class="flex gap-2">
+                            <input type="url" id="videoUrl" required
+                                class="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                placeholder="https://...">
+                            {% if dropbox_app_key %}
+                            <button type="button" onclick="chooseFromDropbox()"
+                                class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm whitespace-nowrap">
+                                Dropbox
+                            </button>
+                            {% endif %}
+                        </div>
                     </div>
                     <div>
                         <label class="block text-gray-300 mb-2">Category *</label>
@@ -243,6 +254,27 @@
 
     <script>
         const categories = {{ categories | tojson }};
+
+        // Dropbox Chooser
+        function chooseFromDropbox() {
+            Dropbox.choose({
+                success: function(files) {
+                    // Get the direct link (change dl=0 to dl=1)
+                    let url = files[0].link.replace('?dl=0', '?dl=1');
+                    document.getElementById('videoUrl').value = url;
+
+                    // Auto-fill title from filename
+                    const title = document.getElementById('videoTitle');
+                    if (!title.value) {
+                        title.value = files[0].name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+                    }
+                },
+                linkType: 'direct',
+                multiselect: false,
+                extensions: ['video'],
+                folderselect: false
+            });
+        }
 
         // Update import subcategories
         function updateImportSubcategories() {

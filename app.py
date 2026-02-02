@@ -28,6 +28,7 @@ except ImportError:
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'uspa-video-library-secret-key')
+DROPBOX_APP_KEY = os.environ.get('DROPBOX_APP_KEY', '')
 
 # Video storage paths (for local development)
 VIDEOS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'videos')
@@ -532,7 +533,8 @@ def admin_dashboard():
                          videos=videos,
                          categories=CATEGORIES,
                          total_videos=total_videos,
-                         total_views=total_views)
+                         total_views=total_views,
+                         dropbox_app_key=DROPBOX_APP_KEY)
 
 
 @app.route('/admin/add-video', methods=['POST'])
