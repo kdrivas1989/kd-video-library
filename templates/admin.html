@@ -36,13 +36,21 @@
         <!-- Import from Folder -->
         <div class="bg-gray-800 rounded-lg p-6 mb-8">
             <h2 class="text-xl font-bold mb-4">Import Videos from Folder</h2>
-            <p class="text-gray-400 text-sm mb-4">Import all videos from a local folder. MTS and other formats will be converted to MP4.</p>
+            <p class="text-gray-400 text-sm mb-4">Import all videos from a local folder (MTS converted to MP4) or select a Dropbox folder.</p>
             <form id="importFolderForm" class="flex flex-wrap gap-4 items-end">
                 <div class="flex-1 min-w-64">
                     <label class="block text-gray-300 mb-2">Folder Path</label>
-                    <input type="text" id="folderPath"
-                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        placeholder="/path/to/video/folder">
+                    <div class="flex gap-2">
+                        <input type="text" id="folderPath"
+                            class="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            placeholder="/path/to/video/folder">
+                        {% if dropbox_app_key %}
+                        <button type="button" onclick="chooseFolderFromDropbox()"
+                            class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm whitespace-nowrap">
+                            Dropbox Folder
+                        </button>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="w-48">
                     <label class="block text-gray-300 mb-2">Category *</label>
@@ -305,6 +313,79 @@
                 },
                 linkType: 'direct',
                 multiselect: false,
+                extensions: ['video'],
+                folderselect: false
+            });
+        }
+
+        // Dropbox Chooser - Folder import (multi-select from folder)
+        function chooseFolderFromDropbox() {
+            const category = document.getElementById('importCategory').value;
+            const subcategory = document.getElementById('importSubcategory').value;
+
+            if (!category) {
+                alert('Please select a category first');
+                return;
+            }
+
+            Dropbox.choose({
+                success: async function(files) {
+                    const progressDiv = document.getElementById('importProgress');
+                    const messageDiv = document.getElementById('importMessage');
+
+                    progressDiv.classList.remove('hidden');
+                    progressDiv.innerHTML = `<div class="flex items-center gap-3"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div><span>Adding ${files.length} videos from Dropbox...</span></div>`;
+
+                    let added = 0;
+                    let errors = [];
+
+                    for (const file of files) {
+                        const url = file.link.replace('?dl=0', '?dl=1');
+                        const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+
+                        try {
+                            const response = await fetch('/admin/add-video', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    title: title,
+                                    url: url,
+                                    category: category,
+                                    subcategory: subcategory,
+                                    description: '',
+                                    tags: '',
+                                    duration: ''
+                                })
+                            });
+
+                            const result = await response.json();
+                            if (result.success) {
+                                added++;
+                            } else {
+                                errors.push(file.name);
+                            }
+                        } catch (e) {
+                            errors.push(file.name);
+                        }
+
+                        progressDiv.innerHTML = `<div class="flex items-center gap-3"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div><span>Adding ${added}/${files.length} videos...</span></div>`;
+                    }
+
+                    progressDiv.classList.add('hidden');
+
+                    if (errors.length > 0) {
+                        messageDiv.className = 'mt-4 bg-yellow-900 border border-yellow-700 text-yellow-200 px-4 py-3 rounded';
+                        messageDiv.textContent = `Added ${added} videos. Failed: ${errors.length}`;
+                    } else {
+                        messageDiv.className = 'mt-4 bg-green-900 border border-green-700 text-green-200 px-4 py-3 rounded';
+                        messageDiv.textContent = `Successfully added ${added} videos from Dropbox!`;
+                    }
+                    messageDiv.classList.remove('hidden');
+
+                    setTimeout(() => location.reload(), 1500);
+                },
+                linkType: 'direct',
+                multiselect: true,
                 extensions: ['video'],
                 folderselect: false
             });
