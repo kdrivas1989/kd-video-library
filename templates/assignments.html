@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assign Videos - USPA Video Library</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <nav class="bg-gray-800 p-4 sticky top-0 z-10">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="/" class="text-2xl font-bold text-blue-400">USPA Video Library</a>
+            <div class="flex items-center gap-4">
+                <a href="/competitions" class="text-gray-400 hover:text-white">Competitions</a>
+                <a href="/assignments" class="text-blue-400">Assignments</a>
+                {% if is_admin %}
+                <a href="/admin" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg">Admin</a>
+                {% endif %}
+                <a href="/logout" class="text-gray-400 hover:text-white">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">Assign Videos to Judges</h1>
+
+        <!-- Assignment Form -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-8">
+            <h2 class="text-xl font-bold mb-4">Create New Assignment</h2>
+            <div class="grid md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Assign To</label>
+                    <select id="assignTo" class="w-full px-4 py-2 rounded bg-gray-700 text-white">
+                        <option value="">Select Judge</option>
+                        {% for judge in judges %}
+                        <option value="{{ judge.username }}">{{ judge.name }} ({{ judge.role }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Filter by Category</label>
+                    <select id="filterCategory" class="w-full px-4 py-2 rounded bg-gray-700 text-white" onchange="filterVideos()">
+                        <option value="">All Categories</option>
+                        {% for cat_id, cat in categories.items() %}
+                        <option value="{{ cat_id }}">{{ cat.abbrev }} - {{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Notes (optional)</label>
+                    <input type="text" id="assignNotes" placeholder="Instructions for judge..."
+                        class="w-full px-4 py-2 rounded bg-gray-700 text-white">
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-4">
+                    <button onclick="selectAll()" class="text-blue-400 hover:text-blue-300 text-sm">Select All</button>
+                    <button onclick="selectNone()" class="text-gray-400 hover:text-gray-300 text-sm">Clear Selection</button>
+                    <span id="selectedCount" class="text-gray-500 text-sm">0 selected</span>
+                </div>
+                <button onclick="assignSelected()" class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-medium">
+                    Assign Selected Videos
+                </button>
+            </div>
+
+            <!-- Video Selection Grid -->
+            <div class="grid md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-[400px] overflow-y-auto" id="videoGrid">
+                {% for video in videos %}
+                <label class="video-item cursor-pointer" data-category="{{ video.category }}">
+                    <input type="checkbox" value="{{ video.id }}" class="video-checkbox hidden">
+                    <div class="bg-gray-700 rounded-lg overflow-hidden hover:ring-2 hover:ring-blue-500 transition select-box">
+                        <div class="aspect-video bg-gray-600 relative">
+                            {% if video.thumbnail %}
+                            <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="w-full h-full object-cover">
+                            {% endif %}
+                            <div class="absolute top-1 right-1 w-5 h-5 rounded border-2 border-white bg-gray-800/50 check-indicator"></div>
+                        </div>
+                        <div class="p-2">
+                            <p class="text-xs text-white truncate">{{ video.title }}</p>
+                            <p class="text-xs text-gray-400">{{ categories.get(video.category, {}).get('abbrev', video.category) }}</p>
+                        </div>
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Current Assignments -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <h2 class="text-xl font-bold mb-4">Current Assignments</h2>
+            {% if assignments %}
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-700">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm">Video</th>
+                            <th class="px-4 py-3 text-left text-sm">Assigned To</th>
+                            <th class="px-4 py-3 text-left text-sm">Assigned By</th>
+                            <th class="px-4 py-3 text-left text-sm">Status</th>
+                            <th class="px-4 py-3 text-left text-sm">Date</th>
+                            <th class="px-4 py-3 text-right text-sm">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-700">
+                        {% for a in assignments %}
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-3">
+                                <a href="/video/{{ a.video_id }}" class="text-blue-400 hover:underline">{{ a.video.title|default('Unknown', true) }}</a>
+                            </td>
+                            <td class="px-4 py-3">{{ a.judge.name|default(a.assigned_to, true) }}</td>
+                            <td class="px-4 py-3 text-gray-400">{{ a.assigner.name|default(a.assigned_by, true) }}</td>
+                            <td class="px-4 py-3">
+                                {% if a.status == 'completed' %}
+                                <span class="bg-green-600 text-white text-xs px-2 py-1 rounded">Completed</span>
+                                {% elif a.status == 'in_progress' %}
+                                <span class="bg-yellow-600 text-white text-xs px-2 py-1 rounded">In Progress</span>
+                                {% else %}
+                                <span class="bg-gray-600 text-white text-xs px-2 py-1 rounded">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-gray-400 text-sm">{{ a.created_at[:10] }}</td>
+                            <td class="px-4 py-3 text-right">
+                                <button onclick="deleteAssignment('{{ a.id }}')" class="text-red-400 hover:text-red-300 text-sm">Remove</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-8">No assignments yet</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <style>
+        .video-checkbox:checked + .select-box {
+            ring: 2px;
+            ring-color: #3b82f6;
+            box-shadow: 0 0 0 2px #3b82f6;
+        }
+        .video-checkbox:checked + .select-box .check-indicator {
+            background-color: #3b82f6;
+        }
+        .video-checkbox:checked + .select-box .check-indicator::after {
+            content: '\2713';
+            color: white;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+
+    <script>
+        function updateSelectedCount() {
+            const count = document.querySelectorAll('.video-checkbox:checked').length;
+            document.getElementById('selectedCount').textContent = count + ' selected';
+        }
+
+        document.querySelectorAll('.video-checkbox').forEach(cb => {
+            cb.addEventListener('change', updateSelectedCount);
+        });
+
+        function selectAll() {
+            const visible = document.querySelectorAll('.video-item:not([style*="display: none"]) .video-checkbox');
+            visible.forEach(cb => cb.checked = true);
+            updateSelectedCount();
+        }
+
+        function selectNone() {
+            document.querySelectorAll('.video-checkbox').forEach(cb => cb.checked = false);
+            updateSelectedCount();
+        }
+
+        function filterVideos() {
+            const category = document.getElementById('filterCategory').value;
+            document.querySelectorAll('.video-item').forEach(item => {
+                if (!category || item.dataset.category === category) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        async function assignSelected() {
+            const assignTo = document.getElementById('assignTo').value;
+            const notes = document.getElementById('assignNotes').value;
+
+            if (!assignTo) {
+                alert('Please select a judge');
+                return;
+            }
+
+            const videoIds = [];
+            document.querySelectorAll('.video-checkbox:checked').forEach(cb => {
+                videoIds.push(cb.value);
+            });
+
+            if (videoIds.length === 0) {
+                alert('Please select at least one video');
+                return;
+            }
+
+            try {
+                const response = await fetch('/assign-videos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        video_ids: videoIds,
+                        assigned_to: assignTo,
+                        notes: notes
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    location.reload();
+                } else {
+                    alert(result.error || 'Failed to assign videos');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function deleteAssignment(assignmentId) {
+            if (!confirm('Remove this assignment?')) return;
+
+            try {
+                const response = await fetch('/assignment/' + assignmentId + '/delete', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert(result.error || 'Failed to remove assignment');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+    </script>
+</body>
+</html>
