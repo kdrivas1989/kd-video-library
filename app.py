@@ -1554,22 +1554,28 @@ def events_list():
 @app.route('/competitions')
 def competitions_list():
     """Show all competitions."""
-    competitions = get_all_competitions()
+    try:
+        competitions = get_all_competitions()
 
-    # Parse event_types for each competition for display
-    for comp in competitions:
-        if comp.get('event_types'):
-            try:
-                comp['parsed_event_types'] = json.loads(comp['event_types'])
-            except:
+        # Parse event_types for each competition for display
+        for comp in competitions:
+            if comp.get('event_types'):
+                try:
+                    comp['parsed_event_types'] = json.loads(comp['event_types'])
+                except:
+                    comp['parsed_event_types'] = [comp.get('event_type', 'fs')]
+            else:
                 comp['parsed_event_types'] = [comp.get('event_type', 'fs')]
-        else:
-            comp['parsed_event_types'] = [comp.get('event_type', 'fs')]
 
-    return render_template('competitions.html',
-                         competitions=competitions,
-                         categories=CATEGORIES,
-                         is_admin=session.get('role') == 'admin')
+        return render_template('competitions.html',
+                             competitions=competitions,
+                             categories=CATEGORIES,
+                             is_admin=session.get('role') == 'admin')
+    except Exception as e:
+        print(f"Error in competitions_list: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error loading competitions: {str(e)}", 500
 
 
 @app.route('/competition/<comp_id>')
@@ -2186,10 +2192,16 @@ def videographer_get_video_info(video_id):
 @app.route('/videographer')
 def videographer_upload_page():
     """Videographer upload page with event/team/round selection."""
-    competitions = get_all_competitions()
-    return render_template('videographer.html',
-                         competitions=competitions,
-                         categories=CATEGORIES)
+    try:
+        competitions = get_all_competitions()
+        return render_template('videographer.html',
+                             competitions=competitions,
+                             categories=CATEGORIES)
+    except Exception as e:
+        print(f"Error in videographer_upload_page: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error loading videographer page: {str(e)}", 500
 
 
 @app.route('/api/competitions')
