@@ -6,7 +6,11 @@ import uuid
 import json
 import subprocess
 import shutil
-from datetime import datetime
+import smtplib
+import secrets
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory, g
 from werkzeug.utils import secure_filename
 from functools import wraps
@@ -30,6 +34,57 @@ except ImportError:
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'uspa-video-library-secret-key')
 DROPBOX_APP_KEY = os.environ.get('DROPBOX_APP_KEY', '')
+
+# Email configuration for password reset
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
+SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL', '')
+APP_URL = os.environ.get('APP_URL', 'http://localhost:5001')
+
+# Password reset tokens (in-memory for simplicity, resets on server restart)
+password_reset_tokens = {}  # {token: {'username': str, 'expires': datetime}}
+
+def send_reset_email(email, username, reset_token):
+    """Send password reset email."""
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        print(f"Email not configured. Reset link: {APP_URL}/reset-password/{reset_token}")
+        return False
+
+    reset_link = f"{APP_URL}/reset-password/{reset_token}"
+
+    msg = MIMEMultipart()
+    msg['From'] = SMTP_FROM_EMAIL or SMTP_USERNAME
+    msg['To'] = email
+    msg['Subject'] = 'USPA Video Library - Password Reset'
+
+    body = f"""
+Hello,
+
+You requested a password reset for your USPA Video Library account ({username}).
+
+Click the link below to reset your password:
+{reset_link}
+
+This link will expire in 1 hour.
+
+If you did not request this reset, please ignore this email.
+
+- USPA Video Library
+"""
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        server.sendmail(SMTP_FROM_EMAIL or SMTP_USERNAME, email, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False
 
 # Global error handler to show actual errors
 @app.errorhandler(500)
@@ -298,21 +353,26 @@ def init_db():
                 password TEXT NOT NULL,
                 role TEXT NOT NULL,
                 name TEXT NOT NULL,
+                email TEXT,
                 must_change_password INTEGER DEFAULT 0
             )
         ''')
 
-        # Add must_change_password column if it doesn't exist
+        # Add columns if they don't exist (for existing databases)
         try:
             cursor.execute('ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0')
+        except:
+            pass
+        try:
+            cursor.execute('ALTER TABLE users ADD COLUMN email TEXT')
         except:
             pass
 
         cursor.execute('SELECT username FROM users WHERE username = ?', ('admin',))
         if not cursor.fetchone():
             cursor.execute(
-                'INSERT INTO users (username, password, role, name, must_change_password) VALUES (?, ?, ?, ?, ?)',
-                ('admin', 'admin123', 'admin', 'Administrator', 0)
+                'INSERT INTO users (username, password, role, name, email, must_change_password) VALUES (?, ?, ?, ?, ?, ?)',
+                ('admin', 'admin123', 'admin', 'Administrator', '', 0)
             )
 
         conn.commit()
@@ -493,6 +553,7 @@ def get_all_users():
 def save_user(user_data):
     """Save or update a user."""
     must_change = user_data.get('must_change_password', 0)
+    email = user_data.get('email', '')
     if USE_SUPABASE:
         existing = supabase.table('users').select('username').eq('username', user_data['username']).execute()
         if existing.data:
@@ -502,10 +563,22 @@ def save_user(user_data):
     else:
         db = get_sqlite_db()
         db.execute('''
-            INSERT OR REPLACE INTO users (username, password, role, name, must_change_password)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (user_data['username'], user_data['password'], user_data['role'], user_data['name'], must_change))
+            INSERT OR REPLACE INTO users (username, password, role, name, email, must_change_password)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_data['username'], user_data['password'], user_data['role'], user_data['name'], email, must_change))
         db.commit()
+
+
+def get_user_by_email(email):
+    """Get user by email address."""
+    if USE_SUPABASE:
+        result = supabase.table('users').select('*').eq('email', email).execute()
+        return result.data[0] if result.data else None
+    else:
+        db = get_sqlite_db()
+        cursor = db.execute('SELECT * FROM users WHERE email = ?', (email,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
 
 
 def delete_user(username):
@@ -1083,6 +1156,79 @@ def change_password():
     return render_template('change_password.html', error=error)
 
 
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    """Forgot password page - sends reset email."""
+    message = None
+    error = None
+
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+
+        if not email:
+            error = 'Please enter your email address'
+        else:
+            user = get_user_by_email(email)
+            if user:
+                # Generate reset token
+                token = secrets.token_urlsafe(32)
+                password_reset_tokens[token] = {
+                    'username': user['username'],
+                    'expires': datetime.now() + timedelta(hours=1)
+                }
+
+                # Try to send email
+                if send_reset_email(email, user['username'], token):
+                    message = 'Password reset link has been sent to your email'
+                else:
+                    # If email not configured, show the link (for development)
+                    if not SMTP_USERNAME:
+                        message = f'Email not configured. Reset link: {APP_URL}/reset-password/{token}'
+                    else:
+                        error = 'Failed to send email. Please try again or contact admin.'
+            else:
+                # Don't reveal if email exists or not
+                message = 'If an account with that email exists, a reset link has been sent'
+
+    return render_template('forgot_password.html', message=message, error=error)
+
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Reset password using token."""
+    # Check if token is valid
+    token_data = password_reset_tokens.get(token)
+    if not token_data or token_data['expires'] < datetime.now():
+        return render_template('reset_password.html', error='Invalid or expired reset link', expired=True)
+
+    error = None
+    if request.method == 'POST':
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        if len(new_password) < 6:
+            error = 'Password must be at least 6 characters'
+        elif new_password != confirm_password:
+            error = 'Passwords do not match'
+        else:
+            # Update password
+            user = get_user(token_data['username'])
+            if user:
+                save_user({
+                    'username': user['username'],
+                    'password': new_password,
+                    'role': user['role'],
+                    'name': user['name'],
+                    'email': user.get('email', ''),
+                    'must_change_password': 0
+                })
+                # Remove used token
+                del password_reset_tokens[token]
+                return redirect(url_for('login'))
+
+    return render_template('reset_password.html', error=error, token=token)
+
+
 @app.route('/logout')
 def logout():
     """Logout."""
@@ -1133,6 +1279,7 @@ def admin_create_user():
     data = request.json
     username = data.get('username', '').strip().lower()
     name = data.get('name', '').strip()
+    email = data.get('email', '').strip().lower()
     role = data.get('role', 'judge')
 
     if not username or not name:
@@ -1152,6 +1299,7 @@ def admin_create_user():
         'password': 'password',
         'role': role,
         'name': name,
+        'email': email,
         'must_change_password': 1
     })
 
