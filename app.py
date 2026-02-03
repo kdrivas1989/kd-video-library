@@ -31,6 +31,21 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'uspa-video-library-secret-key')
 DROPBOX_APP_KEY = os.environ.get('DROPBOX_APP_KEY', '')
 
+# Global error handler to show actual errors
+@app.errorhandler(500)
+def handle_500_error(e):
+    import traceback
+    error_msg = f"500 Error: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+    print(error_msg)
+    return f"<pre>{error_msg}</pre>", 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    error_msg = f"Error: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+    print(error_msg)
+    return f"<pre>{error_msg}</pre>", 500
+
 # Video storage paths (for local development)
 VIDEOS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'videos')
 os.makedirs(VIDEOS_FOLDER, exist_ok=True)
@@ -2228,6 +2243,36 @@ def api_get_competition(comp_id):
     if not competition:
         return jsonify({'error': 'Competition not found'}), 404
     return jsonify(competition)
+
+
+@app.route('/debug/status')
+def debug_status():
+    """Debug endpoint to check system status."""
+    try:
+        # Check database connection
+        db_status = "Supabase" if USE_SUPABASE else "SQLite"
+        competitions = get_all_competitions()
+
+        # Check for event_types column
+        has_event_types = False
+        if competitions and len(competitions) > 0:
+            has_event_types = 'event_types' in competitions[0]
+
+        return jsonify({
+            'status': 'ok',
+            'database': db_status,
+            'supabase_connected': USE_SUPABASE,
+            'competitions_count': len(competitions) if competitions else 0,
+            'has_event_types_column': has_event_types,
+            'sample_competition': competitions[0] if competitions else None
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 
 if __name__ == '__main__':
