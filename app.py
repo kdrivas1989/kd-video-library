@@ -107,6 +107,12 @@ os.makedirs(VIDEOS_FOLDER, exist_ok=True)
 
 # Categories
 CATEGORIES = {
+    'uncategorized': {
+        'name': 'Uncategorized',
+        'abbrev': 'UN',
+        'description': 'Videos pending categorization',
+        'subcategories': []
+    },
     'al': {
         'name': 'Accuracy Landing',
         'abbrev': 'AL',
@@ -1440,17 +1446,17 @@ def add_video():
     title = data.get('title', '').strip()
     description = data.get('description', '').strip()
     url = data.get('url', '').strip()
-    category = data.get('category', '')
+    category = data.get('category', '') or 'uncategorized'
     subcategory = data.get('subcategory', '')
     tags = data.get('tags', '').strip()
     duration = data.get('duration', '').strip()
     event = data.get('event', '').strip()
 
-    if not title or not url or not category:
-        return jsonify({'error': 'Title, URL, and category are required'}), 400
+    if not title or not url:
+        return jsonify({'error': 'Title and URL are required'}), 400
 
     if category not in CATEGORIES:
-        return jsonify({'error': 'Invalid category'}), 400
+        category = 'uncategorized'
 
     video_id = str(uuid.uuid4())[:8]
 
@@ -1520,15 +1526,12 @@ def upload_video():
 
     # Get form data
     title = request.form.get('title', '').strip()
-    category = request.form.get('category', '')
+    category = request.form.get('category', '') or 'uncategorized'
     subcategory = request.form.get('subcategory', '')
     event = request.form.get('event', '').strip()
 
-    if not category:
-        return jsonify({'error': 'Category is required'}), 400
-
     if category not in CATEGORIES:
-        return jsonify({'error': 'Invalid category'}), 400
+        category = 'uncategorized'
 
     # Check file extension
     filename = secure_filename(file.filename)
@@ -1638,7 +1641,7 @@ def import_folder():
             user_category = folder_meta['category']
 
     if user_category and user_category not in CATEGORIES:
-        return jsonify({'error': 'Invalid category'}), 400
+        user_category = 'uncategorized'
 
     video_extensions = ('.mp4', '.mts', '.m2ts', '.mov', '.avi', '.mkv', '.webm')
     files = [f for f in os.listdir(folder_path) if f.lower().endswith(video_extensions)]
@@ -1658,7 +1661,7 @@ def import_folder():
             file_meta = parse_filename_metadata(filename, folder_path)
 
             # Use user-provided values if set, otherwise use auto-detected
-            final_category = user_category or file_meta['category'] or 'cp'  # default to cp
+            final_category = user_category or file_meta['category'] or 'uncategorized'
             final_subcategory = user_subcategory or file_meta['subcategory']
             final_event = user_event or file_meta['event']
             final_title = file_meta['title']
