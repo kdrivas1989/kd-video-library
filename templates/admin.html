@@ -652,16 +652,78 @@
             }
         }
 
-        // Edit Video - placeholder for now
-        function editVideo(videoId) {
-            // For simplicity, redirect to video page or implement edit modal
-            alert('Edit functionality: Use the form to re-add the video with updated details, then delete the old one.');
+        // Edit Video - fetch data and open modal
+        async function editVideo(videoId) {
+            try {
+                const response = await fetch(`/admin/get-video/${videoId}`);
+                const video = await response.json();
+
+                if (video.error) {
+                    alert(video.error);
+                    return;
+                }
+
+                // Populate form fields
+                document.getElementById('editVideoId').value = video.id;
+                document.getElementById('editTitle').value = video.title || '';
+                document.getElementById('editUrl').value = video.url || '';
+                document.getElementById('editCategory').value = video.category || '';
+                document.getElementById('editDescription').value = video.description || '';
+                document.getElementById('editDuration').value = video.duration || '';
+                document.getElementById('editTags').value = video.tags || '';
+
+                // Update subcategories and set value
+                updateEditSubcategories();
+                setTimeout(() => {
+                    document.getElementById('editSubcategory').value = video.subcategory || '';
+                }, 50);
+
+                // Show modal
+                document.getElementById('editModal').classList.remove('hidden');
+                document.getElementById('editModal').classList.add('flex');
+            } catch (error) {
+                alert('Error loading video: ' + error.message);
+            }
         }
 
         function closeEditModal() {
             document.getElementById('editModal').classList.add('hidden');
             document.getElementById('editModal').classList.remove('flex');
         }
+
+        // Edit form submission
+        document.getElementById('editVideoForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const videoId = document.getElementById('editVideoId').value;
+            const data = {
+                title: document.getElementById('editTitle').value,
+                category: document.getElementById('editCategory').value,
+                subcategory: document.getElementById('editSubcategory').value,
+                description: document.getElementById('editDescription').value,
+                duration: document.getElementById('editDuration').value,
+                tags: document.getElementById('editTags').value
+            };
+
+            try {
+                const response = await fetch(`/admin/edit-video/${videoId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    alert(result.error);
+                } else {
+                    closeEditModal();
+                    location.reload();
+                }
+            } catch (error) {
+                alert('Error updating video: ' + error.message);
+            }
+        });
     </script>
 </body>
 </html>

@@ -697,6 +697,16 @@ def delete_video(video_id):
     return jsonify({'success': True, 'message': 'Video deleted'})
 
 
+@app.route('/admin/get-video/<video_id>', methods=['GET'])
+@admin_required
+def get_video_details(video_id):
+    """Get video details for editing."""
+    video = get_video(video_id)
+    if not video:
+        return jsonify({'error': 'Video not found'}), 404
+    return jsonify(video)
+
+
 @app.route('/admin/edit-video/<video_id>', methods=['POST'])
 @admin_required
 def edit_video(video_id):
@@ -712,6 +722,7 @@ def edit_video(video_id):
     video['category'] = data.get('category', video['category'])
     video['subcategory'] = data.get('subcategory', video.get('subcategory', ''))
     video['tags'] = data.get('tags', video.get('tags', '')).strip()
+    video['duration'] = data.get('duration', video.get('duration', '')).strip()
 
     save_video(video)
 
