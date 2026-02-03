@@ -316,14 +316,18 @@ def search_videos(query):
 
 def get_all_events():
     """Get all unique events."""
-    if USE_SUPABASE:
-        result = supabase.table('videos').select('event').execute()
-        events = set(v['event'] for v in result.data if v.get('event'))
-        return sorted(events)
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT DISTINCT event FROM videos WHERE event IS NOT NULL AND event != "" ORDER BY event')
-        return [row[0] for row in cursor.fetchall()]
+    try:
+        if USE_SUPABASE:
+            result = supabase.table('videos').select('event').execute()
+            events = set(v['event'] for v in result.data if v.get('event'))
+            return sorted(events)
+        else:
+            db = get_sqlite_db()
+            cursor = db.execute('SELECT DISTINCT event FROM videos WHERE event IS NOT NULL AND event != "" ORDER BY event')
+            return [row[0] for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Error getting events: {e}")
+        return []
 
 
 def get_videos_by_event(event_name):
@@ -692,10 +696,17 @@ def logout():
 @admin_required
 def admin_dashboard():
     """Admin dashboard."""
-    videos = get_all_videos()
-    total_videos = len(videos)
-    total_views = sum(v.get('views', 0) for v in videos)
-    events = get_all_events()
+    try:
+        videos = get_all_videos()
+        total_videos = len(videos)
+        total_views = sum(v.get('views', 0) for v in videos)
+        events = get_all_events()
+    except Exception as e:
+        print(f"Admin dashboard error: {e}")
+        videos = []
+        total_videos = 0
+        total_views = 0
+        events = []
 
     return render_template('admin.html',
                          videos=videos,
