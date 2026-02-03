@@ -2018,9 +2018,18 @@
             }
 
             if (currentCpEvent === 'zone') {
+                // Check entry gate first - if not checked, automatic zero
+                const entryGateChecked = document.getElementById('cpGateEntry').checked;
+
+                if (!entryGateChecked) {
+                    // Entry gate missed = automatic zero
+                    document.getElementById('cpZoneTotal').textContent = '0 (entry missed)';
+                    document.getElementById('cpScoreValue').value = 0;
+                    return;
+                }
+
                 // Calculate water gate points (entry=3, g1=18, g2=5, g3=8, g4=16)
-                let gatePoints = 0;
-                if (document.getElementById('cpGateEntry').checked) gatePoints += 3;
+                let gatePoints = 3; // Entry gate is checked, so start with 3
                 if (document.getElementById('cpGate1').checked) gatePoints += 18;
                 if (document.getElementById('cpGate2').checked) gatePoints += 5;
                 if (document.getElementById('cpGate3').checked) gatePoints += 8;
