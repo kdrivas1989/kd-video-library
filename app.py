@@ -2622,6 +2622,63 @@ def competition_page(comp_id):
                 team['total_score'] = sum(s.get('score', 0) or 0 for s in team['scores'])
                 teams_by_class['open'].append(team)
 
+        # Calculate weighted scores for CP Individual (cp_dsz) - single event
+        if competition['event_type'] == 'cp_dsz':
+            # Collect all teams across all classes
+            all_cp_teams = []
+            for class_name in teams_by_class:
+                all_cp_teams.extend(teams_by_class[class_name])
+
+            # Find best raw score for each round
+            best_scores = {}
+            for round_num in range(1, 10):  # 9 rounds
+                is_speed_round = round_num >= 7
+                best_score = None
+                for team in all_cp_teams:
+                    for score in team.get('scores', []):
+                        if score.get('round_num') == round_num and score.get('score') is not None:
+                            raw = score.get('score', 0) or 0
+                            score_data = score.get('score_data', '')
+                            if score_data and not score_data.startswith('{'):
+                                continue
+                            if raw > 0:
+                                if best_score is None:
+                                    best_score = raw
+                                elif is_speed_round and raw < best_score:
+                                    best_score = raw
+                                elif not is_speed_round and raw > best_score:
+                                    best_score = raw
+                best_scores[round_num] = best_score
+
+            # Calculate weighted scores for each team
+            for team in all_cp_teams:
+                weighted_total = 0
+                for score in team.get('scores', []):
+                    round_num = score.get('round_num')
+                    raw_score = score.get('score')
+                    score_data = score.get('score_data', '')
+                    is_speed_round = round_num >= 7
+
+                    if score_data and not score_data.startswith('{'):
+                        score['weighted_score'] = 0
+                        score['penalty'] = score_data
+                        continue
+
+                    if raw_score is not None and raw_score > 0 and best_scores.get(round_num):
+                        best = best_scores[round_num]
+                        if is_speed_round:
+                            score_calc = raw_score ** 1.333
+                            best_calc = best ** 1.333
+                            weighted = (best_calc / score_calc) * 100
+                        else:
+                            weighted = (raw_score / best) * 100
+                        score['weighted_score'] = int(weighted * 1000) / 1000
+                        weighted_total += score['weighted_score']
+                    else:
+                        score['weighted_score'] = None
+
+                team['total_score'] = int(weighted_total * 1000) / 1000
+
         # Sort each class by total score descending
         for class_name in teams_by_class:
             teams_by_class[class_name].sort(key=lambda t: t['total_score'], reverse=True)
