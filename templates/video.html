@@ -39,8 +39,15 @@
             <!-- Main Video Area -->
             <div class="lg:col-span-2">
                 <!-- Video Player -->
-                <div class="aspect-video bg-black rounded-lg overflow-hidden mb-4">
+                <div class="aspect-video bg-black rounded-lg overflow-hidden mb-4 relative" id="videoContainer">
                     {% if video.is_local or video.is_direct_url %}
+                    <!-- Freeze Frame Overlay -->
+                    <div id="freezeOverlay" class="absolute inset-0 bg-black/50 flex items-center justify-center z-10 hidden pointer-events-none">
+                        <div class="text-center">
+                            <span class="text-6xl font-bold text-yellow-400 drop-shadow-lg">TIME</span>
+                            <p class="text-white text-xl mt-2">Freeze Frame</p>
+                        </div>
+                    </div>
                     <video controls class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" playsinline preload="metadata">
                         {% if '.webm' in video.video_src|lower %}
                         <source src="{{ video.video_src }}" type="video/webm">
@@ -76,6 +83,374 @@
                         </div>
                         <div class="text-gray-500 text-sm">
                             <span id="currentSpeed">1x</span> playback
+                        </div>
+                    </div>
+                    <!-- Scoring Timeline -->
+                    <div class="mt-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-3">
+                                <span class="text-gray-400 text-sm">Scoring:</span>
+                                <span class="text-xs text-gray-500">X = point (+1) | C = bust (0 pts) | Q = omission (-1) | P = →point | B = →bust</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="toggleNV()" id="nvBtn" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm">
+                                    NV
+                                </button>
+                                <button onclick="clearScoring()" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3 min-h-[40px] font-mono text-xl tracking-widest" id="scoringTimeline">
+                            <span class="text-gray-500">Press X, C, or Q to score...</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <div class="flex items-center gap-4">
+                                <span class="text-gray-400">Points (X): <span id="xCount" class="text-green-400 font-bold">0</span></span>
+                                <span class="text-gray-400">Busts (C): <span id="cCount" class="text-red-400 font-bold">0</span></span>
+                                <span class="text-gray-400">Omissions (Q): <span id="qCount" class="text-orange-400 font-bold">0</span></span>
+                            </div>
+                            <div class="text-lg flex items-center gap-3">
+                                <span id="nvIndicator" class="text-red-500 font-bold hidden">NV PENALTY</span>
+                                <span class="text-gray-400">Total:</span>
+                                <span id="totalScore" class="text-yellow-400 font-bold ml-2">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timer Controls -->
+                    <div class="flex items-center justify-between flex-wrap gap-4 mt-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-center gap-3">
+                            <span class="text-gray-400 text-sm">Event:</span>
+                            <select id="eventType" onchange="updateEventType()"
+                                class="px-3 py-1 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <optgroup label="Formation Skydiving">
+                                    <option value="2way-mfs" data-duration="35">2-Way MFS (35s)</option>
+                                    <option value="4way-vfs" data-duration="35">4-Way VFS (35s)</option>
+                                    <option value="4way-fs" data-duration="35" selected>4-Way FS (35s)</option>
+                                    <option value="8way" data-duration="50">8-Way (50s)</option>
+                                    <option value="10way" data-duration="0">10-Way Speed</option>
+                                    <option value="16way" data-duration="50">16-Way (50s)</option>
+                                </optgroup>
+                                <optgroup label="Canopy Formation">
+                                    <option value="2way-cf-seq" data-duration="60">2-Way CF Sequential (60s)</option>
+                                    <option value="4way-cf-seq" data-duration="120">4-Way CF Sequential (120s)</option>
+                                    <option value="4way-cf-rot" data-duration="90">4-Way CF Rotation (90s)</option>
+                                </optgroup>
+                                <optgroup label="Artistic Events">
+                                    <option value="freestyle" data-duration="45">Freestyle (45s)</option>
+                                    <option value="freefly" data-duration="43">Freeflying (43s)</option>
+                                </optgroup>
+                                <optgroup label="Wingsuit Acrobatic">
+                                    <option value="ws-compulsory" data-duration="0">WS Compulsory Round</option>
+                                    <option value="ws-free" data-duration="0">WS Free Round</option>
+                                </optgroup>
+                                <optgroup label="Speed Skydiving">
+                                    <option value="speed-skydiving" data-duration="0">Speed Skydiving</option>
+                                </optgroup>
+                            </select>
+                            <span id="durationLabel" class="text-gray-400 text-sm">35s working time</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button onclick="startTimer()" id="timerBtn"
+                                class="px-4 py-1 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
+                                Start (X)
+                            </button>
+                            <button onclick="resetTimer()"
+                                class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm">
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-3">
+                        <div id="speedInfo" class="text-xs text-gray-500 hidden">
+                            10-Way Speed: X to start, X again to stop. Max score: 35.00s. Freeze 6s after completion.
+                        </div>
+                        <div class="flex items-center gap-2 ml-auto">
+                            <span id="timerDisplay" class="text-2xl font-mono font-bold text-gray-400">--:--</span>
+                            <span id="timerStatus" class="text-sm text-gray-500"></span>
+                        </div>
+                    </div>
+
+                    <!-- Wingsuit FlySight Upload (hidden by default) -->
+                    <div id="wingsuitSection" class="hidden mt-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-gray-400 text-sm font-medium">FlySight Data</span>
+                            <div class="flex items-center gap-2">
+                                <input type="file" id="flysightFile" accept=".csv" class="hidden" onchange="parseFlySight(event)">
+                                <button onclick="document.getElementById('flysightFile').click()"
+                                    class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-sm">
+                                    Upload CSV
+                                </button>
+                                <span id="flysightStatus" class="text-xs text-gray-500">No file loaded</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div class="bg-gray-900 rounded p-3">
+                                <div class="text-gray-500 text-xs mb-1">Upper Boundary</div>
+                                <div id="upperBoundary" class="font-mono text-white">-- ft</div>
+                            </div>
+                            <div class="bg-gray-900 rounded p-3">
+                                <div class="text-gray-500 text-xs mb-1">Lower Boundary</div>
+                                <div id="lowerBoundary" class="font-mono text-white">-- ft</div>
+                            </div>
+                            <div class="bg-gray-900 rounded p-3">
+                                <div class="text-gray-500 text-xs mb-1">Working Time</div>
+                                <div id="flysightWorkingTime" class="font-mono text-yellow-400 text-lg">--.- s</div>
+                            </div>
+                            <div class="bg-gray-900 rounded p-3">
+                                <div class="text-gray-500 text-xs mb-1">Altitude Window</div>
+                                <div id="altitudeWindow" class="font-mono text-white">7500 ft</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Wingsuit Compulsory Scoring (hidden by default) -->
+                    <div id="wsCompulsorySection" class="hidden mt-4 pt-4 border-t border-gray-700">
+                        <div class="text-gray-400 text-sm font-medium mb-3">Compulsory Round Scoring</div>
+
+                        <!-- Style Score -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-gray-400 text-sm">Style Score (3 judges)</span>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <input type="number" id="wsStyleJ1" min="0" max="10" step="0.1" placeholder="J1"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsCompulsory()">
+                                <input type="number" id="wsStyleJ2" min="0" max="10" step="0.1" placeholder="J2"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsCompulsory()">
+                                <input type="number" id="wsStyleJ3" min="0" max="10" step="0.1" placeholder="J3"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsCompulsory()">
+                                <span class="text-gray-400">=</span>
+                                <span id="wsStyleAvg" class="text-yellow-400 font-bold">0.0</span>
+                            </div>
+                            <div class="mt-2 flex items-center gap-2">
+                                <span class="text-gray-500 text-xs">Maneuver Omissions (each -1.5 from style):</span>
+                                <input type="number" id="wsManeuverOmissions" min="0" max="20" value="0"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsCompulsory()">
+                            </div>
+                        </div>
+
+                        <!-- Grips -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-gray-400 text-sm">Grips</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 text-sm">
+                                <div>
+                                    <label class="text-gray-500 text-xs">Scoring Grips</label>
+                                    <input type="number" id="wsGrips" min="0" max="50" value="0"
+                                        class="w-full px-2 py-1 rounded bg-gray-700 text-white text-center" onchange="calculateWsCompulsory()">
+                                </div>
+                                <div>
+                                    <label class="text-gray-500 text-xs">Grip Omissions (-1 each)</label>
+                                    <input type="number" id="wsGripOmissions" min="0" max="50" value="0"
+                                        class="w-full px-2 py-1 rounded bg-gray-700 text-white text-center" onchange="calculateWsCompulsory()">
+                                </div>
+                                <div>
+                                    <label class="text-gray-500 text-xs">Infringements (0 pts)</label>
+                                    <input type="number" id="wsInfringements" min="0" max="50" value="0"
+                                        class="w-full px-2 py-1 rounded bg-gray-700 text-white text-center" onchange="calculateWsCompulsory()">
+                                </div>
+                            </div>
+                            <div class="mt-2 text-right">
+                                <span class="text-gray-400 text-sm">Grip Score: </span>
+                                <span id="wsGripScore" class="text-yellow-400 font-bold">0</span>
+                            </div>
+                        </div>
+
+                        <!-- NV Toggle -->
+                        <div class="flex items-center justify-between">
+                            <button onclick="toggleWsNV()" id="wsNvBtn" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm">
+                                NV Penalty
+                            </button>
+                            <div class="text-right">
+                                <span class="text-gray-400">Final Style: </span>
+                                <span id="wsFinalStyle" class="text-green-400 font-bold">0.0</span>
+                                <span class="text-gray-500 mx-2">|</span>
+                                <span class="text-gray-400">Final Grips: </span>
+                                <span id="wsFinalGrips" class="text-green-400 font-bold">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Speed Skydiving Scoring (hidden by default) -->
+                    <div id="speedSkydivingSection" class="hidden mt-4 pt-4 border-t border-gray-700">
+                        <div class="text-gray-400 text-sm font-medium mb-3">Speed Skydiving Scoring</div>
+                        <p class="text-xs text-gray-500 mb-3">Score = highest 3-second average vertical speed (km/h) within performance window</p>
+
+                        <!-- PLD Data Upload -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-gray-400 text-sm">PLD Data</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="file" id="speedPldFile" accept=".csv" class="hidden" onchange="parseSpeedPLD(event)">
+                                    <button onclick="document.getElementById('speedPldFile').click()"
+                                        class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-sm">
+                                        Upload CSV
+                                    </button>
+                                    <span id="speedPldStatus" class="text-xs text-gray-500">No file loaded</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mt-3">
+                                <div class="bg-gray-800 rounded p-2">
+                                    <div class="text-gray-500 text-xs">Exit Altitude</div>
+                                    <div id="speedExitAlt" class="font-mono text-white">-- ft</div>
+                                </div>
+                                <div class="bg-gray-800 rounded p-2">
+                                    <div class="text-gray-500 text-xs">Window Start</div>
+                                    <div id="speedWindowStart" class="font-mono text-white">-- ft</div>
+                                </div>
+                                <div class="bg-gray-800 rounded p-2">
+                                    <div class="text-gray-500 text-xs">Breakoff (5,600ft)</div>
+                                    <div id="speedBreakoff" class="font-mono text-white">5,600 ft</div>
+                                </div>
+                                <div class="bg-gray-800 rounded p-2">
+                                    <div class="text-gray-500 text-xs">Max Speed (3s avg)</div>
+                                    <div id="speedMaxSpeed" class="font-mono text-yellow-400 text-lg">-- km/h</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Manual Score Entry -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-gray-400 text-sm">Manual Score Entry (or from PLD reading)</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="number" id="speedManualScore" min="0" max="600" step="0.01" placeholder="Speed"
+                                    class="w-32 px-3 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="addSpeedRound()">
+                                <span class="text-gray-400">km/h</span>
+                                <button onclick="addSpeedRound()" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-sm">
+                                    Add Round
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Rounds Table -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-gray-400 text-sm">Rounds (8 max)</span>
+                                <button onclick="clearSpeedRounds()" class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs">
+                                    Clear All
+                                </button>
+                            </div>
+                            <div id="speedRoundsTable" class="space-y-1 text-sm">
+                                <div class="text-gray-500 text-center py-2">No rounds recorded</div>
+                            </div>
+                        </div>
+
+                        <!-- Totals -->
+                        <div class="flex items-center justify-between bg-gray-800 rounded-lg p-3">
+                            <div class="text-sm">
+                                <span class="text-gray-400">Rounds: </span>
+                                <span id="speedRoundCount" class="text-white font-bold">0</span>
+                                <span class="text-gray-500">/8</span>
+                            </div>
+                            <div class="text-sm">
+                                <span class="text-gray-400">Total: </span>
+                                <span id="speedTotalScore" class="text-green-400 font-bold font-mono">0.00</span>
+                                <span class="text-gray-500">km/h</span>
+                            </div>
+                            <div class="text-sm">
+                                <span class="text-gray-400">Average: </span>
+                                <span id="speedAvgScore" class="text-yellow-400 font-bold font-mono">0.00</span>
+                                <span class="text-gray-500">km/h</span>
+                            </div>
+                        </div>
+
+                        <!-- Mixed Team (optional) -->
+                        <div class="mt-3 pt-3 border-t border-gray-700">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-gray-400 text-sm">Mixed Team (Optional)</span>
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" id="speedMixedTeamEnabled" onchange="toggleSpeedMixedTeam()" class="rounded">
+                                    <span class="text-gray-500">Enable</span>
+                                </label>
+                            </div>
+                            <div id="speedMixedTeamSection" class="hidden">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div class="bg-gray-900 rounded p-2">
+                                        <div class="text-gray-500 text-xs mb-1">Partner Score (this round)</div>
+                                        <input type="number" id="speedPartnerScore" min="0" max="600" step="0.01" placeholder="km/h"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm font-mono" onchange="calculateSpeedTeam()">
+                                    </div>
+                                    <div class="bg-gray-900 rounded p-2">
+                                        <div class="text-gray-500 text-xs mb-1">Team Total (combined)</div>
+                                        <div id="speedTeamTotal" class="font-mono text-green-400 font-bold">0.00 km/h</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Wingsuit Free Round Scoring (hidden by default) -->
+                    <div id="wsFreeSection" class="hidden mt-4 pt-4 border-t border-gray-700">
+                        <div class="text-gray-400 text-sm font-medium mb-3">Free Round Scoring</div>
+
+                        <!-- Style Score -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-gray-400 text-sm">Style (3 judges)</span>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <input type="number" id="wsFreeStyleJ1" min="0" max="10" step="0.1" placeholder="J1"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <input type="number" id="wsFreeStyleJ2" min="0" max="10" step="0.1" placeholder="J2"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <input type="number" id="wsFreeStyleJ3" min="0" max="10" step="0.1" placeholder="J3"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <span class="text-gray-400">=</span>
+                                <span id="wsFreeStyleAvg" class="text-yellow-400 font-bold">0.0</span>
+                            </div>
+                        </div>
+
+                        <!-- Dive Plan Score -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-gray-400 text-sm">Dive Plan (3 judges)</span>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <input type="number" id="wsFreeDiveJ1" min="0" max="10" step="0.1" placeholder="J1"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <input type="number" id="wsFreeDiveJ2" min="0" max="10" step="0.1" placeholder="J2"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <input type="number" id="wsFreeDiveJ3" min="0" max="10" step="0.1" placeholder="J3"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <span class="text-gray-400">=</span>
+                                <span id="wsFreeDiveAvg" class="text-yellow-400 font-bold">0.0</span>
+                            </div>
+                        </div>
+
+                        <!-- Camerawork Score -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-gray-400 text-sm">Camerawork (3 judges)</span>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <input type="number" id="wsFreeCamJ1" min="0" max="10" step="0.1" placeholder="J1"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <input type="number" id="wsFreeCamJ2" min="0" max="10" step="0.1" placeholder="J2"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <input type="number" id="wsFreeCamJ3" min="0" max="10" step="0.1" placeholder="J3"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <span class="text-gray-400">=</span>
+                                <span id="wsFreeCamAvg" class="text-yellow-400 font-bold">0.0</span>
+                            </div>
+                        </div>
+
+                        <!-- NV Toggle and Totals -->
+                        <div class="flex items-center justify-between">
+                            <button onclick="toggleWsFreeNV()" id="wsFreeNvBtn" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm">
+                                NV Penalty
+                            </button>
+                            <div class="text-sm">
+                                <span class="text-gray-400">Style: </span><span id="wsFreeStyleFinal" class="text-green-400 font-bold">0.0</span>
+                                <span class="text-gray-500 mx-1">|</span>
+                                <span class="text-gray-400">Dive: </span><span id="wsFreeDiveFinal" class="text-green-400 font-bold">0.0</span>
+                                <span class="text-gray-500 mx-1">|</span>
+                                <span class="text-gray-400">Cam: </span><span id="wsFreeCamFinal" class="text-green-400 font-bold">0.0</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -155,6 +530,7 @@
             <p>USPA Video Library - Competition footage for judges and competitors</p>
             {% if video.is_local or video.is_direct_url %}
             <p class="text-sm mt-2 text-gray-500">Keyboard: Space = Play/Pause | Left/Right = Frame by frame | 1-4 = Speed (25%-100%)</p>
+            <p class="text-sm mt-1 text-gray-500">Scoring: X = Start/Point (+1) | C = Bust (0 pts) | Q = Omission (-1) | P = →Point | B = →Bust | N = NV</p>
             {% endif %}
         </div>
     </footer>
@@ -217,8 +593,830 @@
                 case 'Digit4':
                     setSpeed(1);
                     break;
+                case 'KeyX':
+                    e.preventDefault();
+                    if (timerRunning) {
+                        // Score a point while timer is running
+                        addScore('x');
+                    } else {
+                        // Start timer when not running
+                        startTimer();
+                    }
+                    break;
+                case 'KeyC':
+                    e.preventDefault();
+                    addScore('c');
+                    break;
+                case 'KeyQ':
+                    e.preventDefault();
+                    addScore('q');
+                    break;
+                case 'KeyP':
+                    e.preventDefault();
+                    bustToPoint();
+                    break;
+                case 'KeyB':
+                    e.preventDefault();
+                    pointToBust();
+                    break;
+                case 'KeyN':
+                    e.preventDefault();
+                    toggleNV();
+                    break;
             }
         });
+
+        // Scoring functionality
+        let scoringTimeline = [];
+        let scoringTypes = []; // Track actual types for corrections
+        let xCount = 0;
+        let cCount = 0;
+        let qCount = 0;
+        let nvPenalty = false;
+
+        function addScore(type) {
+            scoringTypes.push(type);
+            if (type === 'x') {
+                scoringTimeline.push('-');
+                xCount++;
+            } else if (type === 'c') {
+                scoringTimeline.push('<span class="text-red-500">0</span>');
+                cCount++;
+            } else if (type === 'q') {
+                scoringTimeline.push('<span class="text-orange-400">Q</span>');
+                qCount++;
+            }
+            updateScoringDisplay();
+        }
+
+        function bustToPoint() {
+            // Find last bust (c or q) and convert to point
+            for (let i = scoringTypes.length - 1; i >= 0; i--) {
+                if (scoringTypes[i] === 'q' || scoringTypes[i] === 'c') {
+                    if (scoringTypes[i] === 'q') {
+                        qCount--;
+                    } else {
+                        cCount--;
+                    }
+                    scoringTypes[i] = 'x';
+                    scoringTimeline[i] = '<span class="text-purple-400">-</span>'; // Purple to show correction
+                    xCount++;
+                    updateScoringDisplay();
+                    return;
+                }
+            }
+        }
+
+        function pointToBust() {
+            // Find last point (x) and convert to bust
+            for (let i = scoringTypes.length - 1; i >= 0; i--) {
+                if (scoringTypes[i] === 'x') {
+                    xCount--;
+                    scoringTypes[i] = 'c';
+                    scoringTimeline[i] = '<span class="text-yellow-400">0</span>'; // Yellow to show correction
+                    cCount++;
+                    updateScoringDisplay();
+                    return;
+                }
+            }
+        }
+
+        function toggleNV() {
+            nvPenalty = !nvPenalty;
+            const nvBtn = document.getElementById('nvBtn');
+            const nvIndicator = document.getElementById('nvIndicator');
+
+            if (nvPenalty) {
+                nvBtn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                nvBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+                nvIndicator.classList.remove('hidden');
+            } else {
+                nvBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                nvBtn.classList.add('bg-gray-700', 'hover:bg-gray-600');
+                nvIndicator.classList.add('hidden');
+            }
+            updateScoringDisplay();
+        }
+
+        function updateScoringDisplay() {
+            const timeline = document.getElementById('scoringTimeline');
+            if (scoringTimeline.length === 0) {
+                timeline.innerHTML = '<span class="text-gray-500">Press X, C, or Q to score...</span>';
+            } else {
+                timeline.innerHTML = scoringTimeline.join(' ');
+            }
+
+            document.getElementById('xCount').textContent = xCount;
+            document.getElementById('cCount').textContent = cCount;
+            document.getElementById('qCount').textContent = qCount;
+
+            const calculatedTotal = xCount - qCount;
+            const total = nvPenalty ? 0 : calculatedTotal;
+            document.getElementById('totalScore').textContent = total;
+
+            // Color the total based on value
+            const totalEl = document.getElementById('totalScore');
+            totalEl.classList.remove('text-yellow-400', 'text-green-400', 'text-red-400');
+            if (nvPenalty) {
+                totalEl.classList.add('text-red-400');
+            } else if (total > 0) {
+                totalEl.classList.add('text-green-400');
+            } else if (total < 0) {
+                totalEl.classList.add('text-red-400');
+            } else {
+                totalEl.classList.add('text-yellow-400');
+            }
+        }
+
+        function clearScoring() {
+            scoringTimeline = [];
+            scoringTypes = [];
+            xCount = 0;
+            cCount = 0;
+            qCount = 0;
+            nvPenalty = false;
+            document.getElementById('nvBtn').classList.remove('bg-red-600', 'hover:bg-red-700');
+            document.getElementById('nvBtn').classList.add('bg-gray-700', 'hover:bg-gray-600');
+            document.getElementById('nvIndicator').classList.add('hidden');
+            updateScoringDisplay();
+        }
+
+        // Timer functionality
+        let timerInterval = null;
+        let timerRunning = false;
+        let timeRemaining = 0;
+        let elapsedTime = 0;
+        let isSpeedEvent = false;
+        let speedCompleted = false;
+        let freezeTimeout = null;
+
+        function updateEventType() {
+            const select = document.getElementById('eventType');
+            const option = select.options[select.selectedIndex];
+            const duration = parseInt(option.dataset.duration);
+            const eventType = select.value;
+
+            isSpeedEvent = (eventType === '10way');
+            const isWingsuit = (eventType === 'ws-compulsory' || eventType === 'ws-free');
+
+            // Hide all special sections first
+            document.getElementById('speedInfo').classList.add('hidden');
+            document.getElementById('wingsuitSection').classList.add('hidden');
+            document.getElementById('wsCompulsorySection').classList.add('hidden');
+            document.getElementById('wsFreeSection').classList.add('hidden');
+            document.getElementById('speedSkydivingSection').classList.add('hidden');
+
+            const isSpeedSkydiving = (eventType === 'speed-skydiving');
+
+            if (isSpeedSkydiving) {
+                document.getElementById('durationLabel').textContent = 'PLD scoring';
+                document.getElementById('speedSkydivingSection').classList.remove('hidden');
+            } else if (isSpeedEvent) {
+                document.getElementById('durationLabel').textContent = 'Speed competition';
+                document.getElementById('speedInfo').textContent = '10-Way Speed: X to start, X again to stop. Max score: 35.00s. Freeze 6s after completion.';
+                document.getElementById('speedInfo').classList.remove('hidden');
+                document.getElementById('timerBtn').textContent = 'Start (X)';
+            } else if (isWingsuit) {
+                document.getElementById('durationLabel').textContent = 'FlySight timing';
+                document.getElementById('wingsuitSection').classList.remove('hidden');
+                if (eventType === 'ws-compulsory') {
+                    document.getElementById('wsCompulsorySection').classList.remove('hidden');
+                } else {
+                    document.getElementById('wsFreeSection').classList.remove('hidden');
+                }
+            } else {
+                document.getElementById('durationLabel').textContent = duration + 's working time';
+            }
+
+            resetTimer();
+        }
+
+        function getEventDuration() {
+            const select = document.getElementById('eventType');
+            const option = select.options[select.selectedIndex];
+            return parseInt(option.dataset.duration) || 35;
+        }
+
+        function startTimer() {
+            if (isSpeedEvent) {
+                startSpeedTimer();
+            } else {
+                startCountdownTimer();
+            }
+        }
+
+        function startCountdownTimer() {
+            if (timerRunning) {
+                stopTimer();
+                return;
+            }
+
+            const duration = getEventDuration();
+            timeRemaining = duration;
+            timerRunning = true;
+
+            document.getElementById('timerBtn').textContent = 'Stop (X)';
+            document.getElementById('timerBtn').classList.remove('bg-green-600', 'hover:bg-green-700');
+            document.getElementById('timerBtn').classList.add('bg-red-600', 'hover:bg-red-700');
+            document.getElementById('timerStatus').textContent = 'Running';
+            document.getElementById('timerStatus').classList.remove('text-gray-500');
+            document.getElementById('timerStatus').classList.add('text-green-400');
+
+            document.getElementById('freezeOverlay').classList.add('hidden');
+            video.play();
+            updateTimerDisplay();
+
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                updateTimerDisplay();
+
+                if (timeRemaining <= 0) {
+                    video.pause();
+                    stopTimer();
+                    document.getElementById('timerStatus').textContent = 'Time!';
+                    document.getElementById('timerStatus').classList.remove('text-green-400');
+                    document.getElementById('timerStatus').classList.add('text-yellow-400');
+                    document.getElementById('timerDisplay').classList.add('text-yellow-400');
+                    document.getElementById('freezeOverlay').classList.remove('hidden');
+                }
+            }, 1000);
+        }
+
+        function startSpeedTimer() {
+            if (speedCompleted) {
+                // Already completed, do nothing until reset
+                return;
+            }
+
+            if (!timerRunning) {
+                // First X press - start the timer
+                elapsedTime = 0;
+                timerRunning = true;
+
+                document.getElementById('timerBtn').textContent = 'Stop (X)';
+                document.getElementById('timerBtn').classList.remove('bg-green-600', 'hover:bg-green-700');
+                document.getElementById('timerBtn').classList.add('bg-red-600', 'hover:bg-red-700');
+                document.getElementById('timerStatus').textContent = 'Timing...';
+                document.getElementById('timerStatus').classList.remove('text-gray-500');
+                document.getElementById('timerStatus').classList.add('text-green-400');
+
+                document.getElementById('freezeOverlay').classList.add('hidden');
+                video.play();
+
+                timerInterval = setInterval(() => {
+                    elapsedTime += 10; // Update every 10ms for precision
+                    updateSpeedDisplay();
+                }, 10);
+            } else {
+                // Second X press - stop the timer, record time
+                speedCompleted = true;
+                clearInterval(timerInterval);
+                timerInterval = null;
+                timerRunning = false;
+
+                const finalTime = (elapsedTime / 1000).toFixed(2);
+                const maxScore = 35.00;
+
+                document.getElementById('timerBtn').textContent = 'Completed';
+                document.getElementById('timerBtn').classList.remove('bg-red-600', 'hover:bg-red-700');
+                document.getElementById('timerBtn').classList.add('bg-blue-600', 'hover:bg-blue-700');
+
+                if (parseFloat(finalTime) <= maxScore) {
+                    document.getElementById('timerStatus').textContent = `Score: ${finalTime}s`;
+                    document.getElementById('timerStatus').classList.remove('text-green-400');
+                    document.getElementById('timerStatus').classList.add('text-yellow-400');
+                } else {
+                    document.getElementById('timerStatus').textContent = `DNF (>${maxScore}s)`;
+                    document.getElementById('timerStatus').classList.remove('text-green-400');
+                    document.getElementById('timerStatus').classList.add('text-red-400');
+                }
+
+                // Continue playing video, freeze after 6 seconds
+                freezeTimeout = setTimeout(() => {
+                    video.pause();
+                    document.getElementById('freezeOverlay').classList.remove('hidden');
+                    document.getElementById('timerStatus').textContent += ' - Frozen';
+                }, 6000);
+            }
+        }
+
+        function updateSpeedDisplay() {
+            const seconds = Math.floor(elapsedTime / 1000);
+            const centiseconds = Math.floor((elapsedTime % 1000) / 10);
+            const display = `${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+            document.getElementById('timerDisplay').textContent = display;
+            document.getElementById('timerDisplay').classList.remove('text-gray-400');
+            document.getElementById('timerDisplay').classList.add('text-white');
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            if (freezeTimeout) {
+                clearTimeout(freezeTimeout);
+                freezeTimeout = null;
+            }
+            timerRunning = false;
+
+            document.getElementById('timerBtn').textContent = 'Start (X)';
+            document.getElementById('timerBtn').classList.remove('bg-red-600', 'hover:bg-red-700', 'bg-blue-600', 'hover:bg-blue-700');
+            document.getElementById('timerBtn').classList.add('bg-green-600', 'hover:bg-green-700');
+
+            if (!isSpeedEvent && timeRemaining > 0) {
+                document.getElementById('timerStatus').textContent = 'Stopped';
+                document.getElementById('timerStatus').classList.remove('text-green-400');
+                document.getElementById('timerStatus').classList.add('text-gray-500');
+            }
+        }
+
+        function resetTimer() {
+            stopTimer();
+            timeRemaining = 0;
+            elapsedTime = 0;
+            speedCompleted = false;
+            document.getElementById('timerDisplay').textContent = '--:--';
+            document.getElementById('timerDisplay').classList.remove('text-yellow-400', 'text-white');
+            document.getElementById('timerDisplay').classList.add('text-gray-400');
+            document.getElementById('timerStatus').textContent = '';
+            document.getElementById('timerStatus').classList.remove('text-green-400', 'text-yellow-400', 'text-red-400');
+            document.getElementById('timerStatus').classList.add('text-gray-500');
+            document.getElementById('freezeOverlay').classList.add('hidden');
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('timerDisplay').textContent = display;
+            document.getElementById('timerDisplay').classList.remove('text-gray-400');
+            document.getElementById('timerDisplay').classList.add('text-white');
+        }
+
+        // FlySight CSV Parsing
+        let flysightData = null;
+        let wsWorkingTime = 0;
+
+        function parseFlySight(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csv = e.target.result;
+                const lines = csv.split('\n');
+
+                // Find header row and data
+                let headerIndex = -1;
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].toLowerCase().includes('time') && lines[i].toLowerCase().includes('alt')) {
+                        headerIndex = i;
+                        break;
+                    }
+                }
+
+                if (headerIndex === -1) {
+                    document.getElementById('flysightStatus').textContent = 'Invalid CSV format';
+                    document.getElementById('flysightStatus').classList.add('text-red-400');
+                    return;
+                }
+
+                const headers = lines[headerIndex].split(',').map(h => h.trim().toLowerCase());
+                const timeCol = headers.findIndex(h => h === 'time' || h === 'time(s)');
+                const altCol = headers.findIndex(h => h === 'hmsl' || h === 'alt' || h === 'altitude' || h.includes('alt'));
+
+                if (timeCol === -1 || altCol === -1) {
+                    document.getElementById('flysightStatus').textContent = 'Missing time/altitude columns';
+                    document.getElementById('flysightStatus').classList.add('text-red-400');
+                    return;
+                }
+
+                // Parse data rows
+                const data = [];
+                for (let i = headerIndex + 1; i < lines.length; i++) {
+                    const cols = lines[i].split(',');
+                    if (cols.length > Math.max(timeCol, altCol)) {
+                        const time = parseFloat(cols[timeCol]);
+                        const alt = parseFloat(cols[altCol]);
+                        if (!isNaN(time) && !isNaN(alt)) {
+                            // Convert meters to feet if needed (FlySight usually reports in meters)
+                            const altFt = alt < 5000 ? alt * 3.28084 : alt; // Assume meters if < 5000
+                            data.push({ time, alt: altFt });
+                        }
+                    }
+                }
+
+                if (data.length === 0) {
+                    document.getElementById('flysightStatus').textContent = 'No valid data found';
+                    document.getElementById('flysightStatus').classList.add('text-red-400');
+                    return;
+                }
+
+                flysightData = data;
+                calculateWorkingTime();
+                document.getElementById('flysightStatus').textContent = `Loaded ${data.length} points`;
+                document.getElementById('flysightStatus').classList.remove('text-red-400');
+                document.getElementById('flysightStatus').classList.add('text-green-400');
+            };
+            reader.readAsText(file);
+        }
+
+        function calculateWorkingTime() {
+            if (!flysightData || flysightData.length === 0) return;
+
+            // Find max altitude (upper boundary)
+            const maxAlt = Math.max(...flysightData.map(d => d.alt));
+            const altWindow = 7500; // 7500 ft window
+            const lowerBoundary = maxAlt - altWindow;
+
+            // Find first crossing of upper boundary (going down)
+            let upperCrossTime = null;
+            for (let i = 1; i < flysightData.length; i++) {
+                if (flysightData[i-1].alt >= maxAlt - 100 && flysightData[i].alt < maxAlt - 100) {
+                    upperCrossTime = flysightData[i].time;
+                    break;
+                }
+            }
+
+            // Find first crossing of lower boundary
+            let lowerCrossTime = null;
+            for (let i = 1; i < flysightData.length; i++) {
+                if (flysightData[i-1].alt > lowerBoundary && flysightData[i].alt <= lowerBoundary) {
+                    lowerCrossTime = flysightData[i].time;
+                    break;
+                }
+            }
+
+            // Update display
+            document.getElementById('upperBoundary').textContent = Math.round(maxAlt).toLocaleString() + ' ft';
+            document.getElementById('lowerBoundary').textContent = Math.round(lowerBoundary).toLocaleString() + ' ft';
+            document.getElementById('altitudeWindow').textContent = altWindow.toLocaleString() + ' ft';
+
+            if (upperCrossTime !== null && lowerCrossTime !== null) {
+                wsWorkingTime = (lowerCrossTime - upperCrossTime).toFixed(1);
+                document.getElementById('flysightWorkingTime').textContent = wsWorkingTime + ' s';
+
+                // Set timer duration for freeze frame
+                const eventType = document.getElementById('eventType').value;
+                if (eventType.startsWith('ws-')) {
+                    timeRemaining = Math.ceil(parseFloat(wsWorkingTime));
+                }
+            } else {
+                document.getElementById('flysightWorkingTime').textContent = 'N/A';
+            }
+        }
+
+        // Wingsuit Compulsory Scoring
+        let wsCompulsoryNV = false;
+
+        function calculateJudgeAverage(scores) {
+            const validScores = scores.filter(s => !isNaN(s) && s !== null);
+            if (validScores.length === 0) return 0;
+
+            if (validScores.length === 5) {
+                // Drop high and low
+                validScores.sort((a, b) => a - b);
+                const middle = validScores.slice(1, 4);
+                return (middle.reduce((a, b) => a + b, 0) / 3).toFixed(1);
+            } else if (validScores.length >= 3) {
+                // Average all (for 3 judges)
+                return (validScores.reduce((a, b) => a + b, 0) / validScores.length).toFixed(1);
+            }
+            return 0;
+        }
+
+        function calculateWsCompulsory() {
+            // Get style scores (3 judges)
+            const styleScores = [
+                parseFloat(document.getElementById('wsStyleJ1').value),
+                parseFloat(document.getElementById('wsStyleJ2').value),
+                parseFloat(document.getElementById('wsStyleJ3').value)
+            ];
+
+            const styleAvg = calculateJudgeAverage(styleScores);
+            document.getElementById('wsStyleAvg').textContent = styleAvg;
+
+            // Get maneuver omissions
+            const maneuverOmissions = parseInt(document.getElementById('wsManeuverOmissions').value) || 0;
+            const styleDeduction = maneuverOmissions * 1.5;
+            const finalStyle = Math.max(0, parseFloat(styleAvg) - styleDeduction).toFixed(1);
+
+            // Get grips
+            const grips = parseInt(document.getElementById('wsGrips').value) || 0;
+            const gripOmissions = parseInt(document.getElementById('wsGripOmissions').value) || 0;
+            const infringements = parseInt(document.getElementById('wsInfringements').value) || 0;
+
+            // Grip score = grips - omissions (infringements just mean 0 for those grips, already not counted)
+            const gripScore = Math.max(0, grips - gripOmissions);
+            document.getElementById('wsGripScore').textContent = gripScore;
+
+            // Final scores
+            if (wsCompulsoryNV) {
+                document.getElementById('wsFinalStyle').textContent = '0.0';
+                document.getElementById('wsFinalGrips').textContent = '0';
+                document.getElementById('wsFinalStyle').classList.remove('text-green-400');
+                document.getElementById('wsFinalStyle').classList.add('text-red-400');
+                document.getElementById('wsFinalGrips').classList.remove('text-green-400');
+                document.getElementById('wsFinalGrips').classList.add('text-red-400');
+            } else {
+                document.getElementById('wsFinalStyle').textContent = finalStyle;
+                document.getElementById('wsFinalGrips').textContent = gripScore;
+                document.getElementById('wsFinalStyle').classList.remove('text-red-400');
+                document.getElementById('wsFinalStyle').classList.add('text-green-400');
+                document.getElementById('wsFinalGrips').classList.remove('text-red-400');
+                document.getElementById('wsFinalGrips').classList.add('text-green-400');
+            }
+        }
+
+        function toggleWsNV() {
+            wsCompulsoryNV = !wsCompulsoryNV;
+            const btn = document.getElementById('wsNvBtn');
+            if (wsCompulsoryNV) {
+                btn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                btn.textContent = 'NV ACTIVE';
+            } else {
+                btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                btn.classList.add('bg-gray-700', 'hover:bg-gray-600');
+                btn.textContent = 'NV Penalty';
+            }
+            calculateWsCompulsory();
+        }
+
+        // Wingsuit Free Round Scoring
+        let wsFreeNV = false;
+
+        function calculateWsFree() {
+            // Style scores (3 judges)
+            const styleScores = [
+                parseFloat(document.getElementById('wsFreeStyleJ1').value),
+                parseFloat(document.getElementById('wsFreeStyleJ2').value),
+                parseFloat(document.getElementById('wsFreeStyleJ3').value)
+            ];
+            const styleAvg = calculateJudgeAverage(styleScores);
+            document.getElementById('wsFreeStyleAvg').textContent = styleAvg;
+
+            // Dive Plan scores (3 judges)
+            const diveScores = [
+                parseFloat(document.getElementById('wsFreeDiveJ1').value),
+                parseFloat(document.getElementById('wsFreeDiveJ2').value),
+                parseFloat(document.getElementById('wsFreeDiveJ3').value)
+            ];
+            const diveAvg = calculateJudgeAverage(diveScores);
+            document.getElementById('wsFreeDiveAvg').textContent = diveAvg;
+
+            // Camerawork scores (3 judges)
+            const camScores = [
+                parseFloat(document.getElementById('wsFreeCamJ1').value),
+                parseFloat(document.getElementById('wsFreeCamJ2').value),
+                parseFloat(document.getElementById('wsFreeCamJ3').value)
+            ];
+            const camAvg = calculateJudgeAverage(camScores);
+            document.getElementById('wsFreeCamAvg').textContent = camAvg;
+
+            // Final scores
+            if (wsFreeNV) {
+                document.getElementById('wsFreeStyleFinal').textContent = '0.0';
+                document.getElementById('wsFreeDiveFinal').textContent = '0.0';
+                document.getElementById('wsFreeCamFinal').textContent = '0.0';
+                ['wsFreeStyleFinal', 'wsFreeDiveFinal', 'wsFreeCamFinal'].forEach(id => {
+                    document.getElementById(id).classList.remove('text-green-400');
+                    document.getElementById(id).classList.add('text-red-400');
+                });
+            } else {
+                document.getElementById('wsFreeStyleFinal').textContent = styleAvg;
+                document.getElementById('wsFreeDiveFinal').textContent = diveAvg;
+                document.getElementById('wsFreeCamFinal').textContent = camAvg;
+                ['wsFreeStyleFinal', 'wsFreeDiveFinal', 'wsFreeCamFinal'].forEach(id => {
+                    document.getElementById(id).classList.remove('text-red-400');
+                    document.getElementById(id).classList.add('text-green-400');
+                });
+            }
+        }
+
+        function toggleWsFreeNV() {
+            wsFreeNV = !wsFreeNV;
+            const btn = document.getElementById('wsFreeNvBtn');
+            if (wsFreeNV) {
+                btn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                btn.textContent = 'NV ACTIVE';
+            } else {
+                btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                btn.classList.add('bg-gray-700', 'hover:bg-gray-600');
+                btn.textContent = 'NV Penalty';
+            }
+            calculateWsFree();
+        }
+
+        // Speed Skydiving Scoring
+        let speedRounds = [];
+        const BREAKOFF_ALT = 5600; // ft AGL
+        const PERFORMANCE_WINDOW_SIZE = 7400; // ft
+
+        function parseSpeedPLD(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const csv = e.target.result;
+                const lines = csv.split('\n');
+
+                // Find header row
+                let headerIndex = -1;
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].toLowerCase();
+                    if ((line.includes('time') || line.includes('utc')) &&
+                        (line.includes('alt') || line.includes('hmsl') || line.includes('velv') || line.includes('vel'))) {
+                        headerIndex = i;
+                        break;
+                    }
+                }
+
+                if (headerIndex === -1) {
+                    document.getElementById('speedPldStatus').textContent = 'Invalid CSV format';
+                    document.getElementById('speedPldStatus').classList.add('text-red-400');
+                    return;
+                }
+
+                const headers = lines[headerIndex].split(',').map(h => h.trim().toLowerCase());
+                const timeCol = headers.findIndex(h => h === 'time' || h.includes('time') || h.includes('utc'));
+                const altCol = headers.findIndex(h => h === 'hmsl' || h === 'alt' || h.includes('alt'));
+                const velCol = headers.findIndex(h => h === 'velv' || h === 'veld' || h.includes('vel'));
+
+                // Parse data rows
+                const data = [];
+                for (let i = headerIndex + 1; i < lines.length; i++) {
+                    const cols = lines[i].split(',');
+                    if (cols.length > Math.max(timeCol, altCol)) {
+                        const time = parseFloat(cols[timeCol]) || i - headerIndex - 1;
+                        let alt = parseFloat(cols[altCol]);
+                        let vel = velCol >= 0 ? Math.abs(parseFloat(cols[velCol])) : null;
+
+                        if (!isNaN(alt)) {
+                            // Convert meters to feet if needed
+                            if (alt < 5000) alt = alt * 3.28084;
+                            // Convert m/s to km/h if velocity present
+                            if (vel !== null && !isNaN(vel)) {
+                                if (vel < 200) vel = vel * 3.6; // Convert m/s to km/h
+                            }
+                            data.push({ time, alt, vel });
+                        }
+                    }
+                }
+
+                if (data.length === 0) {
+                    document.getElementById('speedPldStatus').textContent = 'No valid data';
+                    document.getElementById('speedPldStatus').classList.add('text-red-400');
+                    return;
+                }
+
+                // Find exit altitude (max altitude)
+                const exitAlt = Math.max(...data.map(d => d.alt));
+                document.getElementById('speedExitAlt').textContent = Math.round(exitAlt).toLocaleString() + ' ft';
+
+                // Performance window starts when vertical speed first reaches 10 m/s (36 km/h)
+                // and ends 7,400 ft below OR at breakoff (5,600 ft), whichever first
+                let windowStartAlt = null;
+                let windowStartIdx = 0;
+
+                // Find window start (first time speed >= 10 m/s = 36 km/h)
+                for (let i = 1; i < data.length; i++) {
+                    if (data[i].vel && data[i].vel >= 36) {
+                        windowStartAlt = data[i].alt;
+                        windowStartIdx = i;
+                        break;
+                    }
+                }
+
+                if (!windowStartAlt) {
+                    // Estimate from altitude drop if no velocity data
+                    windowStartAlt = exitAlt - 500; // Assume ~500ft to reach 10m/s
+                }
+
+                const windowEndAlt = Math.max(windowStartAlt - PERFORMANCE_WINDOW_SIZE, BREAKOFF_ALT);
+                document.getElementById('speedWindowStart').textContent = Math.round(windowStartAlt).toLocaleString() + ' ft';
+
+                // Calculate highest 3-second average speed within performance window
+                let maxSpeed = 0;
+
+                // If we have velocity data, use it
+                if (data[0].vel !== null) {
+                    // Find data points within performance window
+                    const windowData = data.filter(d => d.alt <= windowStartAlt && d.alt >= windowEndAlt);
+
+                    // Calculate 3-second rolling average
+                    const sampleRate = windowData.length > 1 ?
+                        Math.abs(windowData[1].time - windowData[0].time) : 0.2;
+                    const samplesFor3Sec = Math.ceil(3 / sampleRate);
+
+                    for (let i = 0; i <= windowData.length - samplesFor3Sec; i++) {
+                        let sum = 0;
+                        for (let j = 0; j < samplesFor3Sec; j++) {
+                            sum += windowData[i + j].vel || 0;
+                        }
+                        const avg = sum / samplesFor3Sec;
+                        if (avg > maxSpeed) maxSpeed = avg;
+                    }
+                } else {
+                    // Calculate speed from altitude change
+                    const windowData = data.filter(d => d.alt <= windowStartAlt && d.alt >= windowEndAlt);
+                    const sampleRate = windowData.length > 1 ?
+                        Math.abs(windowData[1].time - windowData[0].time) : 0.2;
+                    const samplesFor3Sec = Math.ceil(3 / sampleRate);
+
+                    for (let i = 0; i <= windowData.length - samplesFor3Sec; i++) {
+                        const altDrop = windowData[i].alt - windowData[i + samplesFor3Sec - 1].alt;
+                        const timeDiff = 3; // seconds
+                        const speedFtPerSec = altDrop / timeDiff;
+                        const speedKmh = speedFtPerSec * 0.3048 * 3.6; // ft/s to km/h
+                        if (speedKmh > maxSpeed) maxSpeed = speedKmh;
+                    }
+                }
+
+                document.getElementById('speedMaxSpeed').textContent = maxSpeed.toFixed(2) + ' km/h';
+                document.getElementById('speedManualScore').value = maxSpeed.toFixed(2);
+
+                document.getElementById('speedPldStatus').textContent = `Loaded ${data.length} points`;
+                document.getElementById('speedPldStatus').classList.remove('text-red-400');
+                document.getElementById('speedPldStatus').classList.add('text-green-400');
+            };
+            reader.readAsText(file);
+        }
+
+        function addSpeedRound() {
+            if (speedRounds.length >= 8) {
+                alert('Maximum 8 rounds reached');
+                return;
+            }
+
+            const scoreInput = document.getElementById('speedManualScore');
+            const score = parseFloat(scoreInput.value);
+
+            if (isNaN(score) || score <= 0) {
+                return;
+            }
+
+            speedRounds.push(score);
+            scoreInput.value = '';
+            updateSpeedRoundsDisplay();
+        }
+
+        function removeSpeedRound(index) {
+            speedRounds.splice(index, 1);
+            updateSpeedRoundsDisplay();
+        }
+
+        function clearSpeedRounds() {
+            speedRounds = [];
+            updateSpeedRoundsDisplay();
+        }
+
+        function updateSpeedRoundsDisplay() {
+            const table = document.getElementById('speedRoundsTable');
+
+            if (speedRounds.length === 0) {
+                table.innerHTML = '<div class="text-gray-500 text-center py-2">No rounds recorded</div>';
+            } else {
+                table.innerHTML = speedRounds.map((score, idx) => `
+                    <div class="flex items-center justify-between bg-gray-800 rounded px-3 py-2">
+                        <span class="text-gray-400">Round ${idx + 1}</span>
+                        <span class="font-mono text-white">${score.toFixed(2)} km/h</span>
+                        <button onclick="removeSpeedRound(${idx})" class="text-red-400 hover:text-red-300 text-xs">Remove</button>
+                    </div>
+                `).join('');
+            }
+
+            // Update totals
+            document.getElementById('speedRoundCount').textContent = speedRounds.length;
+
+            const total = speedRounds.reduce((a, b) => a + b, 0);
+            document.getElementById('speedTotalScore').textContent = total.toFixed(2);
+
+            const avg = speedRounds.length > 0 ? total / speedRounds.length : 0;
+            document.getElementById('speedAvgScore').textContent = avg.toFixed(2);
+
+            calculateSpeedTeam();
+        }
+
+        function toggleSpeedMixedTeam() {
+            const enabled = document.getElementById('speedMixedTeamEnabled').checked;
+            const section = document.getElementById('speedMixedTeamSection');
+            if (enabled) {
+                section.classList.remove('hidden');
+            } else {
+                section.classList.add('hidden');
+            }
+        }
+
+        function calculateSpeedTeam() {
+            const myScore = speedRounds.length > 0 ? speedRounds[speedRounds.length - 1] : 0;
+            const partnerScore = parseFloat(document.getElementById('speedPartnerScore').value) || 0;
+            const teamTotal = myScore + partnerScore;
+            document.getElementById('speedTeamTotal').textContent = teamTotal.toFixed(2) + ' km/h';
+        }
     </script>
     {% endif %}
 </body>
