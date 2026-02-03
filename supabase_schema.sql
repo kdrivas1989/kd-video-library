@@ -15,8 +15,12 @@ CREATE TABLE IF NOT EXISTS videos (
     created_at TEXT NOT NULL,
     views INTEGER DEFAULT 0,
     video_type TEXT DEFAULT 'url',
-    local_file TEXT
+    local_file TEXT,
+    event TEXT
 );
+
+-- Add event column if table already exists
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS event TEXT;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (

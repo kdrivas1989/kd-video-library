@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ event_name }} - USPA Video Library</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <nav class="bg-gray-800 p-4 sticky top-0 z-10">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="/" class="text-2xl font-bold text-blue-400">USPA Video Library</a>
+            <div class="flex items-center gap-4">
+                <form action="/search" method="GET" class="flex">
+                    <input type="text" name="q" placeholder="Search videos..."
+                        class="px-4 py-2 rounded-l-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-64">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-r-lg">
+                        Search
+                    </button>
+                </form>
+                {% if is_admin %}
+                <a href="/admin" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg">Admin</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8">
+        <!-- Breadcrumb -->
+        <div class="mb-6">
+            <a href="/" class="text-blue-400 hover:underline">Home</a>
+            <span class="text-gray-500 mx-2">/</span>
+            <a href="/events" class="text-blue-400 hover:underline">Events</a>
+            <span class="text-gray-500 mx-2">/</span>
+            <span class="text-gray-300">{{ event_name }}</span>
+        </div>
+
+        <h1 class="text-3xl font-bold mb-2">{{ event_name }}</h1>
+        <p class="text-gray-400 mb-8">{{ videos|length }} video{{ 's' if videos|length != 1 else '' }}</p>
+
+        {% if videos %}
+            {% for cat_id, cat_videos in videos_by_category.items() %}
+            <div class="mb-8">
+                <h2 class="text-xl font-bold mb-4 text-blue-400">
+                    {{ categories.get(cat_id, {}).get('name', cat_id) }}
+                    <span class="text-gray-500 text-sm font-normal">({{ cat_videos|length }})</span>
+                </h2>
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {% for video in cat_videos %}
+                    <a href="/video/{{ video.id }}" class="bg-gray-800 rounded-lg overflow-hidden hover:bg-gray-700 transition group">
+                        <div class="aspect-video bg-gray-700 relative">
+                            {% if video.thumbnail %}
+                            <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="w-full h-full object-cover">
+                            {% else %}
+                            <div class="w-full h-full flex items-center justify-center text-gray-500">
+                                <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                </svg>
+                            </div>
+                            {% endif %}
+                            {% if video.duration %}
+                            <span class="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+                                {{ video.duration }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="p-4">
+                            <h3 class="font-semibold text-white group-hover:text-blue-400 line-clamp-2">{{ video.title }}</h3>
+                            <div class="flex items-center gap-2 mt-2 text-sm text-gray-400">
+                                {% if video.subcategory %}
+                                <span class="bg-gray-700 px-2 py-0.5 rounded text-xs">{{ video.subcategory }}</span>
+                                {% endif %}
+                                <span>{{ video.views }} views</span>
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="text-center py-16">
+            <p class="text-gray-500 text-xl">No videos in this event yet</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <footer class="bg-gray-800 mt-12 py-8">
+        <div class="container mx-auto px-4 text-center text-gray-400">
+            <p>USPA Video Library - Competition footage for judges and competitors</p>
+        </div>
+    </footer>
+</body>
+</html>

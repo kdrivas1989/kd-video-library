@@ -145,6 +145,17 @@
                             class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                             placeholder="Video description"></textarea>
                     </div>
+                    <div>
+                        <label class="block text-gray-300 mb-2">Event</label>
+                        <input type="text" id="videoEvent" list="eventList"
+                            class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            placeholder="e.g., 2024 USPA Nationals">
+                        <datalist id="eventList">
+                            {% for event in events %}
+                            <option value="{{ event }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-gray-300 mb-2">Duration</label>
@@ -232,6 +243,17 @@
                         <option value="">All / None</option>
                     </select>
                 </div>
+                <div>
+                    <label class="block text-gray-300 mb-2">Event</label>
+                    <input type="text" id="modalEvent" list="modalEventList"
+                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="e.g., 2024 USPA Nationals">
+                    <datalist id="modalEventList">
+                        {% for event in events %}
+                        <option value="{{ event }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
                 <div id="modalProgress" class="hidden"></div>
                 <div id="modalMessage" class="hidden"></div>
                 <div class="flex gap-3">
@@ -280,6 +302,17 @@
                         class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
                         <option value="">Select subcategory</option>
                     </select>
+                </div>
+                <div>
+                    <label class="block text-gray-300 mb-2">Event</label>
+                    <input type="text" id="editEvent" list="editEventList"
+                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="e.g., 2024 USPA Nationals">
+                    <datalist id="editEventList">
+                        {% for event in events %}
+                        <option value="{{ event }}">
+                        {% endfor %}
+                    </datalist>
                 </div>
                 <div>
                     <label class="block text-gray-300 mb-2">Description</label>
@@ -404,6 +437,7 @@
         async function confirmBulkUpload() {
             const category = document.getElementById('modalCategory').value;
             const subcategory = document.getElementById('modalSubcategory').value;
+            const event = document.getElementById('modalEvent').value;
 
             if (!category) {
                 alert('Please select a category');
@@ -434,7 +468,8 @@
                             subcategory: subcategory,
                             description: '',
                             tags: '',
-                            duration: ''
+                            duration: '',
+                            event: event
                         })
                     });
 
@@ -601,7 +636,8 @@
                 subcategory: document.getElementById('videoSubcategory').value,
                 description: document.getElementById('videoDescription').value,
                 duration: document.getElementById('videoDuration').value,
-                tags: document.getElementById('videoTags').value
+                tags: document.getElementById('videoTags').value,
+                event: document.getElementById('videoEvent').value
             };
 
             const messageDiv = document.getElementById('addMessage');
@@ -671,6 +707,7 @@
                 document.getElementById('editDescription').value = video.description || '';
                 document.getElementById('editDuration').value = video.duration || '';
                 document.getElementById('editTags').value = video.tags || '';
+                document.getElementById('editEvent').value = video.event || '';
 
                 // Update subcategories and set value
                 updateEditSubcategories();
@@ -702,7 +739,8 @@
                 subcategory: document.getElementById('editSubcategory').value,
                 description: document.getElementById('editDescription').value,
                 duration: document.getElementById('editDuration').value,
-                tags: document.getElementById('editTags').value
+                tags: document.getElementById('editTags').value,
+                event: document.getElementById('editEvent').value
             };
 
             try {

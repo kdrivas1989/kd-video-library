@@ -143,7 +143,8 @@ def init_db():
                 created_at TEXT NOT NULL,
                 views INTEGER DEFAULT 0,
                 video_type TEXT DEFAULT 'url',
-                local_file TEXT
+                local_file TEXT,
+                event TEXT
             )
         ''')
 
@@ -153,6 +154,10 @@ def init_db():
             pass
         try:
             cursor.execute('ALTER TABLE videos ADD COLUMN local_file TEXT')
+        except:
+            pass
+        try:
+            cursor.execute('ALTER TABLE videos ADD COLUMN event TEXT')
         except:
             pass
 
@@ -234,14 +239,14 @@ def save_video(video_data):
     else:
         db = get_sqlite_db()
         db.execute('''
-            INSERT OR REPLACE INTO videos (id, title, description, url, thumbnail, category, subcategory, tags, duration, created_at, views, video_type, local_file)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO videos (id, title, description, url, thumbnail, category, subcategory, tags, duration, created_at, views, video_type, local_file, event)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (video_data['id'], video_data['title'], video_data.get('description', ''),
               video_data.get('url', ''), video_data.get('thumbnail'), video_data['category'],
               video_data.get('subcategory', ''), video_data.get('tags', ''),
               video_data.get('duration', ''), video_data['created_at'],
               video_data.get('views', 0), video_data.get('video_type', 'url'),
-              video_data.get('local_file', '')))
+              video_data.get('local_file', ''), video_data.get('event', '')))
         db.commit()
 
 
@@ -292,6 +297,29 @@ def search_videos(query):
             WHERE title LIKE ? OR description LIKE ? OR tags LIKE ?
             ORDER BY created_at DESC
         ''', (f'%{query}%', f'%{query}%', f'%{query}%'))
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_all_events():
+    """Get all unique events."""
+    if USE_SUPABASE:
+        result = supabase.table('videos').select('event').execute()
+        events = set(v['event'] for v in result.data if v.get('event'))
+        return sorted(events)
+    else:
+        db = get_sqlite_db()
+        cursor = db.execute('SELECT DISTINCT event FROM videos WHERE event IS NOT NULL AND event != "" ORDER BY event')
+        return [row[0] for row in cursor.fetchall()]
+
+
+def get_videos_by_event(event_name):
+    """Get videos by event name."""
+    if USE_SUPABASE:
+        result = supabase.table('videos').select('*').eq('event', event_name).order('title').execute()
+        return result.data
+    else:
+        db = get_sqlite_db()
+        cursor = db.execute('SELECT * FROM videos WHERE event = ? ORDER BY title', (event_name,))
         return [dict(row) for row in cursor.fetchall()]
 
 
@@ -528,12 +556,14 @@ def admin_dashboard():
     videos = get_all_videos()
     total_videos = len(videos)
     total_views = sum(v.get('views', 0) for v in videos)
+    events = get_all_events()
 
     return render_template('admin.html',
                          videos=videos,
                          categories=CATEGORIES,
                          total_videos=total_videos,
                          total_views=total_views,
+                         events=events,
                          dropbox_app_key=DROPBOX_APP_KEY)
 
 
@@ -550,6 +580,7 @@ def add_video():
     subcategory = data.get('subcategory', '')
     tags = data.get('tags', '').strip()
     duration = data.get('duration', '').strip()
+    event = data.get('event', '').strip()
 
     if not title or not url or not category:
         return jsonify({'error': 'Title, URL, and category are required'}), 400
@@ -573,7 +604,8 @@ def add_video():
         'created_at': datetime.now().isoformat(),
         'views': 0,
         'video_type': 'url',
-        'local_file': ''
+        'local_file': '',
+        'event': event
     })
 
     return jsonify({'success': True, 'message': 'Video added successfully', 'id': video_id})
@@ -723,6 +755,7 @@ def edit_video(video_id):
     video['subcategory'] = data.get('subcategory', video.get('subcategory', ''))
     video['tags'] = data.get('tags', video.get('tags', '')).strip()
     video['duration'] = data.get('duration', video.get('duration', '')).strip()
+    video['event'] = data.get('event', video.get('event', '')).strip()
 
     save_video(video)
 
@@ -743,6 +776,46 @@ def search():
                          query=query,
                          videos=videos,
                          categories=CATEGORIES,
+                         is_admin=session.get('role') == 'admin')
+
+
+@app.route('/event/<event_name>')
+def event_page(event_name):
+    """Show all videos in an event."""
+    videos = get_videos_by_event(event_name)
+
+    # Group videos by category
+    videos_by_category = {}
+    for video in videos:
+        cat = video.get('category', 'other')
+        if cat not in videos_by_category:
+            videos_by_category[cat] = []
+        videos_by_category[cat].append(video)
+
+    return render_template('event.html',
+                         event_name=event_name,
+                         videos=videos,
+                         videos_by_category=videos_by_category,
+                         categories=CATEGORIES,
+                         is_admin=session.get('role') == 'admin')
+
+
+@app.route('/events')
+def events_list():
+    """Show all events."""
+    events = get_all_events()
+
+    # Get video count for each event
+    event_data = []
+    for event_name in events:
+        videos = get_videos_by_event(event_name)
+        event_data.append({
+            'name': event_name,
+            'video_count': len(videos)
+        })
+
+    return render_template('events.html',
+                         events=event_data,
                          is_admin=session.get('role') == 'admin')
 
 
