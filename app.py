@@ -111,8 +111,9 @@ CATEGORIES = {
     'sp': {
         'name': 'Speed Skydiving',
         'abbrev': 'SP',
-        'description': 'Chapter 15 - Speed Skydiving competition videos',
-        'subcategories': []
+        'description': 'Chapter 15 - Speed Skydiving competition data',
+        'subcategories': [],
+        'file_type': 'flysight'  # Uses FlysSight GPS files instead of video
     }
 }
 
@@ -2127,6 +2128,71 @@ def videographer_upload_video():
             'message': 'Video uploaded successfully',
             'id': video_id,
             'converted': needs_conversion
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+
+
+@app.route('/videographer/upload-flysight', methods=['POST'])
+def videographer_upload_flysight():
+    """Upload a FlysSight CSV file for Speed Skydiving."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    # Get form data
+    title = request.form.get('title', '').strip()
+    event = request.form.get('event', '').strip()
+
+    # Check file extension
+    filename = secure_filename(file.filename)
+    ext = os.path.splitext(filename)[1].lower()
+
+    if ext != '.csv':
+        return jsonify({'error': 'Invalid file type. Only CSV files are allowed for FlysSight data.'}), 400
+
+    flysight_id = str(uuid.uuid4())[:8]
+
+    # Generate title from filename if not provided
+    if not title:
+        title = os.path.splitext(filename)[0].replace('_', ' ').replace('-', ' ')
+
+    try:
+        # Create flysight directory if it doesn't exist
+        flysight_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'flysight')
+        os.makedirs(flysight_folder, exist_ok=True)
+
+        # Save the file
+        output_filename = f"{flysight_id}.csv"
+        output_path = os.path.join(flysight_folder, output_filename)
+        file.save(output_path)
+
+        # Save to database (using videos table with special category)
+        save_video({
+            'id': flysight_id,
+            'title': title,
+            'description': 'FlysSight GPS data',
+            'url': '',
+            'thumbnail': None,
+            'category': 'sp',
+            'subcategory': '',
+            'tags': 'flysight,gps,speed',
+            'duration': '',
+            'created_at': datetime.now().isoformat(),
+            'views': 0,
+            'video_type': 'flysight',
+            'local_file': output_filename,
+            'event': event
+        })
+
+        return jsonify({
+            'success': True,
+            'message': 'FlysSight data uploaded successfully',
+            'id': flysight_id
         })
 
     except Exception as e:

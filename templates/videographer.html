@@ -18,7 +18,7 @@
 
     <div class="container mx-auto px-4 py-8 max-w-2xl">
         <h1 class="text-3xl font-bold mb-2">Videographer Upload</h1>
-        <p class="text-gray-400 mb-8">Upload competition videos for judging</p>
+        <p class="text-gray-400 mb-8">Upload competition videos or FlysSight data for judging</p>
 
         <!-- Step 1: Select Event -->
         <div class="bg-gray-800 rounded-lg p-6 mb-4">
@@ -64,16 +64,16 @@
             <p class="text-gray-500 text-xs mt-2 italic">If you don't see your round, a video has already been uploaded. Please contact an administrator.</p>
         </div>
 
-        <!-- Step 4: Upload Video -->
+        <!-- Step 4: Upload Video/FlysSight -->
         <div id="uploadSection" class="bg-gray-800 rounded-lg p-6 mb-4 opacity-50 pointer-events-none">
             <div class="flex items-center gap-3 mb-4">
                 <span class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center font-bold" id="step4Circle">4</span>
-                <h2 class="text-xl font-bold">Upload Video</h2>
+                <h2 class="text-xl font-bold" id="step4Title">Upload Video</h2>
             </div>
 
             <!-- Upload Controls -->
             <div id="uploadControls">
-                <!-- Step 4a: Select File -->
+                <!-- Step 4a: Select File (Video) -->
                 <div id="fileSelectSection">
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <!-- File Upload -->
@@ -98,7 +98,20 @@
                     </div>
                 </div>
 
-                <!-- Step 4b: Set Start Point (shown after file selected) -->
+                <!-- Step 4a: Select FlysSight File (for Speed Skydiving) -->
+                <div id="flysightSelectSection" class="hidden">
+                    <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-4">
+                        <p class="text-blue-300 text-sm">Speed Skydiving uses FlysSight GPS data instead of video.</p>
+                    </div>
+                    <input type="file" id="flysightFile" accept=".csv,.CSV" class="hidden" onchange="handleFlysightSelect(event)">
+                    <button type="button" onclick="document.getElementById('flysightFile').click()"
+                        class="w-full px-4 py-6 rounded bg-gray-700 hover:bg-gray-600 text-center">
+                        <span class="block text-3xl mb-2">📊</span>
+                        <span class="block text-sm">Select FlysSight CSV</span>
+                    </button>
+                </div>
+
+                <!-- Step 4b: Set Start Point (shown after video file selected) -->
                 <div id="startPointSection" class="hidden">
                     <div class="mb-3 flex items-center justify-between">
                         <span id="selectedVideoName" class="text-sm text-gray-400"></span>
@@ -142,6 +155,32 @@
                         Upload Video
                     </button>
                 </div>
+
+                <!-- Step 4b: FlysSight file selected (for Speed Skydiving) -->
+                <div id="flysightReadySection" class="hidden">
+                    <div class="mb-3 flex items-center justify-between">
+                        <span id="selectedFlysightName" class="text-sm text-gray-400"></span>
+                        <button type="button" onclick="clearSelectedFlysight()" class="text-red-400 text-sm hover:underline">Change File</button>
+                    </div>
+
+                    <div class="bg-green-900/30 border border-green-700 rounded-lg p-4 mb-4">
+                        <p class="text-green-300 text-sm">FlysSight file ready for upload</p>
+                    </div>
+
+                    <!-- Upload Progress -->
+                    <div id="flysightUploadProgress" class="hidden mb-4">
+                        <div class="bg-gray-700 rounded-full h-3 mb-2">
+                            <div id="flysightUploadBar" class="bg-blue-600 h-3 rounded-full transition-all" style="width: 0%"></div>
+                        </div>
+                        <p class="text-gray-400 text-sm text-center" id="flysightUploadStatus">Uploading...</p>
+                    </div>
+
+                    <!-- Upload Button -->
+                    <button id="flysightUploadBtn" onclick="uploadFlysight()"
+                        class="w-full px-4 py-4 rounded bg-green-600 hover:bg-green-700 font-bold text-lg">
+                        Upload FlysSight Data
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -163,11 +202,16 @@
 
     <script>
         let selectedVideoFile = null;
+        let selectedFlysightFile = null;
         let currentCompetition = null;
         let currentTeams = [];
         let currentTeam = null;
         let totalRounds = 10;
         let videoStartPoint = null;
+        let isFlysightEvent = false;
+
+        // Categories with file types (from server)
+        const FLYSIGHT_EVENTS = ['sp'];  // Speed Skydiving uses FlysSight
 
         function loadTeams() {
             const eventSelect = document.getElementById('eventSelect');
@@ -295,13 +339,29 @@
                 return;
             }
 
+            // Check if this is a FlysSight event based on team's event type
+            const teamEvent = currentTeam ? (currentTeam.event || currentCompetition.event_type) : currentCompetition.event_type;
+            isFlysightEvent = FLYSIGHT_EVENTS.includes(teamEvent);
+
+            // Update UI based on file type
+            if (isFlysightEvent) {
+                document.getElementById('step4Title').textContent = 'Upload FlysSight Data';
+                document.getElementById('fileSelectSection').classList.add('hidden');
+                document.getElementById('startPointSection').classList.add('hidden');
+                document.getElementById('flysightSelectSection').classList.remove('hidden');
+                document.getElementById('flysightReadySection').classList.add('hidden');
+                clearSelectedFlysight();
+            } else {
+                document.getElementById('step4Title').textContent = 'Upload Video';
+                document.getElementById('fileSelectSection').classList.remove('hidden');
+                document.getElementById('startPointSection').classList.add('hidden');
+                document.getElementById('flysightSelectSection').classList.add('hidden');
+                document.getElementById('flysightReadySection').classList.add('hidden');
+                clearSelectedVideo();
+            }
+
             // Enable upload section - all rounds in dropdown are available (no video yet)
             enableSection('uploadSection', 'step4Circle');
-
-            // Reset to file select view
-            document.getElementById('fileSelectSection').classList.remove('hidden');
-            document.getElementById('startPointSection').classList.add('hidden');
-            clearSelectedVideo();
         }
 
         function enableSection(sectionId, circleId) {
@@ -376,6 +436,105 @@
             if (previewVideo.src) {
                 URL.revokeObjectURL(previewVideo.src);
                 previewVideo.src = '';
+            }
+        }
+
+        function handleFlysightSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFlysightFile = file;
+                const sizeKB = (file.size / 1024).toFixed(2);
+                document.getElementById('selectedFlysightName').textContent = file.name + ' (' + sizeKB + ' KB)';
+
+                // Show ready section, hide file select
+                document.getElementById('flysightSelectSection').classList.add('hidden');
+                document.getElementById('flysightReadySection').classList.remove('hidden');
+            }
+        }
+
+        function clearSelectedFlysight() {
+            selectedFlysightFile = null;
+
+            // Reset UI
+            document.getElementById('flysightSelectSection').classList.remove('hidden');
+            document.getElementById('flysightReadySection').classList.add('hidden');
+            document.getElementById('flysightFile').value = '';
+        }
+
+        async function uploadFlysight() {
+            if (!selectedFlysightFile) {
+                alert('Please select a FlysSight file first');
+                return;
+            }
+
+            const teamId = document.getElementById('teamSelect').value;
+            const roundNum = document.getElementById('roundSelect').value;
+            const eventSelect = document.getElementById('eventSelect');
+            const eventName = eventSelect.options[eventSelect.selectedIndex].textContent;
+            const teamName = currentTeam ? currentTeam.team_name : 'Team';
+
+            // Show progress
+            document.getElementById('flysightUploadProgress').classList.remove('hidden');
+            document.getElementById('flysightUploadBtn').disabled = true;
+            document.getElementById('flysightUploadBar').style.width = '10%';
+            document.getElementById('flysightUploadStatus').textContent = 'Preparing upload...';
+
+            const formData = new FormData();
+            formData.append('file', selectedFlysightFile);
+            formData.append('category', 'sp');
+            formData.append('event', eventName);
+            formData.append('title', teamName + ' - Round ' + roundNum);
+            formData.append('file_type', 'flysight');
+
+            try {
+                document.getElementById('flysightUploadBar').style.width = '30%';
+                document.getElementById('flysightUploadStatus').textContent = 'Uploading FlysSight data...';
+
+                const uploadResponse = await fetch('/videographer/upload-flysight', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const uploadResult = await uploadResponse.json();
+
+                if (uploadResult.success) {
+                    document.getElementById('flysightUploadBar').style.width = '70%';
+                    document.getElementById('flysightUploadStatus').textContent = 'Linking to team...';
+
+                    // Save score record with flysight data
+                    const response = await fetch('/videographer/team/' + teamId + '/score', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            round_num: parseInt(roundNum),
+                            score: null,
+                            video_id: uploadResult.id  // Store flysight ID in video_id field
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        document.getElementById('flysightUploadBar').style.width = '100%';
+                        document.getElementById('flysightUploadStatus').textContent = 'Complete!';
+
+                        // Show success message
+                        document.getElementById('successText').textContent =
+                            'FlysSight data uploaded for ' + teamName + ' - Round ' + roundNum + '. Ready for judging.';
+                        document.getElementById('successMessage').classList.remove('hidden');
+
+                        // Hide upload section
+                        document.getElementById('uploadSection').classList.add('hidden');
+                    } else {
+                        alert('Failed to link FlysSight data: ' + (result.error || 'Unknown error'));
+                        document.getElementById('flysightUploadBtn').disabled = false;
+                    }
+                } else {
+                    alert('FlysSight upload failed: ' + (uploadResult.error || 'Unknown error'));
+                    document.getElementById('flysightUploadBtn').disabled = false;
+                }
+            } catch (err) {
+                alert('Upload error: ' + err.message);
+                document.getElementById('flysightUploadBtn').disabled = false;
             }
         }
 

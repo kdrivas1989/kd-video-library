@@ -62,46 +62,6 @@
             {% endfor %}
         </div>
 
-        <!-- Recent Videos -->
-        {% if recent_videos %}
-        <h2 class="text-2xl font-bold mb-6">Recent Videos</h2>
-        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {% for video in recent_videos %}
-            <a href="/video/{{ video.id }}" class="block bg-gray-800 rounded-lg overflow-hidden hover:bg-gray-700 transition">
-                <div class="aspect-video bg-gray-700 relative">
-                    {% if video.thumbnail %}
-                    <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="w-full h-full object-cover">
-                    {% else %}
-                    <div class="w-full h-full flex items-center justify-center text-gray-500">
-                        <svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
-                        </svg>
-                    </div>
-                    {% endif %}
-                    {% if video.duration %}
-                    <span class="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">{{ video.duration }}</span>
-                    {% endif %}
-                </div>
-                <div class="p-4">
-                    <h3 class="font-semibold text-white truncate">{{ video.title }}</h3>
-                    <div class="flex justify-between items-center mt-2 text-sm text-gray-400">
-                        <span>{{ categories.get(video.category, {}).get('abbrev', video.category) }}</span>
-                        <span>{{ video.views }} views</span>
-                    </div>
-                </div>
-            </a>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="text-center py-16 text-gray-500">
-            <svg class="w-24 h-24 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/>
-            </svg>
-            <p class="text-xl">No videos yet</p>
-            <p class="mt-2">Videos will appear here once added by an administrator.</p>
-        </div>
-        {% endif %}
     </div>
 
     <footer class="bg-gray-800 mt-12 py-8">
