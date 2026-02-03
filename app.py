@@ -550,11 +550,8 @@ def parse_filename_metadata(filename, folder_path=''):
     if title_parts:
         metadata['title'] = ' - '.join(title_parts)
     else:
-        # Fall back to cleaned filename
+        # Fall back to cleaned filename - keep original for numeric files
         metadata['title'] = name.replace('_', ' ').replace('-', ' ').strip()
-        # Remove leading zeros from numeric filenames
-        if metadata['title'].isdigit() or re.match(r'^0+\d+$', metadata['title']):
-            metadata['title'] = f"Video {int(metadata['title'])}"
 
     return metadata
 
