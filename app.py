@@ -1039,6 +1039,44 @@ def convert_dropbox_url_for_streaming(url):
     return url
 
 
+@app.route('/admin/browse-folders', methods=['GET'])
+@admin_required
+def browse_folders():
+    """Browse local folders (local development only)."""
+    if USE_SUPABASE:
+        return jsonify({'error': 'Folder browsing not available in production'}), 400
+
+    path = request.args.get('path', os.path.expanduser('~'))
+
+    try:
+        if not os.path.isdir(path):
+            path = os.path.expanduser('~')
+
+        items = []
+        # Add parent directory
+        parent = os.path.dirname(path)
+        if parent and parent != path:
+            items.append({'name': '..', 'path': parent, 'is_dir': True})
+
+        # List directory contents
+        for name in sorted(os.listdir(path)):
+            full_path = os.path.join(path, name)
+            if os.path.isdir(full_path) and not name.startswith('.'):
+                items.append({'name': name, 'path': full_path, 'is_dir': True})
+
+        # Count video files in current folder
+        video_extensions = ('.mp4', '.mts', '.m2ts', '.mov', '.avi', '.mkv', '.webm')
+        video_count = len([f for f in os.listdir(path) if f.lower().endswith(video_extensions)])
+
+        return jsonify({
+            'current_path': path,
+            'items': items,
+            'video_count': video_count
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/admin/fix-dropbox-urls', methods=['POST'])
 @admin_required
 def fix_dropbox_urls():

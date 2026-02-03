@@ -52,10 +52,14 @@
                             class="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                             placeholder="/path/to/video/folder"
                             oninput="detectCategoryFromPath(this.value)">
+                        <button type="button" onclick="openFolderBrowser()"
+                            class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded-lg text-sm whitespace-nowrap">
+                            Browse...
+                        </button>
                         {% if dropbox_app_key %}
                         <button type="button" onclick="chooseFolderFromDropbox()"
                             class="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg text-sm whitespace-nowrap">
-                            Dropbox Folder
+                            Dropbox
                         </button>
                         {% endif %}
                     </div>
@@ -238,6 +242,28 @@
         </div>
     </div>
 
+    <!-- Folder Browser Modal -->
+    <div id="folderBrowserModal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-xl mx-4 max-h-[80vh] flex flex-col">
+            <h3 class="text-xl font-bold mb-2">Select Folder</h3>
+            <p id="currentFolderPath" class="text-gray-400 text-sm mb-4 truncate"></p>
+            <div id="folderList" class="flex-1 overflow-y-auto bg-gray-900 rounded-lg p-2 mb-4 min-h-64">
+                <!-- Folders listed here -->
+            </div>
+            <p id="videoCountInfo" class="text-sm text-gray-400 mb-4"></p>
+            <div class="flex gap-3">
+                <button type="button" onclick="closeFolderBrowser()"
+                    class="flex-1 bg-gray-600 hover:bg-gray-500 py-3 rounded-lg font-semibold transition">
+                    Cancel
+                </button>
+                <button type="button" onclick="selectCurrentFolder()"
+                    class="flex-1 bg-purple-600 hover:bg-purple-700 py-3 rounded-lg font-semibold transition">
+                    Select This Folder
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Bulk Upload Modal -->
     <div id="bulkUploadModal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-50">
         <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
@@ -367,6 +393,73 @@
     <script>
         const categories = {{ categories | tojson }};
         let pendingFiles = []; // Store files selected from Dropbox
+
+        // Folder Browser
+        let currentBrowsePath = '';
+
+        async function openFolderBrowser() {
+            const startPath = document.getElementById('folderPath').value || '';
+            await browseTo(startPath || '~');
+            document.getElementById('folderBrowserModal').classList.remove('hidden');
+            document.getElementById('folderBrowserModal').classList.add('flex');
+        }
+
+        function closeFolderBrowser() {
+            document.getElementById('folderBrowserModal').classList.add('hidden');
+            document.getElementById('folderBrowserModal').classList.remove('flex');
+        }
+
+        async function browseTo(path) {
+            try {
+                const response = await fetch(`/admin/browse-folders?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                currentBrowsePath = data.current_path;
+                document.getElementById('currentFolderPath').textContent = data.current_path;
+
+                const listDiv = document.getElementById('folderList');
+                listDiv.innerHTML = '';
+
+                for (const item of data.items) {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center gap-2 px-3 py-2 hover:bg-gray-700 rounded cursor-pointer';
+                    div.innerHTML = `
+                        <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                        </svg>
+                        <span class="flex-1 truncate">${item.name}</span>
+                    `;
+                    div.onclick = () => browseTo(item.path);
+                    listDiv.appendChild(div);
+                }
+
+                if (data.items.length === 0) {
+                    listDiv.innerHTML = '<p class="text-gray-500 text-center py-4">No subfolders</p>';
+                }
+
+                const videoInfo = document.getElementById('videoCountInfo');
+                if (data.video_count > 0) {
+                    videoInfo.textContent = `${data.video_count} video file(s) in this folder`;
+                    videoInfo.className = 'text-sm text-green-400 mb-4';
+                } else {
+                    videoInfo.textContent = 'No video files in this folder';
+                    videoInfo.className = 'text-sm text-gray-500 mb-4';
+                }
+            } catch (error) {
+                alert('Error browsing folders: ' + error.message);
+            }
+        }
+
+        function selectCurrentFolder() {
+            document.getElementById('folderPath').value = currentBrowsePath;
+            detectCategoryFromPath(currentBrowsePath);
+            closeFolderBrowser();
+        }
 
         // Fix Dropbox URLs
         async function fixDropboxUrls() {
