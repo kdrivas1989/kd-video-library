@@ -510,9 +510,9 @@
                 success: function(files) {
                     // Check for formats that need conversion
                     const filename = files[0].name.toLowerCase();
-                    const needsConversion = filename.endsWith('.mts') || filename.endsWith('.m2ts') || filename.endsWith('.avi') || filename.endsWith('.mkv');
+                    const needsConversion = ['.mts', '.m2ts', '.avi', '.mkv', '.wmv', '.flv', '.3gp'].some(ext => filename.endsWith(ext));
                     if (needsConversion) {
-                        if (!confirm('This file (' + files[0].name + ') needs to be converted to MP4.\n\nIf running locally, it will be downloaded and converted automatically.\nOn production, this will fail.\n\nContinue?')) {
+                        if (!confirm('This file (' + files[0].name + ') needs to be converted to MP4.\n\nIf running locally, it will be downloaded and converted automatically.\nOn production, this will fail.\n\nSupported formats: MP4, WebM, OGG, MOV\n\nContinue?')) {
                             return;
                         }
                     }
@@ -619,12 +619,13 @@
             let errors = [];
 
             // Check for files that need conversion
+            const conversionExts = ['.mts', '.m2ts', '.avi', '.mkv', '.wmv', '.flv', '.3gp'];
             const conversionFiles = pendingFiles.filter(f => {
                 const name = f.name.toLowerCase();
-                return name.endsWith('.mts') || name.endsWith('.m2ts') || name.endsWith('.avi') || name.endsWith('.mkv');
+                return conversionExts.some(ext => name.endsWith(ext));
             });
             if (conversionFiles.length > 0) {
-                if (!confirm(conversionFiles.length + ' file(s) need conversion to MP4 (MTS/AVI/MKV).\n\nIf running locally, they will be downloaded and converted automatically.\nOn production, these will be skipped.\n\nContinue?')) {
+                if (!confirm(conversionFiles.length + ' file(s) need conversion to MP4.\n\nSupported formats: MP4, WebM, OGG, MOV\nNeed conversion: MTS, AVI, MKV, WMV, FLV\n\nIf running locally, they will be converted automatically.\nOn production, these will fail.\n\nContinue?')) {
                     progressDiv.classList.add('hidden');
                     return;
                 }

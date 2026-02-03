@@ -390,8 +390,15 @@ def is_direct_video_url(url):
     # Dropbox direct links are always streamable
     if 'dropboxusercontent.com' in url_lower or 'dropbox.com' in url_lower:
         return True
-    video_extensions = ('.mp4', '.webm', '.ogg', '.mov')
+    # Browser-supported video formats
+    video_extensions = ('.mp4', '.webm', '.ogg', '.ogv', '.mov', '.m4v')
     return any(url_lower.endswith(ext) or f'{ext}?' in url_lower or f'{ext}&' in url_lower for ext in video_extensions)
+
+
+# Formats that browsers can play natively
+BROWSER_PLAYABLE_FORMATS = ('.mp4', '.webm', '.ogg', '.ogv', '.mov', '.m4v')
+# Formats that need conversion
+CONVERSION_FORMATS = ('.mts', '.m2ts', '.avi', '.mkv', '.wmv', '.flv', '.3gp')
 
 
 def get_video_embed_url(url):
@@ -728,15 +735,23 @@ def download_and_convert_video(url, video_id):
 
     # Check if it's a video format that needs conversion
     url_lower = url.lower()
-    needs_conversion = any(ext in url_lower for ext in ['.mts', '.m2ts', '.avi', '.mkv', '.mov'])
+    needs_conversion = any(ext in url_lower for ext in CONVERSION_FORMATS)
 
     if not needs_conversion:
         return None, None, None  # Use URL directly
 
     try:
+        # Detect file extension
+        ext = None
+        for format_ext in CONVERSION_FORMATS:
+            if format_ext in url_lower:
+                ext = format_ext
+                break
+        if not ext:
+            ext = '.mts'
+
         # Download the file
         temp_dir = tempfile.gettempdir()
-        ext = '.mts' if '.mts' in url_lower else '.m2ts' if '.m2ts' in url_lower else '.avi' if '.avi' in url_lower else '.mkv' if '.mkv' in url_lower else '.mov'
         temp_input = os.path.join(temp_dir, f"{video_id}_input{ext}")
 
         print(f"Downloading {url}...")
@@ -794,9 +809,9 @@ def add_video():
 
     video_id = str(uuid.uuid4())[:8]
 
-    # Check if video needs conversion (MTS, etc.)
+    # Check if video needs conversion (MTS, AVI, etc.)
     url_lower = url.lower()
-    needs_conversion = any(ext in url_lower for ext in ['.mts', '.m2ts', '.avi', '.mkv'])
+    needs_conversion = any(ext in url_lower for ext in CONVERSION_FORMATS)
 
     if needs_conversion and not USE_SUPABASE:
         # Local mode - download and convert

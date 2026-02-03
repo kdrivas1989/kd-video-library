@@ -41,11 +41,18 @@
                 <!-- Video Player -->
                 <div class="aspect-video bg-black rounded-lg overflow-hidden mb-4">
                     {% if video.is_local or video.is_direct_url %}
-                    <video controls class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" playsinline>
-                        <source src="{{ video.video_src }}">
+                    <video controls class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" playsinline preload="metadata">
+                        {% if '.webm' in video.video_src|lower %}
+                        <source src="{{ video.video_src }}" type="video/webm">
+                        {% elif '.ogg' in video.video_src|lower or '.ogv' in video.video_src|lower %}
+                        <source src="{{ video.video_src }}" type="video/ogg">
+                        {% elif '.mov' in video.video_src|lower or '.m4v' in video.video_src|lower %}
+                        <source src="{{ video.video_src }}" type="video/mp4">
+                        {% else %}
+                        <source src="{{ video.video_src }}" type="video/mp4">
+                        {% endif %}
                         Your browser does not support the video tag.
                     </video>
-                    <!-- Debug: {{ video.video_src }} -->
                     {% else %}
                     <iframe src="{{ video.embed_url }}"
                         class="w-full h-full"
