@@ -912,6 +912,31 @@ def get_video_details(video_id):
     return jsonify(video)
 
 
+@app.route('/admin/fix-dropbox-urls', methods=['POST'])
+@admin_required
+def fix_dropbox_urls():
+    """Fix Dropbox URLs to use raw=1 instead of dl=1 for streaming."""
+    fixed = 0
+    if USE_SUPABASE:
+        # Get all videos with dl=1 in URL
+        result = supabase.table('videos').select('id, url').like('url', '%dl=1%').execute()
+        for video in result.data:
+            new_url = video['url'].replace('dl=1', 'raw=1')
+            supabase.table('videos').update({'url': new_url}).eq('id', video['id']).execute()
+            fixed += 1
+    else:
+        db = get_sqlite_db()
+        cursor = db.execute("SELECT id, url FROM videos WHERE url LIKE '%dl=1%'")
+        videos = cursor.fetchall()
+        for video in videos:
+            new_url = video['url'].replace('dl=1', 'raw=1')
+            db.execute("UPDATE videos SET url = ? WHERE id = ?", (new_url, video['id']))
+            fixed += 1
+        db.commit()
+
+    return jsonify({'success': True, 'message': f'Fixed {fixed} Dropbox video URLs'})
+
+
 @app.route('/admin/edit-video/<video_id>', methods=['POST'])
 @admin_required
 def edit_video(video_id):
