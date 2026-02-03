@@ -70,7 +70,15 @@
                         <label class="block text-gray-400 text-sm mb-1">Event Type</label>
                         <select id="compEventType" class="w-full px-4 py-2 rounded bg-gray-700 text-white">
                             {% for cat_id, cat in categories.items() %}
+                            {% if cat.subcategories %}
+                            <optgroup label="{{ cat.name }} ({{ cat.abbrev }})">
+                                {% for sub in cat.subcategories %}
+                                <option value="{{ cat_id }}_{{ sub.id }}">{{ sub.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% else %}
                             <option value="{{ cat_id }}">{{ cat.name }} ({{ cat.abbrev }})</option>
+                            {% endif %}
                             {% endfor %}
                         </select>
                     </div>

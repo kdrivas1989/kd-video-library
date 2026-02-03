@@ -76,7 +76,10 @@ CATEGORIES = {
         'name': 'Wingsuit',
         'abbrev': 'WS',
         'description': 'Chapter 14 - Wingsuit competition videos',
-        'subcategories': []
+        'subcategories': [
+            {'id': 'acrobatic', 'name': 'Acrobatic'},
+            {'id': 'performance', 'name': 'Performance'}
+        ]
     },
     'fs': {
         'name': 'Formation Skydiving',
@@ -90,6 +93,12 @@ CATEGORIES = {
             {'id': '16way', 'name': '16-Way'},
             {'id': '10way', 'name': '10-Way'}
         ]
+    },
+    'sp': {
+        'name': 'Speed Skydiving',
+        'abbrev': 'SP',
+        'description': 'Chapter 15 - Speed Skydiving competition videos',
+        'subcategories': []
     }
 }
 
@@ -194,6 +203,9 @@ def init_db():
                 team_name TEXT NOT NULL,
                 class TEXT NOT NULL,
                 members TEXT,
+                category TEXT,
+                event TEXT,
+                photo TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (competition_id) REFERENCES competitions(id)
             )
@@ -497,11 +509,12 @@ def save_team(team_data):
     else:
         db = get_sqlite_db()
         db.execute('''
-            INSERT OR REPLACE INTO competition_teams (id, competition_id, team_number, team_name, class, members, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO competition_teams (id, competition_id, team_number, team_name, class, members, category, event, photo, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (team_data['id'], team_data['competition_id'], team_data['team_number'],
               team_data['team_name'], team_data['class'], team_data.get('members', ''),
-              team_data['created_at']))
+              team_data.get('category', ''), team_data.get('event', ''),
+              team_data.get('photo', ''), team_data['created_at']))
         db.commit()
 
 
@@ -1575,6 +1588,8 @@ def add_team(comp_id):
     team_number = data.get('team_number', '').strip()
     team_class = data.get('class', 'open').lower()
     members = data.get('members', '').strip()
+    category = data.get('category', '').strip()
+    event = data.get('event', '').strip()
 
     if not team_name or not team_number:
         return jsonify({'error': 'Team name and number are required'}), 400
@@ -1588,6 +1603,8 @@ def add_team(comp_id):
         'team_name': team_name,
         'class': team_class,
         'members': members,
+        'category': category,
+        'event': event,
         'created_at': datetime.now().isoformat()
     })
 
@@ -1656,6 +1673,72 @@ def import_teams(comp_id):
         return jsonify({'error': f'Failed to parse CSV: {str(e)}'}), 400
 
 
+@app.route('/admin/team/<team_id>/update', methods=['POST'])
+@admin_required
+def update_team(team_id):
+    """Update a team."""
+    data = request.json
+
+    team = get_team(team_id)
+    if not team:
+        return jsonify({'error': 'Team not found'}), 404
+
+    # Update team data
+    team_data = {
+        'id': team_id,
+        'competition_id': team['competition_id'],
+        'team_number': data.get('team_number', team['team_number']),
+        'team_name': data.get('team_name', team['team_name']),
+        'class': data.get('class', team['class']),
+        'members': data.get('members', team.get('members', '')),
+        'category': data.get('category', team.get('category', '')),
+        'event': data.get('event', team.get('event', '')),
+        'photo': data.get('photo', team.get('photo', '')),
+        'created_at': team['created_at']
+    }
+
+    save_team(team_data)
+    return jsonify({'success': True, 'message': 'Team updated'})
+
+
+@app.route('/admin/team/<team_id>/upload-photo', methods=['POST'])
+@admin_required
+def upload_team_photo(team_id):
+    """Upload a photo for a team."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    team = get_team(team_id)
+    if not team:
+        return jsonify({'error': 'Team not found'}), 404
+
+    # Check file extension
+    filename = secure_filename(file.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    allowed_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
+
+    if ext not in allowed_extensions:
+        return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
+
+    # Save file
+    photo_filename = f"team_{team_id}{ext}"
+    photo_path = os.path.join(VIDEOS_FOLDER, photo_filename)
+    file.save(photo_path)
+
+    # Update team with photo path
+    team['photo'] = f"/static/videos/{photo_filename}"
+    save_team(team)
+
+    return jsonify({
+        'success': True,
+        'photo_url': team['photo']
+    })
+
+
 @app.route('/admin/team/<team_id>/delete', methods=['POST'])
 @admin_required
 def delete_team(team_id):
@@ -1710,6 +1793,173 @@ def save_team_score(team_id):
 @admin_required
 def get_video_info(video_id):
     """Get video file info for embedding."""
+    video = get_video(video_id)
+    if not video:
+        return jsonify({'error': 'Video not found'}), 404
+
+    video_url = ''
+    if video.get('local_file'):
+        video_url = f'/static/videos/{video["local_file"]}'
+    elif video.get('url'):
+        video_url = video['url']
+
+    return jsonify({
+        'id': video_id,
+        'title': video.get('title', ''),
+        'url': video_url,
+        'local_file': video.get('local_file', '')
+    })
+
+
+# ===========================================
+# Videographer Routes (no admin login required)
+# ===========================================
+
+@app.route('/videographer/upload-video', methods=['POST'])
+def videographer_upload_video():
+    """Upload a video file (videographer access - no admin required)."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    # Get form data
+    title = request.form.get('title', '').strip()
+    category = request.form.get('category', '')
+    subcategory = request.form.get('subcategory', '')
+    event = request.form.get('event', '').strip()
+
+    if not category:
+        category = '4way-fs'  # Default category for competition videos
+
+    # Check file extension
+    filename = secure_filename(file.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    allowed_extensions = ('.mp4', '.webm', '.mov', '.m4v', '.ogg', '.ogv', '.mts', '.m2ts', '.avi', '.mkv')
+
+    if ext not in allowed_extensions:
+        return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
+
+    video_id = str(uuid.uuid4())[:8]
+
+    # Generate title from filename if not provided
+    if not title:
+        title = os.path.splitext(filename)[0].replace('_', ' ').replace('-', ' ')
+
+    needs_conversion = ext in CONVERSION_FORMATS
+
+    try:
+        if needs_conversion:
+            # Save to temp, convert, then save to videos folder
+            import tempfile
+            temp_path = os.path.join(tempfile.gettempdir(), f"{video_id}_input{ext}")
+            file.save(temp_path)
+
+            output_filename = f"{video_id}.mp4"
+            output_path = os.path.join(VIDEOS_FOLDER, output_filename)
+
+            if convert_video_to_mp4(temp_path, output_path):
+                os.remove(temp_path)
+                local_file = output_filename
+            else:
+                os.remove(temp_path)
+                return jsonify({'error': 'Failed to convert video. Make sure ffmpeg is installed.'}), 400
+        else:
+            # Save directly
+            output_filename = f"{video_id}{ext}"
+            output_path = os.path.join(VIDEOS_FOLDER, output_filename)
+            file.save(output_path)
+            local_file = output_filename
+
+        # Generate thumbnail
+        thumbnail_filename = f"{video_id}_thumb.jpg"
+        thumbnail_path = os.path.join(VIDEOS_FOLDER, thumbnail_filename)
+        if generate_thumbnail(output_path, thumbnail_path):
+            thumbnail = f"/static/videos/{thumbnail_filename}"
+        else:
+            thumbnail = None
+
+        # Get duration
+        duration = get_video_duration(output_path)
+
+        # Save to database
+        save_video({
+            'id': video_id,
+            'title': title,
+            'description': '',
+            'url': '',
+            'thumbnail': thumbnail,
+            'category': category,
+            'subcategory': subcategory,
+            'tags': '',
+            'duration': duration,
+            'created_at': datetime.now().isoformat(),
+            'views': 0,
+            'video_type': 'local',
+            'local_file': local_file,
+            'event': event
+        })
+
+        return jsonify({
+            'success': True,
+            'message': 'Video uploaded successfully',
+            'id': video_id,
+            'converted': needs_conversion
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+
+
+@app.route('/videographer/team/<team_id>/score', methods=['POST'])
+def videographer_save_team_score(team_id):
+    """Save a score for a team (videographer access - no admin required)."""
+    data = request.json
+
+    team = get_team(team_id)
+    if not team:
+        return jsonify({'error': 'Team not found'}), 404
+
+    round_num = int(data.get('round_num', 1))
+    score_val = data.get('score')
+    score = float(score_val) if score_val is not None else None
+    score_data = data.get('score_data', '')
+    video_id = data.get('video_id', '')
+
+    # Check if score already exists for this round
+    existing_scores = get_team_scores(team_id)
+    existing = next((s for s in existing_scores if s['round_num'] == round_num), None)
+
+    if existing:
+        score_id = existing['id']
+        # Preserve existing video_id if not provided
+        if not video_id and existing.get('video_id'):
+            video_id = existing['video_id']
+        # Preserve existing score if not provided (videographer uploading video only)
+        if score is None and existing.get('score') is not None:
+            score = existing['score']
+    else:
+        score_id = str(uuid.uuid4())[:8]
+
+    save_score({
+        'id': score_id,
+        'competition_id': team['competition_id'],
+        'team_id': team_id,
+        'round_num': round_num,
+        'score': score,
+        'score_data': score_data,
+        'video_id': video_id,
+        'created_at': datetime.now().isoformat()
+    })
+
+    return jsonify({'success': True, 'message': 'Score saved'})
+
+
+@app.route('/videographer/get-video-info/<video_id>')
+def videographer_get_video_info(video_id):
+    """Get video file info for embedding (no admin required)."""
     video = get_video(video_id)
     if not video:
         return jsonify({'error': 'Video not found'}), 404

@@ -93,9 +93,9 @@
                     <thead class="bg-gray-700">
                         <tr>
                             <th class="px-4 py-3 text-left">Rank</th>
+                            <th class="px-2 py-3 text-center">Photo</th>
                             <th class="px-4 py-3 text-left">#</th>
                             <th class="px-4 py-3 text-left">Team Name</th>
-                            <th class="px-4 py-3 text-left">Members</th>
                             {% for i in range(1, competition.total_rounds + 1) %}
                             <th class="px-2 py-3 text-center text-sm">R{{ i }}</th>
                             {% endfor %}
@@ -109,13 +109,24 @@
                         {% for team in teams %}
                         <tr class="border-t border-gray-700 hover:bg-gray-750">
                             <td class="px-4 py-3 font-bold text-yellow-400">{{ loop.index }}</td>
+                            <td class="px-2 py-3 text-center">
+                                {% if team.photo %}
+                                <img src="{{ team.photo }}" alt="{{ team.team_name }}"
+                                    class="w-10 h-10 rounded-full object-cover cursor-pointer mx-auto"
+                                    onclick="showPhotoModal('{{ team.photo }}', '{{ team.team_name }}', '{{ team.members|default("", true)|replace("'", "\\'") }}')">
+                                {% else %}
+                                <div class="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center mx-auto text-gray-400 text-xs cursor-pointer"
+                                    onclick="showPhotoModal('', '{{ team.team_name }}', '{{ team.members|default("", true)|replace("'", "\\'") }}')">
+                                    --
+                                </div>
+                                {% endif %}
+                            </td>
                             <td class="px-4 py-3">{{ team.team_number }}</td>
                             <td class="px-4 py-3 font-medium">{{ team.team_name }}</td>
-                            <td class="px-4 py-3 text-gray-400 text-sm">{{ team.members or '-' }}</td>
                             {% for i in range(1, competition.total_rounds + 1) %}
                             {% set round_score = team.scores|selectattr('round_num', 'equalto', i)|first %}
                             <td class="px-2 py-3 text-center">
-                                <button onclick="openRoundModal('{{ team.id }}', '{{ team.team_name }}', {{ i }}, {{ round_score.score if round_score and round_score.score is not none else 'null' }}, '{{ round_score.video_id if round_score else '' }}')"
+                                <button onclick="openRoundModal('{{ team.id }}', '{{ team.team_name }}', {{ i }}, {{ round_score.score if round_score and round_score.score is not none else 'null' }}, '{{ round_score.video_id if round_score else '' }}', '{{ team.category|default("", true) }}')"
                                     class="w-10 h-8 rounded text-sm {% if round_score and round_score.score is not none %}bg-green-600 hover:bg-green-700{% elif round_score and round_score.video_id %}bg-yellow-600 hover:bg-yellow-700{% else %}bg-gray-600 hover:bg-gray-500{% endif %}"
                                     title="{% if round_score and round_score.score is not none %}Scored: {{ round_score.score }}{% elif round_score and round_score.video_id %}Video uploaded - needs scoring{% else %}No video{% endif %}">
                                     {% if round_score and round_score.score is not none %}{{ round_score.score|int }}{% elif round_score and round_score.video_id %}📹{% else %}-{% endif %}
@@ -124,7 +135,8 @@
                             {% endfor %}
                             <td class="px-4 py-3 text-right font-bold text-green-400">{{ team.total_score|int }}</td>
                             {% if is_admin %}
-                            <td class="px-4 py-3 text-right">
+                            <td class="px-4 py-3 text-right space-x-2">
+                                <button onclick="openEditTeamModal('{{ team.id }}', '{{ team.team_number }}', '{{ team.team_name }}', '{{ team.class }}', '{{ team.members|default("", true) }}', '{{ team.category|default("", true) }}', '{{ team.event|default("", true) }}', '{{ team.photo|default("", true) }}')" class="text-blue-400 hover:text-blue-300 text-sm">Edit</button>
                                 <button onclick="deleteTeam('{{ team.id }}')" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
                             </td>
                             {% endif %}
@@ -170,6 +182,29 @@
                         </select>
                     </div>
                     <div>
+                        <label class="block text-gray-400 text-sm mb-1">Category</label>
+                        <select id="teamCategory" class="w-full px-4 py-2 rounded bg-gray-700 text-white">
+                            <option value="">-- Select Category --</option>
+                            {% for cat_id, cat in categories.items() %}
+                            {% if cat.subcategories %}
+                            <optgroup label="{{ cat.name }} ({{ cat.abbrev }})">
+                                                                {% for sub in cat.subcategories %}
+                                <option value="{{ cat_id }}_{{ sub.id }}">{{ sub.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% else %}
+                            <option value="{{ cat_id }}">{{ cat.name }} ({{ cat.abbrev }})</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Event Name</label>
+                        <input type="text" id="teamEvent"
+                            class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="2024 USPA Nationals">
+                    </div>
+                    <div>
                         <label class="block text-gray-400 text-sm mb-1">Team Members</label>
                         <input type="text" id="teamMembers"
                             class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -181,6 +216,95 @@
                     <button type="submit" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700">Add Team</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Edit Team Modal -->
+    <div id="editTeamModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 class="text-xl font-bold mb-4">Edit Team</h2>
+            <form onsubmit="updateTeam(event)">
+                <input type="hidden" id="editTeamId">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Team Number</label>
+                        <input type="text" id="editTeamNumber" required
+                            class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Team Name</label>
+                        <input type="text" id="editTeamName" required
+                            class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Class</label>
+                        <select id="editTeamClass" class="w-full px-4 py-2 rounded bg-gray-700 text-white">
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                            <option value="open">Open</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Category</label>
+                        <select id="editTeamCategory" class="w-full px-4 py-2 rounded bg-gray-700 text-white">
+                            <option value="">-- Select Category --</option>
+                            {% for cat_id, cat in categories.items() %}
+                            {% if cat.subcategories %}
+                            <optgroup label="{{ cat.name }} ({{ cat.abbrev }})">
+                                                                {% for sub in cat.subcategories %}
+                                <option value="{{ cat_id }}_{{ sub.id }}">{{ sub.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% else %}
+                            <option value="{{ cat_id }}">{{ cat.name }} ({{ cat.abbrev }})</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Event Name</label>
+                        <input type="text" id="editTeamEvent"
+                            class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="2024 USPA Nationals">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Team Members</label>
+                        <input type="text" id="editTeamMembers"
+                            class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="John, Jane, Bob, Alice">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Team Photo</label>
+                        <div class="flex items-center gap-3">
+                            <div id="editTeamPhotoPreview" class="w-16 h-16 rounded bg-gray-700 flex items-center justify-center overflow-hidden">
+                                <span class="text-gray-500 text-xs">No photo</span>
+                            </div>
+                            <div class="flex-1">
+                                <input type="file" id="editTeamPhoto" accept="image/*" class="hidden" onchange="previewTeamPhoto(event)">
+                                <button type="button" onclick="document.getElementById('editTeamPhoto').click()"
+                                    class="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 text-sm w-full">
+                                    Choose Photo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" onclick="hideEditTeamModal()" class="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500">Cancel</button>
+                    <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Photo Viewer Modal -->
+    <div id="photoModal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50" onclick="hidePhotoModal()">
+        <div class="max-w-2xl mx-4 text-center" onclick="event.stopPropagation()">
+            <img id="photoModalImage" src="" alt="" class="max-h-[70vh] rounded-lg shadow-2xl mx-auto">
+            <h3 id="photoModalName" class="text-2xl font-bold mt-4"></h3>
+            <p id="photoModalMembers" class="text-gray-400 mt-2"></p>
+            <button onclick="hidePhotoModal()" class="mt-4 px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">Close</button>
         </div>
     </div>
 
@@ -240,7 +364,8 @@
                         </div>
                     </div>
 
-                    <!-- Score Entry (for judges) -->
+                    <!-- Score Entry (for judges only) -->
+                    {% if is_admin %}
                     <div class="bg-gray-900 rounded-lg p-4">
                         <label class="block text-gray-400 text-sm mb-2">Score</label>
                         <div class="flex items-center gap-4">
@@ -253,8 +378,9 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
 
-                    <!-- Video Upload Section (for videographers) -->
+                    <!-- Video Upload Section (for videographers - not for Speed Skydiving) -->
                     <div id="videoUploadSection" class="border-t border-gray-700 pt-4">
                         <label class="block text-gray-400 text-sm mb-2">Upload Video</label>
 
@@ -295,6 +421,44 @@
                             <p class="text-gray-400 text-sm mt-1" id="uploadStatus">Uploading...</p>
                         </div>
                     </div>
+
+                    <!-- FlySight CSV Upload Section (for Speed Skydiving only) -->
+                    <div id="flysightUploadSection" class="hidden border-t border-gray-700 pt-4">
+                        <label class="block text-gray-400 text-sm mb-2">Upload FlySight CSV</label>
+                        <p class="text-gray-500 text-xs mb-3">Upload the FlySight CSV file to automatically calculate speed.</p>
+
+                        <div>
+                            <input type="file" id="flysightFile" accept=".csv" class="hidden" onchange="handleFlysightSelect(event)">
+                            <button type="button" onclick="document.getElementById('flysightFile').click()"
+                                class="w-full px-4 py-3 rounded bg-gray-700 hover:bg-gray-600 text-sm">
+                                <span class="block text-lg mb-1">📊</span>
+                                Select FlySight CSV
+                            </button>
+                        </div>
+
+                        <!-- Selected CSV Display -->
+                        <div id="selectedFlysightInfo" class="hidden mt-3 p-3 bg-gray-700 rounded">
+                            <div class="flex items-center justify-between mb-2">
+                                <span id="selectedFlysightName" class="text-sm"></span>
+                                <button type="button" onclick="clearFlysightFile()" class="text-red-400 text-sm hover:underline">Remove</button>
+                            </div>
+                            <div id="flysightResult" class="hidden mt-2 p-3 bg-gray-900 rounded">
+                                <div class="text-center">
+                                    <span class="text-3xl font-mono text-green-400" id="flysightSpeed">--</span>
+                                    <span class="text-gray-400 ml-1">km/h</span>
+                                </div>
+                                <p class="text-gray-500 text-xs text-center mt-1">Max vertical speed detected</p>
+                            </div>
+                        </div>
+
+                        <!-- Upload Progress -->
+                        <div id="flysightProgress" class="hidden mt-3">
+                            <div class="bg-gray-700 rounded-full h-2">
+                                <div id="flysightBar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+                            </div>
+                            <p class="text-gray-400 text-sm mt-1" id="flysightStatus">Processing...</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="flex justify-between items-center mt-6 pt-4 border-t border-gray-700">
@@ -304,7 +468,9 @@
                     <div class="flex gap-3">
                         <button type="button" onclick="hideRoundModal()" class="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500">Cancel</button>
                         <button type="button" onclick="uploadVideoOnly()" id="uploadOnlyBtn" class="hidden px-4 py-2 rounded bg-blue-600 hover:bg-blue-700">Upload Video Only</button>
+                        {% if is_admin %}
                         <button type="submit" id="saveRoundBtn" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700">Save Score</button>
+                        {% endif %}
                     </div>
                 </div>
             </form>
@@ -352,65 +518,292 @@
             document.getElementById('importModal').classList.remove('hidden');
         }
 
+        function showPhotoModal(photoUrl, teamName, members) {
+            const modal = document.getElementById('photoModal');
+            const img = document.getElementById('photoModalImage');
+            const name = document.getElementById('photoModalName');
+            const membersEl = document.getElementById('photoModalMembers');
+
+            if (photoUrl) {
+                img.src = photoUrl;
+                img.classList.remove('hidden');
+            } else {
+                img.src = '';
+                img.classList.add('hidden');
+            }
+            name.textContent = teamName;
+            membersEl.textContent = members || 'No members listed';
+            modal.classList.remove('hidden');
+        }
+
+        function hidePhotoModal() {
+            document.getElementById('photoModal').classList.add('hidden');
+        }
+
+        let selectedTeamPhotoFile = null;
+
+        function previewTeamPhoto(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedTeamPhotoFile = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('editTeamPhotoPreview');
+                    preview.innerHTML = `<img src="${e.target.result}" class="w-full h-full object-cover">`;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
         function hideImportModal() {
             document.getElementById('importModal').classList.add('hidden');
         }
 
-        function openRoundModal(teamId, teamName, roundNum, score, videoId) {
+        function openEditTeamModal(teamId, teamNumber, teamName, teamClass, members, category, event, photo) {
+            document.getElementById('editTeamId').value = teamId;
+            document.getElementById('editTeamNumber').value = teamNumber;
+            document.getElementById('editTeamName').value = teamName;
+            document.getElementById('editTeamClass').value = teamClass;
+            document.getElementById('editTeamMembers').value = members;
+            document.getElementById('editTeamCategory').value = category || '';
+            document.getElementById('editTeamEvent').value = event || '';
+
+            // Reset photo
+            selectedTeamPhotoFile = null;
+            document.getElementById('editTeamPhoto').value = '';
+            const preview = document.getElementById('editTeamPhotoPreview');
+            if (photo) {
+                preview.innerHTML = `<img src="${photo}" class="w-full h-full object-cover">`;
+            } else {
+                preview.innerHTML = '<span class="text-gray-500 text-xs">No photo</span>';
+            }
+
+            document.getElementById('editTeamModal').classList.remove('hidden');
+        }
+
+        function hideEditTeamModal() {
+            document.getElementById('editTeamModal').classList.add('hidden');
+            selectedTeamPhotoFile = null;
+        }
+
+        async function updateTeam(e) {
+            e.preventDefault();
+
+            const teamId = document.getElementById('editTeamId').value;
+
+            // Upload photo first if selected
+            if (selectedTeamPhotoFile) {
+                const formData = new FormData();
+                formData.append('file', selectedTeamPhotoFile);
+
+                try {
+                    const photoResponse = await fetch('/admin/team/' + teamId + '/upload-photo', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const photoResult = await photoResponse.json();
+                    if (!photoResult.success) {
+                        alert('Photo upload failed: ' + (photoResult.error || 'Unknown error'));
+                    }
+                } catch (err) {
+                    alert('Photo upload error: ' + err.message);
+                }
+            }
+
+            const data = {
+                team_number: document.getElementById('editTeamNumber').value,
+                team_name: document.getElementById('editTeamName').value,
+                class: document.getElementById('editTeamClass').value,
+                members: document.getElementById('editTeamMembers').value,
+                category: document.getElementById('editTeamCategory').value,
+                event: document.getElementById('editTeamEvent').value
+            };
+
+            try {
+                const response = await fetch('/admin/team/' + teamId + '/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert(result.error || 'Failed to update team');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        let currentTeamCategory = '';
+        let selectedFlysightFile = null;
+
+        function openRoundModal(teamId, teamName, roundNum, score, videoId, category) {
             document.getElementById('roundTeamId').value = teamId;
             document.getElementById('roundNumber').value = roundNum;
             document.getElementById('roundNum').textContent = roundNum;
             document.getElementById('roundTeamName').textContent = teamName;
-            document.getElementById('roundScore').value = (score !== null && score !== undefined) ? score : '';
             document.getElementById('existingVideoId').value = videoId || '';
+            currentTeamCategory = category || '';
 
             // Reset state
             selectedVideoFile = null;
+            selectedFlysightFile = null;
             document.getElementById('selectedVideoInfo').classList.add('hidden');
             document.getElementById('uploadProgress').classList.add('hidden');
             document.getElementById('roundVideoFile').value = '';
             document.getElementById('roundVideoCapture').value = '';
 
-            // Video player section
+            // Reset FlySight state
+            document.getElementById('flysightFile').value = '';
+            document.getElementById('selectedFlysightInfo').classList.add('hidden');
+            document.getElementById('flysightResult').classList.add('hidden');
+            document.getElementById('flysightProgress').classList.add('hidden');
+
+            // Show/hide appropriate upload section based on category
+            const isSpeedSkydiving = category === 'sp' || category.startsWith('sp_');
+            const videoUploadSection = document.getElementById('videoUploadSection');
+            const flysightUploadSection = document.getElementById('flysightUploadSection');
             const videoPlayerSection = document.getElementById('videoPlayerSection');
             const videoPlayer = document.getElementById('roundVideoPlayer');
             const uploadOnlyBtn = document.getElementById('uploadOnlyBtn');
+            const scoreInput = document.getElementById('roundScore');
 
-            if (videoId) {
-                // Show video player with the uploaded video
-                videoPlayerSection.classList.remove('hidden');
-                // Fetch actual video URL
-                fetch('/admin/get-video-info/' + videoId)
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.url) {
-                            videoPlayer.src = data.url;
-                        }
-                    })
-                    .catch(err => console.error('Error loading video:', err));
-                document.getElementById('viewVideoFullLink').href = '/video/' + videoId;
-
-                // Update status
-                if (score !== null && score !== undefined) {
-                    document.getElementById('modalStatusText').textContent = '✓ Video uploaded and scored';
-                    document.getElementById('modalStatusText').classList.add('text-green-400');
-                } else {
-                    document.getElementById('modalStatusText').textContent = '⏳ Video uploaded - awaiting score';
-                    document.getElementById('modalStatusText').classList.remove('text-green-400');
-                    document.getElementById('modalStatusText').classList.add('text-yellow-400');
+            if (isSpeedSkydiving) {
+                // Speed Skydiving - show FlySight CSV upload
+                videoUploadSection.classList.add('hidden');
+                flysightUploadSection.classList.remove('hidden');
+                videoPlayerSection.classList.add('hidden');
+                if (scoreInput) {
+                    scoreInput.step = '0.01';
+                    scoreInput.placeholder = 'km/h';
+                    scoreInput.parentElement.querySelector('.text-gray-500 div').textContent = 'Speed (km/h)';
+                    scoreInput.parentElement.querySelector('.text-gray-500 .text-xs').textContent = 'from FlySight data';
+                }
+                document.getElementById('modalStatusText').textContent = 'Upload FlySight CSV to record speed';
+                document.getElementById('modalStatusText').classList.remove('text-green-400', 'text-yellow-400');
+            } else {
+                // Other categories - show video upload
+                videoUploadSection.classList.remove('hidden');
+                flysightUploadSection.classList.add('hidden');
+                if (scoreInput) {
+                    scoreInput.step = '1';
+                    scoreInput.placeholder = '--';
+                    scoreInput.parentElement.querySelector('.text-gray-500 div').textContent = 'Points scored';
+                    scoreInput.parentElement.querySelector('.text-gray-500 .text-xs').textContent = '(minus omissions)';
                 }
 
-                uploadOnlyBtn.classList.add('hidden');
-            } else {
-                // No video yet
-                videoPlayerSection.classList.add('hidden');
-                videoPlayer.src = '';
-                document.getElementById('modalStatusText').textContent = 'No video uploaded yet';
-                document.getElementById('modalStatusText').classList.remove('text-green-400', 'text-yellow-400');
-                uploadOnlyBtn.classList.add('hidden');
+                if (videoId) {
+                    // Show video player with the uploaded video
+                    videoPlayerSection.classList.remove('hidden');
+                    fetch('/videographer/get-video-info/' + videoId)
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.url) {
+                                videoPlayer.src = data.url;
+                            }
+                        })
+                        .catch(err => console.error('Error loading video:', err));
+                    document.getElementById('viewVideoFullLink').href = '/video/' + videoId;
+
+                    if (score !== null && score !== undefined) {
+                        document.getElementById('modalStatusText').textContent = '✓ Video uploaded and scored';
+                        document.getElementById('modalStatusText').classList.add('text-green-400');
+                    } else {
+                        document.getElementById('modalStatusText').textContent = '⏳ Video uploaded - awaiting score';
+                        document.getElementById('modalStatusText').classList.remove('text-green-400');
+                        document.getElementById('modalStatusText').classList.add('text-yellow-400');
+                    }
+                    uploadOnlyBtn.classList.add('hidden');
+                } else {
+                    videoPlayerSection.classList.add('hidden');
+                    videoPlayer.src = '';
+                    document.getElementById('modalStatusText').textContent = 'No video uploaded yet';
+                    document.getElementById('modalStatusText').classList.remove('text-green-400', 'text-yellow-400');
+                    uploadOnlyBtn.classList.add('hidden');
+                }
+            }
+
+            // Set score value
+            if (scoreInput) {
+                scoreInput.value = (score !== null && score !== undefined) ? score : '';
             }
 
             document.getElementById('roundModal').classList.remove('hidden');
+        }
+
+        function handleFlysightSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFlysightFile = file;
+                document.getElementById('selectedFlysightName').textContent = file.name;
+                document.getElementById('selectedFlysightInfo').classList.remove('hidden');
+
+                // Parse CSV to extract speed
+                parseFlysightCSV(file);
+            }
+        }
+
+        function clearFlysightFile() {
+            selectedFlysightFile = null;
+            document.getElementById('flysightFile').value = '';
+            document.getElementById('selectedFlysightInfo').classList.add('hidden');
+            document.getElementById('flysightResult').classList.add('hidden');
+            const scoreInput = document.getElementById('roundScore');
+            if (scoreInput) scoreInput.value = '';
+        }
+
+        function parseFlysightCSV(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const lines = text.split('\n');
+
+                // Find the header line and velD column (vertical velocity)
+                let velDIndex = -1;
+                let maxSpeed = 0;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    const cols = line.split(',');
+
+                    // Look for header with velD (vertical velocity in m/s)
+                    if (velDIndex === -1) {
+                        for (let j = 0; j < cols.length; j++) {
+                            if (cols[j].trim().toLowerCase() === 'veld') {
+                                velDIndex = j;
+                                break;
+                            }
+                        }
+                        continue;
+                    }
+
+                    // Parse velocity data
+                    if (velDIndex >= 0 && cols.length > velDIndex) {
+                        const vel = parseFloat(cols[velDIndex]);
+                        if (!isNaN(vel) && vel > maxSpeed) {
+                            maxSpeed = vel;
+                        }
+                    }
+                }
+
+                // Convert m/s to km/h
+                const speedKmh = (maxSpeed * 3.6).toFixed(2);
+
+                document.getElementById('flysightSpeed').textContent = speedKmh;
+                document.getElementById('flysightResult').classList.remove('hidden');
+
+                // Auto-fill the score
+                const scoreInput = document.getElementById('roundScore');
+                if (scoreInput) {
+                    scoreInput.value = speedKmh;
+                }
+            };
+            reader.readAsText(file);
         }
 
         function hideRoundModal() {
@@ -464,7 +857,7 @@
             try {
                 document.getElementById('uploadBar').style.width = '60%';
 
-                const uploadResponse = await fetch('/admin/upload-video', {
+                const uploadResponse = await fetch('/videographer/upload-video', {
                     method: 'POST',
                     body: formData
                 });
@@ -476,7 +869,7 @@
                     document.getElementById('uploadStatus').textContent = 'Saving...';
 
                     // Save score record with video but no score
-                    const response = await fetch('/admin/team/' + teamId + '/score', {
+                    const response = await fetch('/videographer/team/' + teamId + '/score', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -512,6 +905,8 @@
                 team_number: document.getElementById('teamNumber').value,
                 team_name: document.getElementById('teamName').value,
                 class: document.getElementById('teamClass').value,
+                category: document.getElementById('teamCategory').value,
+                event: document.getElementById('teamEvent').value,
                 members: document.getElementById('teamMembers').value
             };
 
@@ -592,7 +987,7 @@
                 try {
                     document.getElementById('uploadBar').style.width = '60%';
 
-                    const uploadResponse = await fetch('/admin/upload-video', {
+                    const uploadResponse = await fetch('/videographer/upload-video', {
                         method: 'POST',
                         body: formData
                     });
@@ -621,7 +1016,7 @@
                 document.getElementById('uploadStatus').textContent = 'Saving score...';
                 document.getElementById('uploadBar').style.width = '90%';
 
-                const response = await fetch('/admin/team/' + teamId + '/score', {
+                const response = await fetch('/videographer/team/' + teamId + '/score', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
