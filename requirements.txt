@@ -6,3 +6,4 @@ gevent>=23.0.0
 gevent-websocket>=0.10.0
 supabase>=1.0.0
 python-dotenv>=1.0.0
+reportlab>=4.0.0

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - USPA Video Library</title>
+    <title>Admin - Video Library</title>
     <script src="https://cdn.tailwindcss.com"></script>
     {% if dropbox_app_key %}
     <script src="https://www.dropbox.com/static/api/2/dropins.js" id="dropboxjs" data-app-key="{{ dropbox_app_key }}"></script>
@@ -12,7 +12,7 @@
 <body class="bg-gray-900 text-white min-h-screen">
     <nav class="bg-purple-800 p-4 sticky top-0 z-10">
         <div class="container mx-auto flex justify-between items-center">
-            <a href="/" class="text-2xl font-bold text-white">USPA Video Library - Admin</a>
+            <a href="/" class="text-2xl font-bold text-white">Video Library - Admin</a>
             <div class="flex items-center gap-4">
                 <a href="/" class="bg-purple-700 hover:bg-purple-600 px-4 py-2 rounded-lg">View Site</a>
                 <a href="/admin/users" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg">Users</a>
@@ -83,7 +83,7 @@
                     <label class="block text-gray-300 mb-2">Event</label>
                     <input type="text" id="importEvent" list="importEventList"
                         class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        placeholder="e.g., 2024 USPA Nationals">
+                        placeholder="e.g., 2024 Nationals">
                     <datalist id="importEventList">
                         {% for event in events %}
                         <option value="{{ event }}">
@@ -131,7 +131,7 @@
                     <label class="block text-gray-300 mb-2">Event</label>
                     <input type="text" id="uploadEvent" list="uploadEventList"
                         class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        placeholder="e.g., 2024 USPA Nationals">
+                        placeholder="e.g., 2024 Nationals">
                     <datalist id="uploadEventList">
                         {% for event in events %}
                         <option value="{{ event }}">
@@ -256,7 +256,7 @@
                     <label class="block text-gray-300 mb-2">Event</label>
                     <input type="text" id="modalEvent" list="modalEventList"
                         class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        placeholder="e.g., 2024 USPA Nationals">
+                        placeholder="e.g., 2024 Nationals">
                     <datalist id="modalEventList">
                         {% for event in events %}
                         <option value="{{ event }}">
@@ -316,7 +316,7 @@
                     <label class="block text-gray-300 mb-2">Event</label>
                     <input type="text" id="editEvent" list="editEventList"
                         class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        placeholder="e.g., 2024 USPA Nationals">
+                        placeholder="e.g., 2024 Nationals">
                     <datalist id="editEventList">
                         {% for event in events %}
                         <option value="{{ event }}">

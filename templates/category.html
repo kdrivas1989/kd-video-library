@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ category.name }} - USPA Video Library</title>
+    <title>{{ category.name }} - Video Library</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
     <nav class="bg-gray-800 p-4 sticky top-0 z-10">
         <div class="container mx-auto flex justify-between items-center">
-            <a href="/" class="text-2xl font-bold text-blue-400">USPA Video Library</a>
+            <a href="/" class="text-2xl font-bold text-blue-400">Video Library</a>
             <div class="flex items-center gap-4">
                 <form action="/search" method="GET" class="flex">
                     <input type="text" name="q" placeholder="Search videos..."
@@ -63,26 +63,46 @@
 
         {% if is_admin and videos %}
         <!-- Bulk Actions Bar -->
-        <div class="bg-gray-800 rounded-lg p-4 mb-6 flex flex-wrap items-center gap-4">
-            <div class="flex items-center gap-3">
-                <button onclick="selectAll()" class="text-blue-400 hover:text-blue-300 text-sm">Select All</button>
-                <button onclick="selectNone()" class="text-gray-400 hover:text-gray-300 text-sm">Clear</button>
-                <span id="selectedCount" class="text-gray-500 text-sm">0 selected</span>
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <div class="flex flex-wrap items-center gap-4 mb-4">
+                <div class="flex items-center gap-3">
+                    <button onclick="selectAll()" class="text-blue-400 hover:text-blue-300 text-sm">Select All</button>
+                    <button onclick="selectNone()" class="text-gray-400 hover:text-gray-300 text-sm">Clear</button>
+                    <span id="selectedCount" class="text-gray-500 text-sm">0 selected</span>
+                </div>
             </div>
-            <div class="flex items-center gap-2 ml-auto">
-                <label class="text-gray-400 text-sm">Move selected to:</label>
-                <select id="bulkCategory" class="bg-gray-700 text-white px-3 py-2 rounded">
-                    <option value="">Select category...</option>
-                    {% for c_id, c in all_categories.items() %}
-                    <option value="{{ c_id }}">{{ c.abbrev }} - {{ c.name }}</option>
-                    {% endfor %}
-                </select>
-                <select id="bulkSubcategory" class="bg-gray-700 text-white px-3 py-2 rounded hidden">
-                    <option value="">No subcategory</option>
-                </select>
-                <button onclick="bulkMove()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-medium">
-                    Move Selected
-                </button>
+            <!-- Bulk Actions -->
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Move to Category -->
+                <div class="flex items-center gap-2">
+                    <label class="text-gray-400 text-sm">Move to:</label>
+                    <select id="bulkCategory" class="bg-gray-700 text-white px-3 py-2 rounded">
+                        <option value="">Select category...</option>
+                        {% for c_id, c in all_categories.items() %}
+                        <option value="{{ c_id }}">{{ c.abbrev }} - {{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <select id="bulkSubcategory" class="bg-gray-700 text-white px-3 py-2 rounded hidden">
+                        <option value="">No subcategory</option>
+                    </select>
+                    <button onclick="bulkMove()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-medium">
+                        Move
+                    </button>
+                </div>
+                <!-- Set Event Name -->
+                <div class="flex items-center gap-2 border-l border-gray-600 pl-4">
+                    <label class="text-gray-400 text-sm">Set Event:</label>
+                    <input type="text" id="bulkEventName" placeholder="e.g., Nationals 2024"
+                        class="bg-gray-700 text-white px-3 py-2 rounded w-48" list="eventSuggestions">
+                    <datalist id="eventSuggestions">
+                        {% for event in events %}
+                        <option value="{{ event }}">
+                        {% endfor %}
+                    </datalist>
+                    <button onclick="bulkSetEvent()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-medium">
+                        Set Event
+                    </button>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -151,7 +171,7 @@
 
     <footer class="bg-gray-800 mt-12 py-8">
         <div class="container mx-auto px-4 text-center text-gray-400">
-            <p>USPA Video Library - Competition footage for judges and competitors</p>
+            <p>Video Library - Competition footage for judges and competitors</p>
         </div>
     </footer>
 
@@ -251,6 +271,49 @@
                     location.reload();
                 } else {
                     alert(result.error || 'Failed to move videos');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function bulkSetEvent() {
+            const eventName = document.getElementById('bulkEventName').value.trim();
+
+            if (!eventName) {
+                alert('Please enter an event name');
+                return;
+            }
+
+            const selectedVideos = [];
+            document.querySelectorAll('.video-checkbox:checked').forEach(cb => {
+                selectedVideos.push(cb.value);
+            });
+
+            if (selectedVideos.length === 0) {
+                alert('Please select at least one video');
+                return;
+            }
+
+            if (!confirm(`Set event "${eventName}" for ${selectedVideos.length} video(s)?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/bulk-set-event', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        video_ids: selectedVideos,
+                        event: eventName
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    location.reload();
+                } else {
+                    alert(result.error || 'Failed to set event');
                 }
             } catch (err) {
                 alert('Error: ' + err.message);

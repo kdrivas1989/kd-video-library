@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Management - USPA Video Library</title>
+    <title>User Management - Video Library</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
     <nav class="bg-gray-800 p-4 sticky top-0 z-10">
         <div class="container mx-auto flex justify-between items-center">
-            <a href="/" class="text-2xl font-bold text-blue-400">USPA Video Library</a>
+            <a href="/" class="text-2xl font-bold text-blue-400">Video Library</a>
             <div class="flex items-center gap-4">
                 <a href="/admin" class="text-gray-400 hover:text-white">Admin Dashboard</a>
                 <a href="/admin/users" class="text-blue-400">Users</a>
@@ -68,7 +68,7 @@
                             {% endif %}
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <button onclick="showEditModal('{{ user.username }}', '{{ user.name }}', '{{ user.email|default("", true) }}', '{{ user.role }}')"
+                            <button onclick="showEditModal('{{ user.username }}', '{{ user.name }}', '{{ user.email|default("", true) }}', '{{ user.role }}', {{ 'true' if user.signature_pin else 'false' }})"
                                 class="text-blue-400 hover:text-blue-300 mr-3">Edit</button>
                             <button onclick="confirmDelete('{{ user.username }}')"
                                 class="text-red-400 hover:text-red-300">Delete</button>
@@ -162,13 +162,20 @@
                     </div>
                     <div>
                         <label class="block text-gray-400 text-sm mb-1">Role</label>
-                        <select id="editRole"
+                        <select id="editRole" onchange="togglePinField()"
                             class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="judge">Judge</option>
                             <option value="event_judge">Event Judge</option>
                             <option value="chief_judge">Chief Judge</option>
                             <option value="admin">Admin</option>
                         </select>
+                    </div>
+                    <div id="pinFieldContainer" class="hidden">
+                        <label class="block text-gray-400 text-sm mb-1">Signature PIN <span class="text-gray-500">(4-6 digits for signing documents)</span></label>
+                        <input type="password" id="editSignaturePin" pattern="[0-9]{4,6}" maxlength="6"
+                            class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter new PIN (leave blank to keep current)">
+                        <p class="text-gray-500 text-xs mt-1">Required for Chief Judges to electronically sign competition results</p>
                     </div>
                 </div>
                 <div class="flex justify-end gap-3 mt-6">
@@ -196,7 +203,7 @@
             document.getElementById('createModal').classList.add('hidden');
         }
 
-        function showEditModal(username, name, email, role) {
+        function showEditModal(username, name, email, role, hasPin) {
             document.getElementById('editModal').classList.remove('hidden');
             document.getElementById('editUsername').value = username;
             document.getElementById('editUsernameDisplay').value = username;
@@ -204,6 +211,18 @@
             document.getElementById('editEmail').value = email || '';
             document.getElementById('editPassword').value = '';
             document.getElementById('editRole').value = role;
+            document.getElementById('editSignaturePin').value = '';
+            togglePinField();
+        }
+
+        function togglePinField() {
+            const role = document.getElementById('editRole').value;
+            const pinContainer = document.getElementById('pinFieldContainer');
+            if (role === 'chief_judge' || role === 'admin') {
+                pinContainer.classList.remove('hidden');
+            } else {
+                pinContainer.classList.add('hidden');
+            }
         }
 
         function hideEditModal() {
@@ -246,7 +265,8 @@
                 name: document.getElementById('editName').value,
                 email: document.getElementById('editEmail').value,
                 password: document.getElementById('editPassword').value,
-                role: document.getElementById('editRole').value
+                role: document.getElementById('editRole').value,
+                signature_pin: document.getElementById('editSignaturePin').value
             };
 
             try {

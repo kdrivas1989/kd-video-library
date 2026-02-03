@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Videographer Upload - USPA Video Library</title>
+    <title>Videographer Upload - Video Library</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
     <nav class="bg-gray-800 p-4 sticky top-0 z-10">
         <div class="container mx-auto flex justify-between items-center">
-            <a href="/" class="text-2xl font-bold text-blue-400">USPA Video Library</a>
+            <a href="/" class="text-2xl font-bold text-blue-400">Video Library</a>
             <div class="flex items-center gap-4">
                 <a href="/competitions" class="text-gray-400 hover:text-white">Competitions</a>
             </div>
@@ -380,6 +380,54 @@
             circle.classList.add('bg-gray-600');
         }
 
+        function parseFilename(filename) {
+            // Parse filename like "3_23_4201_1.mp4" or "3 23 4201 1.mp4"
+            // Returns { teamNumber: "4201", round: "1" } or null
+            const nameWithoutExt = filename.replace(/\.[^/.]+$/, ''); // Remove extension
+            const parts = nameWithoutExt.split(/[_\s-]+/); // Split by underscore, space, or dash
+
+            if (parts.length >= 4) {
+                // Format: X_X_TEAM_ROUND (team is 3rd part, round is 4th)
+                return {
+                    teamNumber: parts[2],
+                    round: parts[3]
+                };
+            }
+            return null;
+        }
+
+        function autoSelectFromFilename(filename) {
+            const parsed = parseFilename(filename);
+            if (!parsed || !currentTeams || currentTeams.length === 0) {
+                return false;
+            }
+
+            // Find team with matching team_number
+            const matchingTeam = currentTeams.find(t => t.team_number === parsed.teamNumber);
+            if (matchingTeam) {
+                // Select the team
+                const teamSelect = document.getElementById('teamSelect');
+                teamSelect.value = matchingTeam.id;
+                loadRounds();
+
+                // Wait for rounds to load, then select the round
+                setTimeout(() => {
+                    const roundSelect = document.getElementById('roundSelect');
+                    // Find the option with matching round number
+                    for (let i = 0; i < roundSelect.options.length; i++) {
+                        if (roundSelect.options[i].value === parsed.round) {
+                            roundSelect.value = parsed.round;
+                            enableUpload();
+                            break;
+                        }
+                    }
+                }, 300);
+
+                return true;
+            }
+            return false;
+        }
+
         function handleVideoSelect(event) {
             const file = event.target.files[0];
             if (file) {
@@ -387,6 +435,14 @@
                 videoStartPoint = null;
                 const sizeMB = (file.size / 1024 / 1024).toFixed(2);
                 document.getElementById('selectedVideoName').textContent = file.name + ' (' + sizeMB + ' MB)';
+
+                // Try to auto-select team and round from filename
+                if (currentTeams && currentTeams.length > 0) {
+                    const autoSelected = autoSelectFromFilename(file.name);
+                    if (autoSelected) {
+                        console.log('Auto-selected team and round from filename:', file.name);
+                    }
+                }
 
                 // Show start point section, hide file select
                 document.getElementById('fileSelectSection').classList.add('hidden');

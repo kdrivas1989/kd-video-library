@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ competition.name }} - USPA Video Library</title>
+    <title>{{ competition.name }} - Video Library</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 text-gray-900 min-h-screen">
     <nav class="bg-white border-b border-gray-200 p-4 sticky top-0 z-10 shadow-sm">
         <div class="container mx-auto flex justify-between items-center">
-            <a href="/" class="text-2xl font-bold text-blue-600">USPA Video Library</a>
+            <a href="/" class="text-2xl font-bold text-blue-600">Video Library</a>
             <div class="flex items-center gap-4">
                 <a href="/competitions" class="text-gray-600 hover:text-gray-900">Competitions</a>
                 <a href="/videographer" class="bg-yellow-500 hover:bg-gray-400 text-white px-4 py-2 rounded-lg">Videographer Upload</a>
@@ -87,6 +87,25 @@
                 <button onclick="showTrainingPanel()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm flex items-center gap-1">
                     <span>🎓</span> Training Videos
                 </button>
+                <span class="text-gray-600">|</span>
+                <button onclick="showChiefJudgeModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
+                    Chief Judge
+                </button>
+                <button onclick="showEventDetailsModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
+                    Event Details
+                </button>
+                <button onclick="printResults()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Print PDF
+                </button>
+            </div>
+            {% else %}
+            <!-- Non-admin print button -->
+            <div class="flex gap-2">
+                <button onclick="printResults()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Print PDF
+                </button>
             </div>
             {% endif %}
         </div>
@@ -140,25 +159,6 @@
             {% endif %}
         </div>
         {% endif %}
-
-        <!-- Class Tabs -->
-        <div class="flex gap-2 mb-6 border-b border-gray-200 pb-2">
-            <button onclick="showClass('all')" id="tab-all" class="px-4 py-2 rounded-t-lg bg-blue-600 text-white">
-                All Teams
-            </button>
-            <button onclick="showClass('beginner')" id="tab-beginner" class="px-4 py-2 rounded-t-lg bg-gray-200 hover:bg-gray-300">
-                Beginner
-            </button>
-            <button onclick="showClass('intermediate')" id="tab-intermediate" class="px-4 py-2 rounded-t-lg bg-gray-200 hover:bg-gray-300">
-                Intermediate
-            </button>
-            <button onclick="showClass('advanced')" id="tab-advanced" class="px-4 py-2 rounded-t-lg bg-gray-200 hover:bg-gray-300">
-                Advanced
-            </button>
-            <button onclick="showClass('open')" id="tab-open" class="px-4 py-2 rounded-t-lg bg-gray-200 hover:bg-gray-300">
-                Open
-            </button>
-        </div>
 
         {% if is_multi_event %}
         <!-- Multi-Event Competition: Teams organized by Event then Class -->
@@ -248,7 +248,7 @@
                                     {% elif round_score and (round_score.video_id or round_score.score is not none) %}
                                 {% set is_cp_penalty = event_type == 'cp_dsz' and round_score.score_data in ['WL', 'DR', 'MR', 'DQ', 'OF', 'OC', 'CD', 'ME'] %}
                                 <button onclick="openRoundModal('{{ team.id }}', '{{ team.team_name }}', {{ i }}, {{ round_score.score if round_score.score is not none else 'null' }}, '{{ round_score.video_id }}', '{{ team.event|default("", true) }}', '{{ round_score.id }}', {{ round_score.training_flag|default(0) }})"
-                                    class="relative inline-flex items-center justify-center gap-1 {% if event_type == 'cp_dsz' %}w-24 h-10{% else %}w-10 h-8{% endif %} rounded text-xs {% if is_cp_penalty %}bg-red-700 hover:bg-red-600{% elif round_score.exit_time_penalty %}ring-2 ring-red-500 {% elif round_score.training_flag %}ring-2 ring-purple-500 {% endif %}{% if round_score.score is not none and not is_cp_penalty %}bg-green-600 hover:bg-gray-300{% elif not is_cp_penalty %}bg-yellow-600 hover:bg-gray-300{% endif %}"
+                                    class="relative inline-flex items-center justify-center gap-1 {% if event_type == 'cp_dsz' %}w-24 h-10{% else %}w-10 h-8{% endif %} rounded text-xs {% if is_cp_penalty %}bg-red-700 hover:bg-red-600{% elif round_score.exit_time_penalty %}ring-2 ring-red-500 {% elif round_score.training_flag %}ring-2 ring-purple-500 {% endif %}{% if round_score.score is not none and not is_cp_penalty %}bg-gray-300 hover:bg-gray-400{% elif not is_cp_penalty %}bg-yellow-600 hover:bg-gray-300{% endif %}"
                                     title="{% if is_cp_penalty %}{{ round_score.score_data }} - Penalty{% elif event_type == 'cp_dsz' and round_score.weighted_score is defined and round_score.weighted_score is not none %}Raw: {{ round_score.score }} | Weighted: {{ round_score.weighted_score|round(2) }}{% elif round_score.exit_time_penalty %}⏱️ -20% Penalty | {% endif %}{% if round_score.training_flag %}🎓 Training | {% endif %}{% if round_score.score is not none %}Score: {{ round_score.score }}{% if round_score.score_data %} ({{ round_score.score_data }}){% endif %}{% if round_score.scored_by %} by {{ round_score.scored_by }}{% endif %}{% else %}Video uploaded - Click to judge{% endif %}">
                                     {% if round_score.exit_time_penalty %}<span class="absolute -top-1 -left-1 text-xs">⏱️</span>{% endif %}
                                     {% if round_score.training_flag %}<span class="absolute -top-1 -right-1 text-xs">🎓</span>{% endif %}
@@ -329,9 +329,47 @@
         {% endfor %}
         {% else %}
         <!-- Single-Event Competition: Teams organized by Class only -->
+
+        <!-- Class Selector and Discipline Tabs -->
+        <div class="mb-4 flex flex-wrap items-center gap-4">
+            <div class="flex items-center gap-2">
+                <label class="text-gray-700 font-medium">Class:</label>
+                <select id="classSelector" onchange="filterClass(this.value)" class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {% set has_teams = [] %}
+                    {% for class_name, teams in teams_by_class.items() %}
+                        {% if teams %}
+                            {% set _ = has_teams.append(class_name) %}
+                        {% endif %}
+                    {% endfor %}
+                    {% for class_name, teams in teams_by_class.items() %}
+                        {% if teams %}
+                        <option value="{{ class_name }}" {% if loop.first %}selected{% endif %}>{{ class_name|capitalize }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+
+            {% if competition.event_type == 'cp_dsz' %}
+            <!-- Discipline Tabs for CP DSZ -->
+            <div class="flex gap-2">
+                <button onclick="filterDiscipline('all')" id="tab-all" class="discipline-tab px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white">
+                    Overall
+                </button>
+                <button onclick="filterDiscipline('za')" id="tab-za" class="discipline-tab px-4 py-2 rounded-lg text-sm font-medium bg-gray-200 hover:bg-gray-300 text-gray-700">
+                    Zone Accuracy
+                </button>
+                <button onclick="filterDiscipline('d')" id="tab-d" class="discipline-tab px-4 py-2 rounded-lg text-sm font-medium bg-gray-200 hover:bg-gray-300 text-gray-700">
+                    Distance
+                </button>
+                <button onclick="filterDiscipline('s')" id="tab-s" class="discipline-tab px-4 py-2 rounded-lg text-sm font-medium bg-gray-200 hover:bg-gray-300 text-gray-700">
+                    Speed
+                </button>
+            </div>
+            {% endif %}
+        </div>
+
         {% for class_name, teams in teams_by_class.items() %}
-        <div id="class-{{ class_name }}" class="class-section mb-8">
-            <h2 class="text-xl font-bold mb-4 capitalize">{{ class_name }} Class</h2>
+        <div id="class-{{ class_name }}" class="class-section mb-8 hidden">
             {% if teams %}
             <div class="bg-white rounded-lg overflow-hidden">
                 <table class="w-full">
@@ -349,18 +387,18 @@
                             {% set single_event_rounds = event_rounds.get(event_types[0], competition.total_rounds) if event_types else competition.total_rounds %}
                             {% if competition.event_type == 'cp_dsz' %}
                             <!-- CP Individual: Zone Accuracy (1-3), Distance (4-6), Speed (7-9) -->
-                            <th class="px-2 py-3 text-center text-sm bg-gray-200" title="Zone Accuracy Round 1">ZA1</th>
-                            <th class="px-2 py-3 text-center text-sm bg-gray-200" title="Zone Accuracy Round 2">ZA2</th>
-                            <th class="px-2 py-3 text-center text-sm bg-gray-200" title="Zone Accuracy Round 3">ZA3</th>
-                            <th class="px-2 py-3 text-center text-sm bg-gray-300 font-bold" title="Zone Accuracy Total">ZA</th>
-                            <th class="px-2 py-3 text-center text-sm bg-gray-200" title="Distance Round 1">D1</th>
-                            <th class="px-2 py-3 text-center text-sm bg-gray-200" title="Distance Round 2">D2</th>
-                            <th class="px-2 py-3 text-center text-sm bg-gray-200" title="Distance Round 3">D3</th>
-                            <th class="px-2 py-3 text-center text-sm bg-gray-300 font-bold" title="Distance Total">D</th>
-                            <th class="px-2 py-3 text-center text-sm bg-gray-200" title="Speed Round 1">S1</th>
-                            <th class="px-2 py-3 text-center text-sm bg-gray-200" title="Speed Round 2">S2</th>
-                            <th class="px-2 py-3 text-center text-sm bg-gray-200" title="Speed Round 3">S3</th>
-                            <th class="px-2 py-3 text-center text-sm bg-gray-300 font-bold" title="Speed Total">S</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-200 col-za" title="Zone Accuracy Round 1">ZA1</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-200 col-za" title="Zone Accuracy Round 2">ZA2</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-200 col-za" title="Zone Accuracy Round 3">ZA3</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-300 font-bold col-za col-za-total" title="Zone Accuracy Total">ZA</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-200 col-d" title="Distance Round 1">D1</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-200 col-d" title="Distance Round 2">D2</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-200 col-d" title="Distance Round 3">D3</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-300 font-bold col-d col-d-total" title="Distance Total">D</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-200 col-s" title="Speed Round 1">S1</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-200 col-s" title="Speed Round 2">S2</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-200 col-s" title="Speed Round 3">S3</th>
+                            <th class="px-2 py-3 text-center text-sm bg-gray-300 font-bold col-s col-s-total" title="Speed Total">S</th>
                             {% else %}
                             {% for i in range(1, single_event_rounds + 1) %}
                             <th class="px-2 py-3 text-center text-sm">R{{ i }}</th>
@@ -401,7 +439,7 @@
                             {% endif %}
                             {% for i in range(1, single_event_rounds + 1) %}
                             {% set round_score = team.scores|selectattr('round_num', 'equalto', i)|first %}
-                            <td class="px-2 py-3 text-center">
+                            <td class="px-2 py-3 text-center {% if competition.event_type == 'cp_dsz' %}{% if i <= 3 %}col-za{% elif i <= 6 %}col-d{% else %}col-s{% endif %}{% endif %}">
                                 {% if round_score and round_score.rejump %}
                                 <!-- Rejump awarded - awaiting new video -->
                                 <button onclick="openRoundModal('{{ team.id }}', '{{ team.team_name }}', {{ i }}, null, '', '{{ team.category|default("", true) }}', '{{ round_score.id }}', 0)"
@@ -412,7 +450,7 @@
                                 {% elif round_score and (round_score.video_id or round_score.score is not none) %}
                                 {% set is_cp_penalty = competition.event_type == 'cp_dsz' and round_score.score_data in ['WL', 'DR', 'MR', 'DQ', 'OF', 'OC', 'CD', 'ME'] %}
                                 <button onclick="openRoundModal('{{ team.id }}', '{{ team.team_name }}', {{ i }}, {{ round_score.score if round_score.score is not none else 'null' }}, '{{ round_score.video_id }}', '{{ team.category|default("", true) }}', '{{ round_score.id }}', {{ round_score.training_flag|default(0) }})"
-                                    class="inline-flex items-center justify-center gap-1 {% if competition.event_type == 'cp_dsz' %}w-24 h-10{% else %}w-10 h-8{% endif %} rounded text-xs relative {% if is_cp_penalty %}bg-red-700 hover:bg-red-600{% elif round_score.exit_time_penalty %}ring-2 ring-red-500 {% elif round_score.training_flag %}ring-2 ring-purple-500 {% endif %}{% if round_score.score is not none and not is_cp_penalty %}bg-green-600 hover:bg-gray-300{% elif not is_cp_penalty %}bg-yellow-600 hover:bg-gray-300{% endif %}"
+                                    class="inline-flex items-center justify-center gap-1 {% if competition.event_type == 'cp_dsz' %}w-24 h-10{% else %}w-10 h-8{% endif %} rounded text-xs relative {% if is_cp_penalty %}bg-red-700 hover:bg-red-600{% elif round_score.exit_time_penalty %}ring-2 ring-red-500 {% elif round_score.training_flag %}ring-2 ring-purple-500 {% endif %}{% if round_score.score is not none and not is_cp_penalty %}bg-gray-300 hover:bg-gray-400{% elif not is_cp_penalty %}bg-yellow-600 hover:bg-gray-300{% endif %}"
                                     title="{% if is_cp_penalty %}{{ round_score.score_data }} - Penalty{% elif competition.event_type == 'cp_dsz' and round_score.weighted_score is defined and round_score.weighted_score is not none %}Raw: {{ round_score.score }} | Weighted: {{ round_score.weighted_score|round(2) }}{% elif round_score.exit_time_penalty %}⏱️ -20% Penalty | {% endif %}{% if round_score.training_flag %}🎓 Training | {% endif %}{% if round_score.score is not none %}Score: {{ round_score.score }}{% if round_score.score_data %} ({{ round_score.score_data }}){% endif %}{% if round_score.scored_by %} by {{ round_score.scored_by }}{% endif %}{% else %}Video uploaded - Click to judge{% endif %}">
                                     {% if round_score.exit_time_penalty %}<span class="absolute -top-1 -left-1 text-xs">⏱️</span>{% endif %}
                                     {% if round_score.training_flag %}<span class="absolute -top-1 -right-1 text-xs">🎓</span>{% endif %}
@@ -428,7 +466,7 @@
                             </td>
                             {% if competition.event_type == 'cp_dsz' and i == 3 %}
                             <!-- ZA Subtotal after round 3 -->
-                            <td class="px-2 py-3 text-center bg-gray-200/30 font-bold">
+                            <td class="px-2 py-3 text-center bg-gray-200/30 font-bold col-za col-za-total">
                                 {% set ns = namespace(total=0) %}
                                 {% for r in range(1, 4) %}
                                     {% set rs = team.scores|selectattr('round_num', 'equalto', r)|first %}
@@ -441,7 +479,7 @@
                             {% endif %}
                             {% if competition.event_type == 'cp_dsz' and i == 6 %}
                             <!-- D Subtotal after round 6 -->
-                            <td class="px-2 py-3 text-center bg-gray-200/30 font-bold">
+                            <td class="px-2 py-3 text-center bg-gray-200/30 font-bold col-d col-d-total">
                                 {% set ns = namespace(total=0) %}
                                 {% for r in range(4, 7) %}
                                     {% set rs = team.scores|selectattr('round_num', 'equalto', r)|first %}
@@ -454,7 +492,7 @@
                             {% endif %}
                             {% if competition.event_type == 'cp_dsz' and i == 9 %}
                             <!-- S Subtotal after round 9 -->
-                            <td class="px-2 py-3 text-center bg-gray-200/30 font-bold">
+                            <td class="px-2 py-3 text-center bg-gray-200/30 font-bold col-s col-s-total">
                                 {% set ns = namespace(total=0) %}
                                 {% for r in range(7, 10) %}
                                     {% set rs = team.scores|selectattr('round_num', 'equalto', r)|first %}
@@ -582,7 +620,7 @@
                         <label class="block text-gray-600 text-sm mb-1">Event Name</label>
                         <input type="text" id="teamEventName"
                             class="w-full px-4 py-2 rounded bg-white text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="2024 USPA Nationals">
+                            placeholder="2024 Nationals">
                     </div>
                     {% endif %}
 
@@ -679,10 +717,12 @@
                 <h2 class="text-xl font-bold">Bulk Edit Competitors</h2>
                 <button onclick="hideBulkEditModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
             </div>
+            <p class="text-gray-600 text-sm mb-3">Use the arrows to change the display order. Competitor numbers remain unchanged.</p>
             <div class="overflow-x-auto max-h-[60vh] overflow-y-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-100 sticky top-0">
                         <tr>
+                            <th class="px-2 py-2 text-center w-20">Order</th>
                             <th class="px-3 py-2 text-left">#</th>
                             <th class="px-3 py-2 text-left">Name</th>
                             <th class="px-3 py-2 text-left">Country</th>
@@ -695,9 +735,161 @@
                     </tbody>
                 </table>
             </div>
-            <div class="mt-4 flex justify-end gap-2">
+            <div class="mt-4 flex justify-between">
+                <button onclick="saveTeamOrder()" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Save Order</button>
                 <button onclick="hideBulkEditModal()" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Close</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Print Options Modal -->
+    <div id="printOptionsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Print Options</h2>
+                <button onclick="hidePrintOptionsModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 font-medium mb-2">Select Rounds to Include</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="printRange" value="full" checked class="w-4 h-4">
+                            <span>Full Event (All Rounds)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="printRange" value="upTo" class="w-4 h-4">
+                            <span>Up to Round:</span>
+                            <select id="printUpToRound" class="px-2 py-1 border border-gray-300 rounded">
+                                {% if competition.event_type == 'cp_dsz' %}
+                                <option value="1">ZA1</option>
+                                <option value="2">ZA2</option>
+                                <option value="3">ZA3</option>
+                                <option value="4">D1</option>
+                                <option value="5">D2</option>
+                                <option value="6">D3</option>
+                                <option value="7">S1</option>
+                                <option value="8">S2</option>
+                                <option value="9">S3</option>
+                                {% else %}
+                                {% for i in range(1, (competition.total_rounds or 10) + 1) %}
+                                <option value="{{ i }}">Round {{ i }}</option>
+                                {% endfor %}
+                                {% endif %}
+                            </select>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="printRange" value="single" class="w-4 h-4">
+                            <span>Single Round:</span>
+                            <select id="printSingleRound" class="px-2 py-1 border border-gray-300 rounded">
+                                {% if competition.event_type == 'cp_dsz' %}
+                                <option value="1">ZA1</option>
+                                <option value="2">ZA2</option>
+                                <option value="3">ZA3</option>
+                                <option value="4">D1</option>
+                                <option value="5">D2</option>
+                                <option value="6">D3</option>
+                                <option value="7">S1</option>
+                                <option value="8">S2</option>
+                                <option value="9">S3</option>
+                                {% else %}
+                                {% for i in range(1, (competition.total_rounds or 10) + 1) %}
+                                <option value="{{ i }}">Round {{ i }}</option>
+                                {% endfor %}
+                                {% endif %}
+                            </select>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            {% if competition.chief_judge %}
+                <div class="border-t border-gray-200 pt-4 mt-4">
+                    <label class="block text-gray-700 font-medium mb-2">Chief Judge Signature (Optional)</label>
+                    <p class="text-gray-500 text-sm mb-2">Enter PIN to include signature, or leave blank to print without</p>
+                    <input type="text" id="printSignaturePin" placeholder="PIN (optional)"
+                        maxlength="6"
+                        class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                {% endif %}
+            </div>
+            <div class="flex justify-end gap-2 mt-6">
+                <button type="button" onclick="hidePrintOptionsModal()" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Cancel</button>
+                <button type="button" onclick="generatePDF()" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Generate PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chief Judge Modal -->
+    <div id="chiefJudgeModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Set Chief Judge</h2>
+                <button onclick="hideChiefJudgeModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <form onsubmit="saveChiefJudge(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-600 text-sm mb-1">Select Chief Judge</label>
+                        <select id="chiefJudgeSelect"
+                            class="w-full px-4 py-2 rounded bg-white text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">-- Select a Chief Judge --</option>
+                        </select>
+                        <p class="text-gray-400 text-xs mt-1">Only users with a Signature PIN can be selected.</p>
+                    </div>
+                    <div id="noSignersMessage" class="hidden bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded">
+                        <p class="text-sm">No users with signature PINs found.</p>
+                        <p class="text-xs mt-1">Go to <a href="/admin/users" class="text-blue-600 underline">User Management</a> to set up a Chief Judge with a signature PIN.</p>
+                    </div>
+                    <p class="text-gray-500 text-sm">
+                        The Chief Judge's name will appear as an electronic signature on printed PDF results when verified with their PIN.
+                    </p>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button type="button" onclick="hideChiefJudgeModal()" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Cancel</button>
+                    <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Event Details Modal -->
+    <div id="eventDetailsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-lg mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Event Details</h2>
+                <button onclick="hideEventDetailsModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <form onsubmit="saveEventDetails(event)">
+                <div class="space-y-4 max-h-96 overflow-y-auto">
+                    {% for event_type in event_types %}
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-800 mb-3">{{ EVENT_DISPLAY_NAMES.get(event_type, event_type) }}</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-gray-600 text-xs mb-1">Location</label>
+                                <input type="text" id="eventLocation_{{ event_type }}"
+                                    value="{{ (competition.event_locations|default('{}', true)|tojson|safe|replace('\\\"', '\"')|from_json).get(event_type, '') if competition.event_locations else '' }}"
+                                    placeholder="e.g., Skydive Arizona"
+                                    class="w-full px-3 py-2 rounded bg-white text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-gray-600 text-xs mb-1">Date</label>
+                                <input type="date" id="eventDate_{{ event_type }}"
+                                    value="{{ (competition.event_dates|default('{}', true)|tojson|safe|replace('\\\"', '\"')|from_json).get(event_type, '') if competition.event_dates else '' }}"
+                                    class="w-full px-3 py-2 rounded bg-white text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button type="button" onclick="hideEventDetailsModal()" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Cancel</button>
+                    <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Save</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -758,7 +950,7 @@
                         <label class="block text-gray-600 text-sm mb-1">Event Name</label>
                         <input type="text" id="editTeamEventName"
                             class="w-full px-4 py-2 rounded bg-white text-gray-900 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="2024 USPA Nationals">
+                            placeholder="2024 Nationals">
                     </div>
                     {% endif %}
                     <div>
@@ -1595,32 +1787,22 @@
             document.getElementById('addTeamPhotoPreview').innerHTML = '<span class="text-gray-500 text-xs">No photo</span>';
         }
 
+        let bulkEditTeams = [];
+
         function showBulkEditModal() {
             // Fetch all competitors and populate table
             fetch('/admin/competition/{{ competition.id }}/teams')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        const tbody = document.getElementById('bulkEditTableBody');
-                        tbody.innerHTML = '';
-                        data.teams.forEach(team => {
-                            const hasScores = team.has_scores || false;
-                            const row = document.createElement('tr');
-                            row.className = 'border-t border-gray-200';
-                            row.innerHTML = `
-                                <td class="px-3 py-2">${team.team_number || ''}</td>
-                                <td class="px-3 py-2 font-medium">${team.team_name || ''}</td>
-                                <td class="px-3 py-2">${team.members || ''}</td>
-                                <td class="px-3 py-2">${team.class || ''}</td>
-                                <td class="px-3 py-2 text-center">
-                                    ${!hasScores ? `
-                                        <button onclick="openEditTeamModal('${team.id}', '${team.team_number || ''}', '${team.team_name || ''}', '${team.class || ''}', '${(team.members || '').replace(/'/g, "\\'")}', '${team.category || ''}', '${team.event || ''}', '${team.photo || ''}')" class="text-blue-600 hover:text-blue-800 text-sm mr-2">Edit</button>
-                                        <button onclick="deleteTeam('${team.id}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
-                                    ` : '<span class="text-gray-400 text-xs">Has scores</span>'}
-                                </td>
-                            `;
-                            tbody.appendChild(row);
+                        // Sort by display_order, then by team_number
+                        bulkEditTeams = data.teams.sort((a, b) => {
+                            const orderA = a.display_order || 0;
+                            const orderB = b.display_order || 0;
+                            if (orderA !== orderB) return orderA - orderB;
+                            return (a.team_number || '').localeCompare(b.team_number || '');
                         });
+                        renderBulkEditTable();
                     }
                 })
                 .catch(err => console.error('Error loading teams:', err));
@@ -1628,8 +1810,267 @@
             document.getElementById('bulkEditModal').classList.remove('hidden');
         }
 
+        function renderBulkEditTable() {
+            const tbody = document.getElementById('bulkEditTableBody');
+            tbody.innerHTML = '';
+            bulkEditTeams.forEach((team, index) => {
+                const hasScores = team.has_scores || false;
+                const row = document.createElement('tr');
+                row.className = 'border-t border-gray-200';
+                row.dataset.teamId = team.id;
+                row.innerHTML = `
+                    <td class="px-2 py-2 text-center">
+                        <div class="flex justify-center gap-1">
+                            <button onclick="moveTeamUp(${index})" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 ${index === 0 ? 'opacity-50 cursor-not-allowed' : ''}" ${index === 0 ? 'disabled' : ''}>▲</button>
+                            <button onclick="moveTeamDown(${index})" class="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 ${index === bulkEditTeams.length - 1 ? 'opacity-50 cursor-not-allowed' : ''}" ${index === bulkEditTeams.length - 1 ? 'disabled' : ''}>▼</button>
+                        </div>
+                    </td>
+                    <td class="px-3 py-2">${team.team_number || ''}</td>
+                    <td class="px-3 py-2 font-medium">${team.team_name || ''}</td>
+                    <td class="px-3 py-2">${team.members || ''}</td>
+                    <td class="px-3 py-2">${team.class || ''}</td>
+                    <td class="px-3 py-2 text-center">
+                        ${!hasScores ? `
+                            <button onclick="openEditTeamModal('${team.id}', '${team.team_number || ''}', '${team.team_name || ''}', '${team.class || ''}', '${(team.members || '').replace(/'/g, "\\'")}', '${team.category || ''}', '${team.event || ''}', '${team.photo || ''}')" class="text-blue-600 hover:text-blue-800 text-sm mr-2">Edit</button>
+                            <button onclick="deleteTeam('${team.id}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                        ` : '<span class="text-gray-400 text-xs">Has scores</span>'}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function moveTeamUp(index) {
+            if (index <= 0) return;
+            const temp = bulkEditTeams[index];
+            bulkEditTeams[index] = bulkEditTeams[index - 1];
+            bulkEditTeams[index - 1] = temp;
+            renderBulkEditTable();
+        }
+
+        function moveTeamDown(index) {
+            if (index >= bulkEditTeams.length - 1) return;
+            const temp = bulkEditTeams[index];
+            bulkEditTeams[index] = bulkEditTeams[index + 1];
+            bulkEditTeams[index + 1] = temp;
+            renderBulkEditTable();
+        }
+
+        async function saveTeamOrder() {
+            const orders = bulkEditTeams.map((team, index) => ({
+                team_id: team.id,
+                display_order: index + 1
+            }));
+
+            try {
+                const response = await fetch('/admin/competition/{{ competition.id }}/update-team-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orders })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('Order saved successfully');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to save order'));
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Error saving order');
+            }
+        }
+
         function hideBulkEditModal() {
             document.getElementById('bulkEditModal').classList.add('hidden');
+        }
+
+        async function showChiefJudgeModal() {
+            document.getElementById('chiefJudgeModal').classList.remove('hidden');
+
+            // Fetch available signers
+            try {
+                const response = await fetch('/api/signers');
+                const result = await response.json();
+                const select = document.getElementById('chiefJudgeSelect');
+                const noSignersMsg = document.getElementById('noSignersMessage');
+
+                // Clear existing options except the first
+                select.innerHTML = '<option value="">-- Select a Chief Judge --</option>';
+
+                if (result.success && result.signers.length > 0) {
+                    noSignersMsg.classList.add('hidden');
+                    result.signers.forEach(signer => {
+                        const option = document.createElement('option');
+                        option.value = signer.username;
+                        option.textContent = `${signer.name} (${signer.role === 'admin' ? 'Admin' : 'Chief Judge'})`;
+                        if (signer.username === '{{ competition.chief_judge or "" }}') {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                } else {
+                    noSignersMsg.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error('Error loading signers:', err);
+            }
+        }
+
+        function hideChiefJudgeModal() {
+            document.getElementById('chiefJudgeModal').classList.add('hidden');
+        }
+
+        async function saveChiefJudge(e) {
+            e.preventDefault();
+            const chiefJudge = document.getElementById('chiefJudgeSelect').value;
+
+            try {
+                const response = await fetch('/admin/competition/' + compId + '/set-chief-judge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chief_judge: chiefJudge })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    hideChiefJudgeModal();
+                    alert('Chief Judge saved: ' + (result.display_name || '(none)'));
+                    location.reload();
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to save'));
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Error saving Chief Judge');
+            }
+        }
+
+        function showEventDetailsModal() {
+            document.getElementById('eventDetailsModal').classList.remove('hidden');
+        }
+
+        function hideEventDetailsModal() {
+            document.getElementById('eventDetailsModal').classList.add('hidden');
+        }
+
+        async function saveEventDetails(e) {
+            e.preventDefault();
+            const eventTypes = {{ event_types|tojson|safe }};
+            const eventLocations = {};
+            const eventDates = {};
+
+            eventTypes.forEach(et => {
+                const locationInput = document.getElementById('eventLocation_' + et);
+                const dateInput = document.getElementById('eventDate_' + et);
+                if (locationInput && locationInput.value.trim()) {
+                    eventLocations[et] = locationInput.value.trim();
+                }
+                if (dateInput && dateInput.value) {
+                    eventDates[et] = dateInput.value;
+                }
+            });
+
+            try {
+                const response = await fetch('/admin/competition/' + compId + '/set-event-details', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event_locations: eventLocations, event_dates: eventDates })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    hideEventDetailsModal();
+                    alert('Event details saved');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to save'));
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Error saving event details');
+            }
+        }
+
+        function filterClass(className) {
+            // Hide all class sections
+            document.querySelectorAll('.class-section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            // Show selected class section
+            const selectedSection = document.getElementById('class-' + className);
+            if (selectedSection) {
+                selectedSection.classList.remove('hidden');
+            }
+        }
+
+        function filterDiscipline(discipline) {
+            // Update tab styles
+            document.querySelectorAll('.discipline-tab').forEach(tab => {
+                tab.classList.remove('bg-blue-600', 'text-white');
+                tab.classList.add('bg-gray-200', 'text-gray-700');
+            });
+            const activeTab = document.getElementById('tab-' + discipline);
+            if (activeTab) {
+                activeTab.classList.remove('bg-gray-200', 'text-gray-700');
+                activeTab.classList.add('bg-blue-600', 'text-white');
+            }
+
+            // Show/hide columns based on discipline
+            const allCols = ['col-za', 'col-d', 'col-s'];
+
+            if (discipline === 'all') {
+                // Show all columns
+                allCols.forEach(cls => {
+                    document.querySelectorAll('.' + cls).forEach(el => {
+                        el.style.display = '';
+                    });
+                });
+            } else {
+                // Hide all, then show selected
+                allCols.forEach(cls => {
+                    document.querySelectorAll('.' + cls).forEach(el => {
+                        el.style.display = 'none';
+                    });
+                });
+                // Show selected discipline
+                const showClass = 'col-' + discipline;
+                document.querySelectorAll('.' + showClass).forEach(el => {
+                    el.style.display = '';
+                });
+            }
+        }
+
+        function printResults() {
+            document.getElementById('printOptionsModal').classList.remove('hidden');
+        }
+
+        function hidePrintOptionsModal() {
+            document.getElementById('printOptionsModal').classList.add('hidden');
+        }
+
+        function generatePDF() {
+            const printRange = document.querySelector('input[name="printRange"]:checked').value;
+            let url = '/competition/' + compId + '/print-pdf?';
+
+            if (printRange === 'full') {
+                url += 'range=full';
+            } else if (printRange === 'upTo') {
+                const upToRound = document.getElementById('printUpToRound').value;
+                url += 'range=upTo&round=' + upToRound;
+            } else if (printRange === 'single') {
+                const singleRound = document.getElementById('printSingleRound').value;
+                url += 'range=single&round=' + singleRound;
+            }
+
+            // Add PIN if provided
+            const pinInput = document.getElementById('printSignaturePin');
+            if (pinInput && pinInput.value.trim()) {
+                url += '&pin=' + encodeURIComponent(pinInput.value.trim());
+            }
+
+            hidePrintOptionsModal();
+            window.open(url, '_blank');
         }
 
         function showAddCompetitorModal() {
@@ -3376,6 +3817,14 @@
                 if (document.activeElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
                     document.activeElement.blur();
                 }
+            }
+        });
+
+        // Initialize: show first class on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const classSelector = document.getElementById('classSelector');
+            if (classSelector && classSelector.value) {
+                filterClass(classSelector.value);
             }
         });
     </script>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""USPA Video Library - Video database for skydiving disciplines."""
+"""Video Library - Video database for skydiving disciplines."""
 
 import os
 import uuid
@@ -15,6 +15,23 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 from werkzeug.utils import secure_filename
 from functools import wraps
 import sqlite3
+from io import BytesIO
+
+# PDF generation
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, Flowable
+    from reportlab.pdfgen import canvas
+    from reportlab.graphics.shapes import Drawing, String, Line, Rect
+    from reportlab.graphics import renderPDF
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
 
 # Database support - Supabase for production, SQLite for local dev
 try:
@@ -50,7 +67,7 @@ EVENT_DISPLAY_NAMES = {
     'cf_2way': '2-Way CF',
     'al_individual': 'AL Individual',
     'al_team': 'AL Team',
-    'cp_dsz': 'CP Individual',
+    'cp_dsz': 'Canopy Piloting',
     'cp_team': 'CP Team',
     'cp_freestyle': 'CP Freestyle',
     'ae_freestyle': 'AE Freestyle',
@@ -59,6 +76,13 @@ EVENT_DISPLAY_NAMES = {
     'ws_performance': 'WS Performance',
     'sp_individual': 'SP Individual',
     'sp_mixed_team': 'SP Mixed Team',
+    'indoor_4way_fs': 'Indoor 4-Way FS',
+    'indoor_4way_vfs': 'Indoor 4-Way VFS',
+    'indoor_2way_fs': 'Indoor 2-Way FS',
+    'indoor_2way_vfs': 'Indoor 2-Way VFS',
+    'indoor_8way': 'Indoor 8-Way',
+    'indoor_freestyle': 'Indoor Freestyle',
+    'indoor_freefly': 'Indoor Freefly',
 }
 
 @app.template_filter('event_name')
@@ -174,12 +198,12 @@ def send_reset_email(email, username, reset_token):
     msg = MIMEMultipart()
     msg['From'] = SMTP_FROM_EMAIL or SMTP_USERNAME
     msg['To'] = email
-    msg['Subject'] = 'USPA Video Library - Password Reset'
+    msg['Subject'] = 'Video Library - Password Reset'
 
     body = f"""
 Hello,
 
-You requested a password reset for your USPA Video Library account ({username}).
+You requested a password reset for your Video Library account ({username}).
 
 Click the link below to reset your password:
 {reset_link}
@@ -188,7 +212,7 @@ This link will expire in 1 hour.
 
 If you did not request this reset, please ignore this email.
 
-- USPA Video Library
+- Video Library
 """
     msg.attach(MIMEText(body, 'plain'))
 
@@ -300,6 +324,20 @@ CATEGORIES = {
             {'id': 'mixed_team', 'name': 'Mixed Team (3 rounds)'}
         ],
         'file_type': 'flysight'  # Uses FlysSight GPS files instead of video
+    },
+    'indoor': {
+        'name': 'Indoor',
+        'abbrev': 'IND',
+        'description': 'Indoor skydiving competition videos',
+        'subcategories': [
+            {'id': '4way_fs', 'name': '4-Way FS'},
+            {'id': '4way_vfs', 'name': '4-Way VFS'},
+            {'id': '2way_fs', 'name': '2-Way FS'},
+            {'id': '2way_vfs', 'name': '2-Way VFS'},
+            {'id': '8way', 'name': '8-Way'},
+            {'id': 'freestyle', 'name': 'Freestyle'},
+            {'id': 'freefly', 'name': 'Freefly'}
+        ]
     }
 }
 
@@ -453,6 +491,30 @@ def init_db():
         except:
             pass
 
+        # Add chief_judge column if it doesn't exist
+        try:
+            cursor.execute('ALTER TABLE competitions ADD COLUMN chief_judge TEXT')
+        except:
+            pass
+
+        # Add chief_judge_pin column if it doesn't exist
+        try:
+            cursor.execute('ALTER TABLE competitions ADD COLUMN chief_judge_pin TEXT')
+        except:
+            pass
+
+        # Add event_locations column if it doesn't exist (JSON: event_type -> location)
+        try:
+            cursor.execute('ALTER TABLE competitions ADD COLUMN event_locations TEXT')
+        except:
+            pass
+
+        # Add event_dates column if it doesn't exist (JSON: event_type -> date)
+        try:
+            cursor.execute('ALTER TABLE competitions ADD COLUMN event_dates TEXT')
+        except:
+            pass
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS competition_teams (
                 id TEXT PRIMARY KEY,
@@ -468,6 +530,12 @@ def init_db():
                 FOREIGN KEY (competition_id) REFERENCES competitions(id)
             )
         ''')
+
+        # Add display_order column if it doesn't exist
+        try:
+            cursor.execute('ALTER TABLE competition_teams ADD COLUMN display_order INTEGER DEFAULT 0')
+        except:
+            pass
 
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS competition_scores (
@@ -529,6 +597,10 @@ def init_db():
             cursor.execute('ALTER TABLE users ADD COLUMN email TEXT')
         except:
             pass
+        try:
+            cursor.execute('ALTER TABLE users ADD COLUMN signature_pin TEXT')
+        except:
+            pass
 
         # Video assignments table (for chief judge to assign videos to judges)
         cursor.execute('''
@@ -545,6 +617,20 @@ def init_db():
                 FOREIGN KEY (assigned_by) REFERENCES users(username)
             )
         ''')
+
+        # Add practice_score columns to video_assignments if they don't exist
+        try:
+            cursor.execute('ALTER TABLE video_assignments ADD COLUMN practice_score REAL')
+        except:
+            pass
+        try:
+            cursor.execute('ALTER TABLE video_assignments ADD COLUMN practice_score_data TEXT')
+        except:
+            pass
+        try:
+            cursor.execute('ALTER TABLE video_assignments ADD COLUMN scored_at TEXT')
+        except:
+            pass
 
         cursor.execute('SELECT username FROM users WHERE username = ?', ('admin',))
         if not cursor.fetchone():
@@ -732,6 +818,7 @@ def save_user(user_data):
     """Save or update a user."""
     must_change = user_data.get('must_change_password', 0)
     email = user_data.get('email', '')
+    signature_pin = user_data.get('signature_pin', '')
     if USE_SUPABASE:
         existing = supabase.table('users').select('username').eq('username', user_data['username']).execute()
         if existing.data:
@@ -741,9 +828,9 @@ def save_user(user_data):
     else:
         db = get_sqlite_db()
         db.execute('''
-            INSERT OR REPLACE INTO users (username, password, role, name, email, must_change_password)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (user_data['username'], user_data['password'], user_data['role'], user_data['name'], email, must_change))
+            INSERT OR REPLACE INTO users (username, password, role, name, email, must_change_password, signature_pin)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (user_data['username'], user_data['password'], user_data['role'], user_data['name'], email, must_change, signature_pin))
         db.commit()
 
 
@@ -882,11 +969,13 @@ def save_competition(comp_data):
     else:
         db = get_sqlite_db()
         db.execute('''
-            INSERT OR REPLACE INTO competitions (id, name, event_type, event_types, event_rounds, total_rounds, created_at, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO competitions (id, name, event_type, event_types, event_rounds, total_rounds, created_at, status, chief_judge, chief_judge_pin, event_locations, event_dates)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (comp_data['id'], comp_data['name'], comp_data['event_type'],
               comp_data.get('event_types', ''), comp_data.get('event_rounds', '{}'),
-              comp_data.get('total_rounds', 10), comp_data['created_at'], comp_data.get('status', 'active')))
+              comp_data.get('total_rounds', 10), comp_data['created_at'], comp_data.get('status', 'active'),
+              comp_data.get('chief_judge', ''), comp_data.get('chief_judge_pin', ''),
+              comp_data.get('event_locations', '{}'), comp_data.get('event_dates', '{}')))
         db.commit()
 
 
@@ -955,12 +1044,12 @@ def save_team(team_data):
     else:
         db = get_sqlite_db()
         db.execute('''
-            INSERT OR REPLACE INTO competition_teams (id, competition_id, team_number, team_name, class, members, category, event, photo, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO competition_teams (id, competition_id, team_number, team_name, class, members, category, event, photo, created_at, display_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (team_data['id'], team_data['competition_id'], team_data['team_number'],
               team_data['team_name'], team_data['class'], team_data.get('members', ''),
               team_data.get('category', ''), team_data.get('event', ''),
-              team_data.get('photo', ''), team_data['created_at']))
+              team_data.get('photo', ''), team_data['created_at'], team_data.get('display_order', 0)))
         db.commit()
 
 
@@ -1115,11 +1204,86 @@ def parse_filename_metadata(filename, folder_path=''):
         'subcategory': '',
         'event': '',
         'team': '',
+        'team_number': '',
         'round': '',
         'jump': '',
-        'title': ''
+        'title': '',
+        'class': ''
     }
 
+    # Check for structured filename format: Event_EventType_TeamNum-TeamName_Round
+    # Examples:
+    #   5thFAIWorldIndoorSkydivingChampionships-FormationSkydiving_FS4-Way-Female_421-SingaporeFemale_1.mkv
+    #   JudgeSeminarMeet_FS4-Way-Open_408-Brazil4_1.mkv
+    parts = name.split('_')
+    if len(parts) >= 4:
+        # Try to parse structured format
+        event_part = parts[0]
+        event_type_part = parts[1]
+        team_part = parts[2]
+        round_part = parts[3] if len(parts) > 3 else ''
+
+        # Map event types to category and subcategory
+        event_type_mapping = {
+            'fs4-way-open': ('indoor', '4way_fs', 'open'),
+            'fs4-way-female': ('indoor', '4way_fs', 'female'),
+            'fs4-way-junior': ('indoor', '4way_fs', 'junior'),
+            'fs8-way-open': ('indoor', '8way', 'open'),
+            'fs8-way-female': ('indoor', '8way', 'female'),
+            'vfs-open': ('indoor', '4way_vfs', 'open'),
+            'vfs-female': ('indoor', '4way_vfs', 'female'),
+            '2way-mfs': ('indoor', '2way_fs', 'open'),
+            '2way-fs': ('indoor', '2way_fs', 'open'),
+            '2way-vfs': ('indoor', '2way_vfs', 'open'),
+            'fs-4way-open': ('indoor', '4way_fs', 'open'),
+            'fs-4way-female': ('indoor', '4way_fs', 'female'),
+            'fs-8way-open': ('indoor', '8way', 'open'),
+            'fs-8way-female': ('indoor', '8way', 'female'),
+        }
+
+        event_type_lower = event_type_part.lower()
+        if event_type_lower in event_type_mapping:
+            cat, subcat, class_name = event_type_mapping[event_type_lower]
+            metadata['category'] = cat
+            metadata['subcategory'] = subcat
+            metadata['class'] = class_name
+
+            # Check if it's an indoor event from event name
+            if 'indoor' in event_part.lower() or 'wind tunnel' in event_part.lower():
+                metadata['category'] = 'indoor'
+
+        # Parse event name (clean up the event part)
+        event_name = event_part.replace('-', ' ').strip()
+        # Add event type descriptor for clarity
+        if event_type_part:
+            event_name = f"{event_name} - {event_type_part.replace('-', ' ')}"
+        metadata['event'] = event_name
+
+        # Parse team number and name (format: 421-SingaporeFemale or 408-Brazil4)
+        team_match = re.match(r'(\d+)-(.+)', team_part)
+        if team_match:
+            metadata['team_number'] = team_match.group(1)
+            metadata['team'] = team_match.group(2)
+        else:
+            metadata['team'] = team_part
+
+        # Parse round number
+        if round_part and round_part.isdigit():
+            metadata['round'] = round_part
+
+        # Build title
+        title_parts = []
+        if metadata['team']:
+            title_parts.append(metadata['team'])
+        if metadata['team_number']:
+            title_parts.append(f"#{metadata['team_number']}")
+        if metadata['round']:
+            title_parts.append(f"Round {metadata['round']}")
+        metadata['title'] = ' - '.join(title_parts) if title_parts else name
+
+        return metadata
+
+    # Fall back to generic parsing for non-structured filenames
     # Category detection
     category_patterns = {
         'cp': [r'\bcp\b', r'canopy.?piloting'],
@@ -1127,7 +1291,8 @@ def parse_filename_metadata(filename, folder_path=''):
         'cf': [r'\bcf\b', r'canopy.?formation', r'\bcrw\b'],
         'ae': [r'\bae\b', r'artistic', r'\bfreestyle\b', r'\bfreefly\b'],
         'ws': [r'\bws\b', r'wingsuit'],
-        'al': [r'\bal\b', r'accuracy.?landing', r'\baccuracy\b']
+        'al': [r'\bal\b', r'accuracy.?landing', r'\baccuracy\b'],
+        'indoor': [r'\bindoor\b', r'wind.?tunnel', r'\bifly\b']
     }
 
     for cat_id, patterns in category_patterns.items():
@@ -1153,6 +1318,13 @@ def parse_filename_metadata(filename, folder_path=''):
             '8way': [r'\b8.?way\b'],
             '10way': [r'\b10.?way\b'],
             '16way': [r'\b16.?way\b']
+        },
+        'indoor': {
+            '4way_fs': [r'\b4.?way\b(?!.*vfs)', r'4way.?fs', r'fs.?4'],
+            '4way_vfs': [r'vfs', r'vertical', r'4.?way.?vfs'],
+            '2way_fs': [r'2.?way.*fs', r'mfs', r'fs.?2'],
+            '2way_vfs': [r'2.?way.*vfs'],
+            '8way': [r'\b8.?way\b', r'fs.?8']
         },
         'cf': {
             '4way': [r'\b4.?way\b'],
@@ -1288,13 +1460,17 @@ def category(cat_id):
 
     videos = get_videos_by_category(cat_id, subcategory)
 
+    # Get all events for autocomplete (admin only)
+    events = get_all_events() if session.get('role') == 'admin' else []
+
     return render_template('category.html',
                          category=cat,
                          cat_id=cat_id,
                          videos=videos,
                          current_sub=subcategory,
                          is_admin=session.get('role') == 'admin',
-                         all_categories=CATEGORIES)
+                         all_categories=CATEGORIES,
+                         events=events)
 
 
 @app.route('/video/<video_id>')
@@ -1619,9 +1795,14 @@ def admin_update_user(username):
     email = data.get('email', user.get('email', '')).strip().lower()
     role = data.get('role', user['role'])
     password = data.get('password', '').strip()
+    signature_pin = data.get('signature_pin', '').strip()
 
     if role not in ROLES:
         return jsonify({'error': 'Invalid role'}), 400
+
+    # Validate PIN if provided
+    if signature_pin and (len(signature_pin) < 4 or len(signature_pin) > 6 or not signature_pin.isdigit()):
+        return jsonify({'error': 'Signature PIN must be 4-6 digits'}), 400
 
     # Don't allow demoting the last admin
     if user['role'] == 'admin' and role != 'admin':
@@ -1630,13 +1811,20 @@ def admin_update_user(username):
         if admin_count <= 1:
             return jsonify({'error': 'Cannot demote the last admin'}), 400
 
+    # Hash the signature PIN if provided
+    hashed_pin = user.get('signature_pin', '')
+    if signature_pin:
+        import hashlib
+        hashed_pin = hashlib.sha256(signature_pin.encode()).hexdigest()
+
     update_data = {
         'username': username,
         'name': name,
         'email': email,
         'role': role,
         'password': password if password else user['password'],
-        'must_change_password': user.get('must_change_password', 0)
+        'must_change_password': user.get('must_change_password', 0),
+        'signature_pin': hashed_pin
     }
 
     save_user(update_data)
@@ -1761,6 +1949,101 @@ def update_assignment_status_route(assignment_id):
 
     update_assignment_status(assignment_id, status)
     return jsonify({'success': True})
+
+
+@app.route('/assignment/<assignment_id>/score', methods=['POST'])
+@judge_required
+def submit_practice_score(assignment_id):
+    """Submit a practice score for an assigned video."""
+    data = request.json
+    score = data.get('score')
+    score_data = data.get('score_data', '')
+
+    if score is None:
+        return jsonify({'error': 'Score is required'}), 400
+
+    if USE_SUPABASE:
+        supabase.table('video_assignments').update({
+            'practice_score': score,
+            'practice_score_data': score_data,
+            'scored_at': datetime.now().isoformat(),
+            'status': 'completed'
+        }).eq('id', assignment_id).execute()
+    else:
+        db = get_sqlite_db()
+        db.execute('''
+            UPDATE video_assignments
+            SET practice_score = ?, practice_score_data = ?, scored_at = ?, status = 'completed'
+            WHERE id = ?
+        ''', (score, score_data, datetime.now().isoformat(), assignment_id))
+        db.commit()
+
+    return jsonify({'success': True})
+
+
+@app.route('/assignments/report')
+@chief_judge_required
+def practice_scores_report():
+    """Generate a report of all practice scores."""
+    assignments = get_all_assignments()
+
+    # Enrich with video and user info
+    for a in assignments:
+        video = get_video(a['video_id'])
+        a['video'] = video if video else {}
+        assigned_user = get_user(a['assigned_to'])
+        a['assigned_user'] = assigned_user if assigned_user else {}
+        assigner = get_user(a['assigned_by'])
+        a['assigner'] = assigner if assigner else {}
+
+    # Group by assigner (chief judge)
+    grouped = {}
+    for a in assignments:
+        assigner = a['assigned_by']
+        if assigner not in grouped:
+            grouped[assigner] = {
+                'assigner': a['assigner'],
+                'assignments': [],
+                'total': 0,
+                'completed': 0
+            }
+        grouped[assigner]['assignments'].append(a)
+        grouped[assigner]['total'] += 1
+        if a.get('practice_score') is not None:
+            grouped[assigner]['completed'] += 1
+
+    return render_template('practice_report.html',
+                         grouped_assignments=grouped,
+                         all_assignments=assignments,
+                         categories=CATEGORIES,
+                         is_admin=session.get('role') == 'admin')
+
+
+@app.route('/assignments/report/csv')
+@chief_judge_required
+def practice_scores_csv():
+    """Download practice scores as CSV."""
+    assignments = get_all_assignments()
+
+    # Build CSV
+    output = "Video Title,Category,Assigned To,Assigned By,Practice Score,Score Data,Status,Scored At\n"
+    for a in assignments:
+        video = get_video(a['video_id'])
+        video_title = video['title'] if video else 'Unknown'
+        video_cat = video.get('category', '') if video else ''
+        assigned_user = get_user(a['assigned_to'])
+        assigned_name = assigned_user['name'] if assigned_user else a['assigned_to']
+        assigner = get_user(a['assigned_by'])
+        assigner_name = assigner['name'] if assigner else a['assigned_by']
+
+        output += f'"{video_title}","{video_cat}","{assigned_name}","{assigner_name}",'
+        output += f'{a.get("practice_score", "")},"{a.get("practice_score_data", "")}","{a.get("status", "")}","{a.get("scored_at", "")}"\n'
+
+    return Response(
+        output,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=practice_scores_report.csv'}
+    )
 
 
 def download_and_convert_video(url, video_id):
@@ -2296,6 +2579,35 @@ def bulk_move_videos():
     })
 
 
+@app.route('/admin/bulk-set-event', methods=['POST'])
+@admin_required
+def bulk_set_event():
+    """Set event name for multiple videos at once."""
+    data = request.json
+    video_ids = data.get('video_ids', [])
+    event_name = data.get('event', '').strip()
+
+    if not video_ids:
+        return jsonify({'error': 'No videos selected'}), 400
+
+    if not event_name:
+        return jsonify({'error': 'No event name specified'}), 400
+
+    success_count = 0
+    for video_id in video_ids:
+        video = get_video(video_id)
+        if video:
+            video['event'] = event_name
+            save_video(video)
+            success_count += 1
+
+    return jsonify({
+        'success': True,
+        'message': f'Set event "{event_name}" for {success_count} video(s)',
+        'updated_count': success_count
+    })
+
+
 @app.route('/api/video/<video_id>/set-start-time', methods=['POST'])
 def set_video_start_time(video_id):
     """Set the start time for a video (videographer/judge access)."""
@@ -2519,72 +2831,90 @@ def competition_page(comp_id):
         # Rounds 1-3: Zone Accuracy (higher is better)
         # Rounds 4-6: Distance (higher is better)
         # Rounds 7-9: Speed (lower time is better, score^1.333, inverse weighted)
+        # NOTE: Weighted scores only calculated when ALL competitors in a class have scored that round
         if 'cp_dsz' in teams_by_event:
-            # Collect all teams in cp_dsz across all classes
-            all_cp_teams = []
+            # Process each class separately
             for class_name in teams_by_event['cp_dsz']:
-                all_cp_teams.extend(teams_by_event['cp_dsz'][class_name])
+                class_teams = teams_by_event['cp_dsz'][class_name]
+                if not class_teams:
+                    continue
 
-            # Find best raw score for each round
-            # For Zone Accuracy (1-3) and Distance (4-6): best = highest
-            # For Speed (7-9): best = lowest (fastest time)
-            best_scores = {}
-            for round_num in range(1, 10):  # 9 rounds
-                is_speed_round = round_num >= 7  # Rounds 7-9 are Speed
-                best_score = None
-                for team in all_cp_teams:
+                total_teams_in_class = len(class_teams)
+
+                # Find best raw score for each round AND check if all teams have scored
+                best_scores = {}
+                round_complete = {}  # Track if all teams have scored each round
+
+                for round_num in range(1, 10):  # 9 rounds
+                    is_speed_round = round_num >= 7  # Rounds 7-9 are Speed
+                    best_score = None
+                    scored_count = 0
+
+                    for team in class_teams:
+                        team_has_score = False
+                        for score in team.get('scores', []):
+                            if score.get('round_num') == round_num:
+                                raw = score.get('score')
+                                score_data = score.get('score_data', '')
+
+                                # Count this as scored if has score or penalty
+                                if raw is not None or (score_data and not score_data.startswith('{')):
+                                    team_has_score = True
+
+                                # Skip penalty results for best score calculation
+                                if score_data and not score_data.startswith('{'):
+                                    continue
+
+                                if raw is not None and raw > 0:
+                                    if best_score is None:
+                                        best_score = raw
+                                    elif is_speed_round and raw < best_score:
+                                        best_score = raw  # For speed, lower is better
+                                    elif not is_speed_round and raw > best_score:
+                                        best_score = raw  # For ZA/Distance, higher is better
+
+                        if team_has_score:
+                            scored_count += 1
+
+                    best_scores[round_num] = best_score
+                    round_complete[round_num] = (scored_count == total_teams_in_class)
+
+                # Calculate weighted scores for each team (only for complete rounds)
+                for team in class_teams:
+                    weighted_total = 0
                     for score in team.get('scores', []):
-                        if score.get('round_num') == round_num and score.get('score') is not None:
-                            raw = score.get('score', 0) or 0
-                            # Skip penalty results (score_data contains penalty code)
-                            score_data = score.get('score_data', '')
-                            # Penalty codes: WL, OF, OC, CD, ME, DQ (not JSON)
-                            if score_data and not score_data.startswith('{'):
-                                continue
-                            if raw > 0:
-                                if best_score is None:
-                                    best_score = raw
-                                elif is_speed_round and raw < best_score:
-                                    best_score = raw  # For speed, lower is better
-                                elif not is_speed_round and raw > best_score:
-                                    best_score = raw  # For ZA/Distance, higher is better
-                best_scores[round_num] = best_score
+                        round_num = score.get('round_num')
+                        raw_score = score.get('score')
+                        score_data = score.get('score_data', '')
+                        is_speed_round = round_num >= 7
 
-            # Calculate weighted scores for each team
-            for team in all_cp_teams:
-                weighted_total = 0
-                for score in team.get('scores', []):
-                    round_num = score.get('round_num')
-                    raw_score = score.get('score')
-                    score_data = score.get('score_data', '')
-                    is_speed_round = round_num >= 7
+                        # Handle penalties (score_data contains penalty code, not JSON)
+                        if score_data and not score_data.startswith('{'):
+                            # Penalty result - weighted score is 0 (not counted in weighted total)
+                            score['weighted_score'] = 0
+                            score['penalty'] = score_data
+                            continue
 
-                    # Handle penalties (score_data contains penalty code, not JSON)
-                    if score_data and not score_data.startswith('{'):
-                        # Penalty result - weighted score is 0 (not counted in weighted total)
-                        score['weighted_score'] = 0
-                        score['penalty'] = score_data
-                        continue
-
-                    if raw_score is not None and raw_score > 0 and best_scores.get(round_num):
-                        best = best_scores[round_num]
-                        if is_speed_round:
-                            # Speed: score^1.333, then inverse weighted
-                            # Points = (best^1.333 / score^1.333) * 100
-                            score_calc = raw_score ** 1.333
-                            best_calc = best ** 1.333
-                            weighted = (best_calc / score_calc) * 100
+                        # Only calculate weighted score if round is complete (everyone scored)
+                        if round_complete.get(round_num) and raw_score is not None and raw_score > 0 and best_scores.get(round_num):
+                            best = best_scores[round_num]
+                            if is_speed_round:
+                                # Speed: score^1.333, then inverse weighted
+                                # Points = (best^1.333 / score^1.333) * 100
+                                score_calc = raw_score ** 1.333
+                                best_calc = best ** 1.333
+                                weighted = (best_calc / score_calc) * 100
+                            else:
+                                # Zone Accuracy & Distance: (score / best) * 100
+                                weighted = (raw_score / best) * 100
+                            # 3 decimal places, no rounding
+                            score['weighted_score'] = int(weighted * 1000) / 1000
+                            weighted_total += score['weighted_score']
                         else:
-                            # Zone Accuracy & Distance: (score / best) * 100
-                            weighted = (raw_score / best) * 100
-                        # 3 decimal places, no rounding
-                        score['weighted_score'] = int(weighted * 1000) / 1000
-                        weighted_total += score['weighted_score']
-                    else:
-                        score['weighted_score'] = None
+                            score['weighted_score'] = None
 
-                # Calculate total (3 decimal places)
-                team['total_score'] = int(weighted_total * 1000) / 1000
+                    # Calculate total (3 decimal places)
+                    team['total_score'] = int(weighted_total * 1000) / 1000
 
         # Sort each class within each event by total score descending
         for event_type in teams_by_event:
@@ -2600,7 +2930,8 @@ def competition_page(comp_id):
                              event_rounds=event_rounds,
                              categories=CATEGORIES,
                              is_admin=session.get('role') == 'admin',
-                             has_scores=has_scores)
+                             has_scores=has_scores,
+                             EVENT_DISPLAY_NAMES=EVENT_DISPLAY_NAMES)
     else:
         # Single event - group by class only
         teams_by_class = {
@@ -2623,61 +2954,81 @@ def competition_page(comp_id):
                 teams_by_class['open'].append(team)
 
         # Calculate weighted scores for CP Individual (cp_dsz) - single event
+        # NOTE: Weighted scores only calculated when ALL competitors in a class have scored that round
         if competition['event_type'] == 'cp_dsz':
-            # Collect all teams across all classes
-            all_cp_teams = []
+            # Process each class separately
             for class_name in teams_by_class:
-                all_cp_teams.extend(teams_by_class[class_name])
+                class_teams = teams_by_class[class_name]
+                if not class_teams:
+                    continue
 
-            # Find best raw score for each round
-            best_scores = {}
-            for round_num in range(1, 10):  # 9 rounds
-                is_speed_round = round_num >= 7
-                best_score = None
-                for team in all_cp_teams:
-                    for score in team.get('scores', []):
-                        if score.get('round_num') == round_num and score.get('score') is not None:
-                            raw = score.get('score', 0) or 0
-                            score_data = score.get('score_data', '')
-                            if score_data and not score_data.startswith('{'):
-                                continue
-                            if raw > 0:
-                                if best_score is None:
-                                    best_score = raw
-                                elif is_speed_round and raw < best_score:
-                                    best_score = raw
-                                elif not is_speed_round and raw > best_score:
-                                    best_score = raw
-                best_scores[round_num] = best_score
+                total_teams_in_class = len(class_teams)
 
-            # Calculate weighted scores for each team
-            for team in all_cp_teams:
-                weighted_total = 0
-                for score in team.get('scores', []):
-                    round_num = score.get('round_num')
-                    raw_score = score.get('score')
-                    score_data = score.get('score_data', '')
+                # Find best raw score for each round AND check if all teams have scored
+                best_scores = {}
+                round_complete = {}
+
+                for round_num in range(1, 10):  # 9 rounds
                     is_speed_round = round_num >= 7
+                    best_score = None
+                    scored_count = 0
 
-                    if score_data and not score_data.startswith('{'):
-                        score['weighted_score'] = 0
-                        score['penalty'] = score_data
-                        continue
+                    for team in class_teams:
+                        team_has_score = False
+                        for score in team.get('scores', []):
+                            if score.get('round_num') == round_num:
+                                raw = score.get('score')
+                                score_data = score.get('score_data', '')
 
-                    if raw_score is not None and raw_score > 0 and best_scores.get(round_num):
-                        best = best_scores[round_num]
-                        if is_speed_round:
-                            score_calc = raw_score ** 1.333
-                            best_calc = best ** 1.333
-                            weighted = (best_calc / score_calc) * 100
+                                if raw is not None or (score_data and not score_data.startswith('{')):
+                                    team_has_score = True
+
+                                if score_data and not score_data.startswith('{'):
+                                    continue
+
+                                if raw is not None and raw > 0:
+                                    if best_score is None:
+                                        best_score = raw
+                                    elif is_speed_round and raw < best_score:
+                                        best_score = raw
+                                    elif not is_speed_round and raw > best_score:
+                                        best_score = raw
+
+                        if team_has_score:
+                            scored_count += 1
+
+                    best_scores[round_num] = best_score
+                    round_complete[round_num] = (scored_count == total_teams_in_class)
+
+                # Calculate weighted scores for each team (only for complete rounds)
+                for team in class_teams:
+                    weighted_total = 0
+                    for score in team.get('scores', []):
+                        round_num = score.get('round_num')
+                        raw_score = score.get('score')
+                        score_data = score.get('score_data', '')
+                        is_speed_round = round_num >= 7
+
+                        if score_data and not score_data.startswith('{'):
+                            score['weighted_score'] = 0
+                            score['penalty'] = score_data
+                            continue
+
+                        # Only calculate weighted score if round is complete
+                        if round_complete.get(round_num) and raw_score is not None and raw_score > 0 and best_scores.get(round_num):
+                            best = best_scores[round_num]
+                            if is_speed_round:
+                                score_calc = raw_score ** 1.333
+                                best_calc = best ** 1.333
+                                weighted = (best_calc / score_calc) * 100
+                            else:
+                                weighted = (raw_score / best) * 100
+                            score['weighted_score'] = int(weighted * 1000) / 1000
+                            weighted_total += score['weighted_score']
                         else:
-                            weighted = (raw_score / best) * 100
-                        score['weighted_score'] = int(weighted * 1000) / 1000
-                        weighted_total += score['weighted_score']
-                    else:
-                        score['weighted_score'] = None
+                            score['weighted_score'] = None
 
-                team['total_score'] = int(weighted_total * 1000) / 1000
+                    team['total_score'] = int(weighted_total * 1000) / 1000
 
         # Sort each class by total score descending
         for class_name in teams_by_class:
@@ -2692,7 +3043,8 @@ def competition_page(comp_id):
                              event_rounds=event_rounds,
                              categories=CATEGORIES,
                              is_admin=session.get('role') == 'admin',
-                             has_scores=has_scores)
+                             has_scores=has_scores,
+                             EVENT_DISPLAY_NAMES=EVENT_DISPLAY_NAMES)
 
 
 @app.route('/admin/competition/create', methods=['POST'])
@@ -2705,6 +3057,8 @@ def create_competition():
     event_types = data.get('event_types', [])  # Array of event types
     event_type = data.get('event_type', 'fs')  # Legacy single event type
     event_rounds = data.get('event_rounds', {})  # Rounds per event type
+    event_locations = data.get('event_locations', {})  # Location per event type
+    event_dates = data.get('event_dates', {})  # Date per event type
     total_rounds = int(data.get('total_rounds', 10))
 
     if not name:
@@ -2721,6 +3075,8 @@ def create_competition():
 
     # Store event_rounds as JSON
     event_rounds_json = json.dumps(event_rounds) if event_rounds else '{}'
+    event_locations_json = json.dumps(event_locations) if event_locations else '{}'
+    event_dates_json = json.dumps(event_dates) if event_dates else '{}'
 
     comp_id = str(uuid.uuid4())[:8]
 
@@ -2730,6 +3086,8 @@ def create_competition():
         'event_type': event_type,
         'event_types': event_types_json,
         'event_rounds': event_rounds_json,
+        'event_locations': event_locations_json,
+        'event_dates': event_dates_json,
         'total_rounds': total_rounds,
         'created_at': datetime.now().isoformat(),
         'status': 'active'
@@ -3102,6 +3460,723 @@ def admin_get_competition_teams(comp_id):
     return jsonify({'success': True, 'teams': teams})
 
 
+@app.route('/api/signers', methods=['GET'])
+def get_signers():
+    """Get users who can sign documents (chief_judge or admin roles with a PIN set)."""
+    all_users = get_all_users()
+    signers = []
+    for user in all_users:
+        if user.get('role') in ['chief_judge', 'admin'] and user.get('signature_pin'):
+            signers.append({
+                'username': user['username'],
+                'name': user['name'],
+                'role': user['role']
+            })
+    return jsonify({'success': True, 'signers': signers})
+
+
+@app.route('/admin/competition/<comp_id>/set-chief-judge', methods=['POST'])
+@admin_required
+def set_chief_judge(comp_id):
+    """Set the chief judge for a competition (stores username of the signer)."""
+    data = request.json
+    chief_judge = data.get('chief_judge', '').strip()  # This is the username
+
+    competition = get_competition(comp_id)
+    if not competition:
+        return jsonify({'success': False, 'error': 'Competition not found'}), 404
+
+    # If a chief judge is specified, verify they exist and have a PIN
+    if chief_judge:
+        user = get_user(chief_judge)
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        if not user.get('signature_pin'):
+            return jsonify({'success': False, 'error': 'User does not have a signature PIN set'}), 400
+
+    competition['chief_judge'] = chief_judge
+    save_competition(competition)
+
+    # Get the user's display name for the response
+    if chief_judge:
+        user = get_user(chief_judge)
+        display_name = user.get('name', chief_judge) if user else chief_judge
+    else:
+        display_name = ''
+
+    return jsonify({'success': True, 'chief_judge': chief_judge, 'display_name': display_name})
+
+
+@app.route('/admin/competition/<comp_id>/set-event-details', methods=['POST'])
+@admin_required
+def set_event_details(comp_id):
+    """Set location and date for each event in the competition."""
+    data = request.json
+    event_locations = data.get('event_locations', {})
+    event_dates = data.get('event_dates', {})
+
+    competition = get_competition(comp_id)
+    if not competition:
+        return jsonify({'success': False, 'error': 'Competition not found'}), 404
+
+    competition['event_locations'] = json.dumps(event_locations)
+    competition['event_dates'] = json.dumps(event_dates)
+    save_competition(competition)
+
+    return jsonify({'success': True})
+
+
+@app.route('/competition/<comp_id>/verify-pin', methods=['POST'])
+def verify_chief_judge_pin(comp_id):
+    """Verify the Chief Judge PIN."""
+    data = request.json
+    pin = data.get('pin', '').strip()
+
+    competition = get_competition(comp_id)
+    if not competition:
+        return jsonify({'success': False, 'error': 'Competition not found'}), 404
+
+    chief_judge_username = competition.get('chief_judge', '')
+    if not chief_judge_username:
+        return jsonify({'success': False, 'error': 'No Chief Judge set'}), 400
+
+    # Get the user's PIN
+    user = get_user(chief_judge_username)
+    if not user:
+        return jsonify({'success': False, 'error': 'Chief Judge user not found'}), 404
+
+    stored_pin = user.get('signature_pin', '')
+    if not stored_pin:
+        return jsonify({'success': False, 'error': 'Chief Judge does not have a PIN set'}), 400
+
+    # Hash the provided PIN and compare
+    import hashlib
+    provided_hash = hashlib.sha256(pin.encode()).hexdigest()
+
+    if provided_hash == stored_pin:
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'error': 'Invalid PIN'}), 401
+
+
+@app.route('/competition/<comp_id>/print-pdf')
+def print_competition_pdf(comp_id):
+    """Generate a PDF of the competition results."""
+    from flask import Response
+
+    if not REPORTLAB_AVAILABLE:
+        return jsonify({'error': 'PDF generation not available. Install reportlab package.'}), 500
+
+    competition = get_competition(comp_id)
+    if not competition:
+        return jsonify({'error': 'Competition not found'}), 404
+
+    # Get round selection parameters
+    print_range = request.args.get('range', 'full')  # full, upTo, single
+    selected_round = int(request.args.get('round', 9))
+    provided_pin = request.args.get('pin', '')
+
+    # Verify PIN for signature - look up user's PIN
+    import hashlib
+    pin_verified = False
+    chief_judge_username = competition.get('chief_judge', '')
+    chief_judge_name = ''
+    if chief_judge_username:
+        chief_judge_user = get_user(chief_judge_username)
+        if chief_judge_user:
+            chief_judge_name = chief_judge_user.get('name', chief_judge_username)
+            stored_pin = chief_judge_user.get('signature_pin', '')
+            if stored_pin and provided_pin:
+                provided_hash = hashlib.sha256(provided_pin.encode()).hexdigest()
+                pin_verified = (provided_hash == stored_pin)
+
+    teams = get_competition_teams(comp_id)
+    event_type = competition.get('event_type', '')
+
+    # Get scores for each team
+    for team in teams:
+        team['scores'] = get_team_scores(team['id'])
+
+    # Calculate weighted scores for CP DSZ events (per class, only when round is complete)
+    if event_type == 'cp_dsz':
+        # Group teams by class
+        teams_by_class_pdf = {}
+        for team in teams:
+            team_class = team.get('class', 'open')
+            if team_class not in teams_by_class_pdf:
+                teams_by_class_pdf[team_class] = []
+            teams_by_class_pdf[team_class].append(team)
+
+        # Process each class separately
+        for class_name, class_teams in teams_by_class_pdf.items():
+            if not class_teams:
+                continue
+
+            total_teams_in_class = len(class_teams)
+
+            # Find best score for each round AND check if all teams have scored
+            best_scores = {}
+            round_complete = {}
+
+            for round_num in range(1, 10):
+                is_speed_round = round_num >= 7
+                best_score = None
+                scored_count = 0
+
+                for team in class_teams:
+                    team_has_score = False
+                    for score in team.get('scores', []):
+                        if score.get('round_num') == round_num:
+                            raw = score.get('score')
+                            score_data = score.get('score_data', '')
+
+                            if raw is not None or (score_data and not score_data.startswith('{')):
+                                team_has_score = True
+
+                            if score_data and not score_data.startswith('{'):
+                                continue
+
+                            if raw is not None and raw > 0:
+                                if is_speed_round:
+                                    if best_score is None or raw < best_score:
+                                        best_score = raw
+                                else:
+                                    if best_score is None or raw > best_score:
+                                        best_score = raw
+
+                    if team_has_score:
+                        scored_count += 1
+
+                best_scores[round_num] = best_score
+                round_complete[round_num] = (scored_count == total_teams_in_class)
+
+            # Calculate weighted scores for each team (only for complete rounds)
+            for team in class_teams:
+                weighted_total = 0
+                for score in team.get('scores', []):
+                    round_num = score.get('round_num')
+                    raw_score = score.get('score')
+                    score_data = score.get('score_data', '')
+                    is_speed_round = round_num >= 7
+
+                    if score_data and not score_data.startswith('{'):
+                        score['weighted_score'] = 0
+                        continue
+
+                    if round_complete.get(round_num) and raw_score is not None and raw_score > 0 and best_scores.get(round_num):
+                        best = best_scores[round_num]
+                        if is_speed_round:
+                            score_calc = raw_score ** 1.333
+                            best_calc = best ** 1.333
+                            weighted = (best_calc / score_calc) * 100
+                        else:
+                            weighted = (raw_score / best) * 100
+                        score['weighted_score'] = int(weighted * 1000) / 1000
+                        weighted_total += score['weighted_score']
+                    else:
+                        score['weighted_score'] = None
+
+                team['total_score'] = int(weighted_total * 1000) / 1000
+    else:
+        # Non-CP events - just sum raw scores
+        for team in teams:
+            team['total_score'] = sum(s.get('score', 0) or 0 for s in team['scores'] if s.get('score') is not None)
+
+    # Sort by total score (descending)
+    teams.sort(key=lambda t: t['total_score'], reverse=True)
+
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter),
+                           leftMargin=0.5*inch, rightMargin=0.5*inch,
+                           topMargin=0.5*inch, bottomMargin=0.5*inch)
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=20, alignment=1, spaceAfter=6,
+                                  textColor=colors.Color(0.0, 0.25, 0.4))
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=11, alignment=1, spaceAfter=4,
+                                     textColor=colors.Color(0.3, 0.3, 0.3))
+    signature_style = ParagraphStyle('Signature', parent=styles['Normal'], fontSize=10, alignment=2)
+
+    elements = []
+
+    # Title
+    elements.append(Paragraph(f"<b>{competition['name']}</b>", title_style))
+
+    # Subtitle based on range
+    if print_range == 'single':
+        if event_type == 'cp_dsz':
+            round_names = {1: 'ZA1', 2: 'ZA2', 3: 'ZA3', 4: 'D1', 5: 'D2', 6: 'D3', 7: 'S1', 8: 'S2', 9: 'S3'}
+            round_label = round_names.get(selected_round, f'Round {selected_round}')
+        else:
+            round_label = f'Round {selected_round}'
+        elements.append(Paragraph(f"Results - {round_label}", subtitle_style))
+    elif print_range == 'upTo':
+        if event_type == 'cp_dsz':
+            if selected_round <= 3:
+                range_label = 'Zone Accuracy (ZA1-ZA3)'
+            elif selected_round <= 6:
+                range_label = 'Through Distance (ZA1-D3)'
+            else:
+                range_label = 'Full Event'
+        else:
+            range_label = f'Rounds 1-{selected_round}'
+        elements.append(Paragraph(f"Results - {range_label}", subtitle_style))
+    else:
+        elements.append(Paragraph(f"Official Competition Results", subtitle_style))
+
+    # Event type display
+    event_display = EVENT_DISPLAY_NAMES.get(event_type, event_type.upper().replace('_', ' '))
+    elements.append(Paragraph(f"Event: {event_display}", subtitle_style))
+
+    # Event location and date
+    event_locations = json.loads(competition.get('event_locations', '{}') or '{}')
+    event_dates = json.loads(competition.get('event_dates', '{}') or '{}')
+    event_location = event_locations.get(event_type, '')
+    event_date = event_dates.get(event_type, '')
+
+    if event_location or event_date:
+        location_date_parts = []
+        if event_location:
+            location_date_parts.append(event_location)
+        if event_date:
+            # Format date nicely
+            try:
+                date_obj = datetime.strptime(event_date, '%Y-%m-%d')
+                formatted_date = date_obj.strftime('%B %d, %Y')
+                location_date_parts.append(formatted_date)
+            except:
+                location_date_parts.append(event_date)
+        elements.append(Paragraph(' | '.join(location_date_parts), subtitle_style))
+    elements.append(Spacer(1, 0.25*inch))
+
+    # Determine rounds to include based on selection
+    if event_type == 'cp_dsz':
+        # Build headers with separate columns for each round (no Raw/Wtd labels)
+        if print_range == 'single':
+            num_rounds = selected_round
+            start_round = selected_round
+            round_names = {1: 'Z1', 2: 'Z2', 3: 'Z3', 4: 'D1', 5: 'D2', 6: 'D3', 7: 'S1', 8: 'S2', 9: 'S3'}
+            rn = round_names[selected_round]
+            round_headers = [rn, f'{rn}W']
+        elif print_range == 'upTo':
+            num_rounds = selected_round
+            start_round = 1
+            round_headers = []
+            # Z rounds
+            for i in range(1, min(4, selected_round + 1)):
+                rn = ['Z1', 'Z2', 'Z3'][i-1]
+                round_headers.extend([rn, f'{rn}W'])
+            if selected_round >= 3:
+                round_headers.append('ZT')
+            # D rounds
+            if selected_round >= 4:
+                for i in range(4, min(7, selected_round + 1)):
+                    rn = ['D1', 'D2', 'D3'][i-4]
+                    round_headers.extend([rn, f'{rn}W'])
+                if selected_round >= 6:
+                    round_headers.append('DT')
+            # S rounds
+            if selected_round >= 7:
+                for i in range(7, min(10, selected_round + 1)):
+                    rn = ['S1', 'S2', 'S3'][i-7]
+                    round_headers.extend([rn, f'{rn}W'])
+                if selected_round >= 9:
+                    round_headers.append('ST')
+        else:
+            # Full event
+            num_rounds = 9
+            start_round = 1
+            round_headers = []
+            for rn in ['Z1', 'Z2', 'Z3']:
+                round_headers.extend([rn, f'{rn}W'])
+            round_headers.append('ZT')
+            for rn in ['D1', 'D2', 'D3']:
+                round_headers.extend([rn, f'{rn}W'])
+            round_headers.append('DT')
+            for rn in ['S1', 'S2', 'S3']:
+                round_headers.extend([rn, f'{rn}W'])
+            round_headers.append('ST')
+    else:
+        total_rounds = competition.get('total_rounds', 10)
+        if print_range == 'single':
+            num_rounds = selected_round
+            start_round = selected_round
+            round_headers = [f'R{selected_round}']
+        elif print_range == 'upTo':
+            num_rounds = selected_round
+            start_round = 1
+            round_headers = [f'R{i}' for i in range(1, selected_round + 1)]
+        else:
+            num_rounds = total_rounds
+            start_round = 1
+            round_headers = [f'R{i}' for i in range(1, total_rounds + 1)]
+
+    # Build table data - separate tables per class
+    is_individual = event_type.startswith('cp') or event_type.startswith('al') or event_type.startswith('sp') or event_type.startswith('ws_performance')
+
+    # For CP DSZ, build two-row header with round labels spanning raw/weighted columns
+    if event_type == 'cp_dsz':
+        # Build header row 1 (round labels that will span 2 columns)
+        # Build header row 2 (Score/Points sub-columns under each round)
+        header_row1 = ['Rank', 'Name' if is_individual else 'Team']
+        header_row2 = ['', '']  # Empty for rank/name columns
+        span_commands = []  # Will hold SPAN commands for merging cells
+        col_idx = 2  # Start after Rank and Name
+
+        if print_range == 'single':
+            # Single round - just one round label spanning 2 columns
+            round_names = {1: 'Z1', 2: 'Z2', 3: 'Z3', 4: 'D1', 5: 'D2', 6: 'D3', 7: 'S1', 8: 'S2', 9: 'S3'}
+            rn = round_names[selected_round]
+            header_row1.extend([rn, ''])  # Label + empty for span
+            header_row2.extend(['Score', 'Points'])  # Sub-columns
+            span_commands.append(('SPAN', (col_idx, 0), (col_idx + 1, 0)))
+            col_idx += 2
+        elif print_range == 'upTo':
+            # Z rounds
+            for i in range(1, min(4, selected_round + 1)):
+                rn = ['Z1', 'Z2', 'Z3'][i-1]
+                header_row1.extend([rn, ''])
+                header_row2.extend(['Score', 'Points'])
+                span_commands.append(('SPAN', (col_idx, 0), (col_idx + 1, 0)))
+                col_idx += 2
+            if selected_round >= 3:
+                header_row1.append('ZT')
+                header_row2.append('')
+                col_idx += 1
+            # D rounds
+            if selected_round >= 4:
+                for i in range(4, min(7, selected_round + 1)):
+                    rn = ['D1', 'D2', 'D3'][i-4]
+                    header_row1.extend([rn, ''])
+                    header_row2.extend(['Score', 'Points'])
+                    span_commands.append(('SPAN', (col_idx, 0), (col_idx + 1, 0)))
+                    col_idx += 2
+                if selected_round >= 6:
+                    header_row1.append('DT')
+                    header_row2.append('')
+                    col_idx += 1
+            # S rounds
+            if selected_round >= 7:
+                for i in range(7, min(10, selected_round + 1)):
+                    rn = ['S1', 'S2', 'S3'][i-7]
+                    header_row1.extend([rn, ''])
+                    header_row2.extend(['Score', 'Points'])
+                    span_commands.append(('SPAN', (col_idx, 0), (col_idx + 1, 0)))
+                    col_idx += 2
+                if selected_round >= 9:
+                    header_row1.append('ST')
+                    header_row2.append('')
+                    col_idx += 1
+        else:
+            # Full event
+            for rn in ['Z1', 'Z2', 'Z3']:
+                header_row1.extend([rn, ''])
+                header_row2.extend(['Score', 'Points'])
+                span_commands.append(('SPAN', (col_idx, 0), (col_idx + 1, 0)))
+                col_idx += 2
+            header_row1.append('ZT')
+            header_row2.append('')
+            col_idx += 1
+            for rn in ['D1', 'D2', 'D3']:
+                header_row1.extend([rn, ''])
+                header_row2.extend(['Score', 'Points'])
+                span_commands.append(('SPAN', (col_idx, 0), (col_idx + 1, 0)))
+                col_idx += 2
+            header_row1.append('DT')
+            header_row2.append('')
+            col_idx += 1
+            for rn in ['S1', 'S2', 'S3']:
+                header_row1.extend([rn, ''])
+                header_row2.extend(['Score', 'Points'])
+                span_commands.append(('SPAN', (col_idx, 0), (col_idx + 1, 0)))
+                col_idx += 2
+            header_row1.append('ST')
+            header_row2.append('')
+            col_idx += 1
+
+        header_row1.append('Total')
+        header_row2.append('')
+        # Span Rank and Name vertically across both header rows
+        span_commands.append(('SPAN', (0, 0), (0, 1)))  # Rank
+        span_commands.append(('SPAN', (1, 0), (1, 1)))  # Name
+        span_commands.append(('SPAN', (col_idx, 0), (col_idx, 1)))  # Total
+    else:
+        header = ['Rank', 'Name' if is_individual else 'Team'] + round_headers + ['Total']
+        span_commands = []
+
+    # Group teams by class
+    team_classes = sorted(set(t.get('class', 'open') for t in teams))
+
+    for team_class in team_classes:
+        # Add class header
+        class_style = ParagraphStyle('ClassHeader', parent=styles['Heading2'], fontSize=12, spaceAfter=6, spaceBefore=12,
+                                         textColor=colors.Color(0.0, 0.25, 0.4), borderPadding=4)
+        elements.append(Paragraph(f"<b>{event_display} - {team_class.capitalize()}</b>", class_style))
+
+        # Filter and sort teams for this class
+        class_teams = [t for t in teams if t.get('class', 'open') == team_class]
+        class_teams.sort(key=lambda t: t['total_score'], reverse=True)
+
+        if event_type == 'cp_dsz':
+            table_data = [header_row1, header_row2]
+        else:
+            table_data = [header]
+
+        for rank, team in enumerate(class_teams, 1):
+            row = [str(rank), team['team_name']]
+
+            if event_type == 'cp_dsz':
+                # CP DSZ with separate raw and weighted columns
+                za_total = 0
+                d_total = 0
+                s_total = 0
+
+                if print_range == 'single':
+                    # Single round only - separate raw and weighted columns
+                    score = next((s for s in team['scores'] if s['round_num'] == selected_round), None)
+                    if score and score.get('score') is not None:
+                        if selected_round <= 3:
+                            raw = str(int(score['score']))
+                        elif selected_round <= 6:
+                            raw = f"{score['score']:.2f}"
+                        else:
+                            raw = f"{score['score']:.3f}"
+                        row.append(raw)
+                        weighted = score.get('weighted_score')
+                        if weighted is not None:
+                            row.append(f"{weighted:.1f}")
+                            if selected_round <= 3:
+                                za_total = weighted
+                            elif selected_round <= 6:
+                                d_total = weighted
+                            else:
+                                s_total = weighted
+                        else:
+                            row.append('-')
+                    else:
+                        row.append('-')
+                        row.append('-')
+                    # Total for single round
+                    row.append(f"{za_total + d_total + s_total:.1f}")
+                else:
+                    # Full or upTo - include appropriate rounds with separate columns
+                    max_round = 9 if print_range == 'full' else selected_round
+
+                    # ZA rounds 1-3 (if in range)
+                    if max_round >= 1:
+                        for i in range(1, min(4, max_round + 1)):
+                            score = next((s for s in team['scores'] if s['round_num'] == i), None)
+                            if score and score.get('score') is not None:
+                                raw = str(int(score['score']))
+                                row.append(raw)
+                                weighted = score.get('weighted_score')
+                                if weighted is not None:
+                                    row.append(f"{weighted:.1f}")
+                                    za_total += weighted
+                                else:
+                                    row.append('-')
+                            else:
+                                row.append('-')
+                                row.append('-')
+                        # Add ZA total if we completed ZA or it's our stopping point
+                        if max_round >= 3 or (print_range == 'upTo' and max_round <= 3):
+                            row.append(f"{za_total:.1f}")
+
+                    # D rounds 4-6 (if in range)
+                    if max_round >= 4:
+                        for i in range(4, min(7, max_round + 1)):
+                            score = next((s for s in team['scores'] if s['round_num'] == i), None)
+                            if score and score.get('score') is not None:
+                                raw = f"{score['score']:.2f}"
+                                row.append(raw)
+                                weighted = score.get('weighted_score')
+                                if weighted is not None:
+                                    row.append(f"{weighted:.1f}")
+                                    d_total += weighted
+                                else:
+                                    row.append('-')
+                            else:
+                                row.append('-')
+                                row.append('-')
+                        # Add D total if we completed D or it's our stopping point
+                        if max_round >= 6 or (print_range == 'upTo' and max_round <= 6 and max_round >= 4):
+                            row.append(f"{d_total:.1f}")
+
+                    # S rounds 7-9 (if in range)
+                    if max_round >= 7:
+                        for i in range(7, min(10, max_round + 1)):
+                            score = next((s for s in team['scores'] if s['round_num'] == i), None)
+                            if score and score.get('score') is not None:
+                                raw = f"{score['score']:.3f}"
+                                row.append(raw)
+                                weighted = score.get('weighted_score')
+                                if weighted is not None:
+                                    row.append(f"{weighted:.1f}")
+                                    s_total += weighted
+                                else:
+                                    row.append('-')
+                            else:
+                                row.append('-')
+                                row.append('-')
+                        # Add S total if full event
+                        if max_round >= 9:
+                            row.append(f"{s_total:.1f}")
+
+                    # Overall total
+                    overall_total = za_total + d_total + s_total
+                    row.append(f"{overall_total:.2f}")
+            else:
+                # Non-CP DSZ events
+                if print_range == 'single':
+                    score = next((s for s in team['scores'] if s['round_num'] == selected_round), None)
+                    if score and score.get('score') is not None:
+                        row.append(f"{score['score']:.2f}" if isinstance(score['score'], float) else str(score['score']))
+                    else:
+                        row.append('-')
+                    row.append(f"{score['score']:.2f}" if score and score.get('score') is not None else '-')
+                else:
+                    end_round = selected_round if print_range == 'upTo' else num_rounds
+                    running_total = 0
+                    for i in range(1, end_round + 1):
+                        score = next((s for s in team['scores'] if s['round_num'] == i), None)
+                        if score and score.get('score') is not None:
+                            row.append(f"{score['score']:.2f}" if isinstance(score['score'], float) else str(score['score']))
+                            running_total += score['score'] or 0
+                        else:
+                            row.append('-')
+                    row.append(str(int(running_total)))
+
+            table_data.append(row)
+
+        # Create table for this class
+        if event_type == 'cp_dsz':
+            num_cols = len(header_row1)
+            # Compact columns to fit all data on page
+            col_widths = [0.3*inch, 1.2*inch] + [0.4*inch] * (num_cols - 3) + [0.5*inch]
+        else:
+            num_cols = len(header)
+            col_widths = [0.5*inch, 2*inch] + [0.5*inch] * (num_cols - 3) + [0.7*inch]
+
+        table = Table(table_data, colWidths=col_widths)
+
+        # Determine header row count
+        header_rows = 1 if event_type != 'cp_dsz' else 1  # Single header row visually (row2 is hidden)
+        data_start_row = 2 if event_type == 'cp_dsz' else 1
+
+        # InTime-style professional table formatting
+        style_commands = [
+            # Header row - dark blue background
+            ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.0, 0.25, 0.4)),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
+            ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
+        ]
+
+        if event_type == 'cp_dsz':
+            # Style the second header row (Score/Points sub-labels)
+            style_commands.extend([
+                ('BACKGROUND', (0, 1), (-1, 1), colors.Color(0.1, 0.35, 0.5)),
+                ('TEXTCOLOR', (0, 1), (-1, 1), colors.white),
+                ('FONTNAME', (0, 1), (-1, 1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, 1), 6),
+                ('TOPPADDING', (0, 1), (-1, 1), 2),
+                ('BOTTOMPADDING', (0, 1), (-1, 1), 2),
+                ('VALIGN', (0, 1), (-1, 1), 'MIDDLE'),
+            ])
+            # Add span commands for round labels
+            style_commands.extend(span_commands)
+
+        style_commands.extend([
+            # Data rows
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (1, data_start_row), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, data_start_row), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, data_start_row), (-1, -1), 7),
+            ('TOPPADDING', (0, data_start_row), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, data_start_row), (-1, -1), 4),
+            # Alternating row colors (starting from data rows)
+            ('ROWBACKGROUNDS', (0, data_start_row), (-1, -1), [colors.white, colors.Color(0.94, 0.96, 0.98)]),
+            # Grid borders around all cells
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(0.7, 0.7, 0.7)),
+            # Outer border (darker)
+            ('BOX', (0, 0), (-1, -1), 1, colors.Color(0.3, 0.3, 0.3)),
+            # Header bottom border
+            ('LINEBELOW', (0, data_start_row - 1), (-1, data_start_row - 1), 1, colors.Color(0.0, 0.2, 0.35)),
+            # Make rank and total columns bold
+            ('FONTNAME', (0, data_start_row), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (-1, data_start_row), (-1, -1), 'Helvetica-Bold'),
+        ])
+
+        table.setStyle(TableStyle(style_commands))
+
+        elements.append(table)
+        elements.append(Spacer(1, 0.3*inch))
+
+    # Get current date/time for signature (but don't display generated time)
+    now = datetime.now()
+    print_datetime = now.strftime("%B %d, %Y at %I:%M %p")
+
+    # Chief Judge signature (only if PIN verified)
+    if chief_judge_name and pin_verified:
+        elements.append(Spacer(1, 0.4*inch))
+
+        # Create signature block
+        sig_width = 250
+        sig_height = 80
+
+        # Create a drawing for the signature
+        d = Drawing(sig_width, sig_height)
+
+        # Add a light border/box
+        d.add(Rect(0, 0, sig_width, sig_height, strokeColor=colors.Color(0.7, 0.7, 0.7),
+                   fillColor=colors.Color(0.98, 0.98, 0.98), strokeWidth=0.5))
+
+        # Add "OFFICIAL SIGNATURE" header
+        d.add(String(sig_width/2, sig_height - 12, "OFFICIAL SIGNATURE",
+                    fontSize=8, fillColor=colors.Color(0.5, 0.5, 0.5),
+                    textAnchor='middle'))
+
+        # Add signature line
+        d.add(Line(20, 25, sig_width - 20, 25, strokeColor=colors.Color(0.3, 0.3, 0.3), strokeWidth=0.5))
+
+        # Add the signature name in italic style (simulating handwriting)
+        d.add(String(sig_width/2, 32, chief_judge_name,
+                    fontSize=16, fillColor=colors.Color(0.1, 0.1, 0.4),
+                    textAnchor='middle', fontName='Times-Italic'))
+
+        # Add title below signature line
+        d.add(String(sig_width/2, 10, "Chief Judge",
+                    fontSize=9, fillColor=colors.Color(0.3, 0.3, 0.3),
+                    textAnchor='middle'))
+
+        # Add timestamp
+        d.add(String(sig_width/2, sig_height - 25, f"Electronically signed: {print_datetime}",
+                    fontSize=7, fillColor=colors.Color(0.5, 0.5, 0.5),
+                    textAnchor='middle'))
+
+        # Wrap drawing in a right-aligned table to position it
+        sig_table = Table([[d]], colWidths=[sig_width])
+        sig_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+        ]))
+        elements.append(sig_table)
+
+    doc.build(elements)
+
+    buffer.seek(0)
+    filename = f"{competition['name'].replace(' ', '_')}_Results_{now.strftime('%Y%m%d_%H%M')}.pdf"
+
+    return Response(
+        buffer.getvalue(),
+        mimetype='application/pdf',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
+
 @app.route('/admin/competition/<comp_id>/add-team', methods=['POST'])
 @admin_required
 def add_team(comp_id):
@@ -3322,11 +4397,32 @@ def update_team(team_id):
         'category': data.get('category', team.get('category', '')),
         'event': data.get('event', team.get('event', '')),
         'photo': data.get('photo', team.get('photo', '')),
+        'display_order': data.get('display_order', team.get('display_order', 0)),
         'created_at': team['created_at']
     }
 
     save_team(team_data)
     return jsonify({'success': True, 'message': 'Team updated'})
+
+
+@app.route('/admin/competition/<comp_id>/update-team-order', methods=['POST'])
+@admin_required
+def update_team_order(comp_id):
+    """Update display order for multiple teams."""
+    data = request.json
+    orders = data.get('orders', [])  # List of {team_id, display_order}
+
+    if USE_SUPABASE:
+        for item in orders:
+            supabase.table('competition_teams').update({'display_order': item['display_order']}).eq('id', item['team_id']).execute()
+    else:
+        db = get_sqlite_db()
+        for item in orders:
+            db.execute('UPDATE competition_teams SET display_order = ? WHERE id = ?',
+                      (item['display_order'], item['team_id']))
+        db.commit()
+
+    return jsonify({'success': True, 'message': 'Order updated'})
 
 
 @app.route('/admin/team/<team_id>/upload-photo', methods=['POST'])
@@ -4135,7 +5231,7 @@ if SOCKETIO_ENABLED:
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
     debug = os.environ.get('FLASK_ENV', 'development') == 'development'
-    print("\n=== USPA Video Library ===")
+    print("\n=== Video Library ===")
     print(f"Database: {'Supabase' if USE_SUPABASE else 'SQLite'}")
     print(f"SocketIO: {'Enabled' if SOCKETIO_ENABLED else 'Disabled'}")
     print(f"Open http://localhost:{port} in your browser")
