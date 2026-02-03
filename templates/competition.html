@@ -211,7 +211,7 @@
                         <tbody>
                             {% for team in teams %}
                             <tr class="border-t border-gray-200 hover:bg-gray-750">
-                                <td class="px-4 py-3 font-bold text-yellow-400">{{ loop.index }}</td>
+                                <td class="px-4 py-3 font-bold text-black">{{ loop.index }}</td>
                                 <td class="px-2 py-3 text-center">
                                     {% if team.photo %}
                                     <img src="{{ team.photo }}" alt="{{ team.team_name }}"
@@ -315,8 +315,13 @@
                                 {% endif %}
                                 {% if is_admin %}
                                 <td class="px-4 py-3 text-right space-x-2">
+                                    {% set has_scores = team.scores|selectattr('score', 'ne', none)|list|length > 0 %}
+                                    {% if not has_scores %}
                                     <button onclick="openEditTeamModal('{{ team.id }}', '{{ team.team_number }}', '{{ team.team_name }}', '{{ team.class }}', '{{ team.members|default("", true) }}', '{{ team.category|default("", true) }}', '{{ team.event|default("", true) }}', '{{ team.photo|default("", true) }}')" class="text-blue-400 hover:text-gray-700 text-sm">Edit</button>
                                     <button onclick="deleteTeam('{{ team.id }}')" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                    {% else %}
+                                    <span class="text-gray-400 text-xs">-</span>
+                                    {% endif %}
                                 </td>
                                 {% endif %}
                             </tr>
@@ -384,7 +389,7 @@
                     <tbody>
                         {% for team in teams %}
                         <tr class="border-t border-gray-200 hover:bg-gray-750">
-                            <td class="px-4 py-3 font-bold text-yellow-400">{{ loop.index }}</td>
+                            <td class="px-4 py-3 font-bold text-black">{{ loop.index }}</td>
                             <td class="px-2 py-3 text-center">
                                 {% if team.photo %}
                                 <img src="{{ team.photo }}" alt="{{ team.team_name }}"
@@ -488,8 +493,13 @@
                             {% endif %}
                             {% if is_admin %}
                             <td class="px-4 py-3 text-right space-x-2">
+                                {% set has_scores = team.scores|selectattr('score', 'ne', none)|list|length > 0 %}
+                                {% if not has_scores %}
                                 <button onclick="openEditTeamModal('{{ team.id }}', '{{ team.team_number }}', '{{ team.team_name }}', '{{ team.class }}', '{{ team.members|default("", true) }}', '{{ team.category|default("", true) }}', '{{ team.event|default("", true) }}', '{{ team.photo|default("", true) }}')" class="text-blue-400 hover:text-gray-700 text-sm">Edit</button>
                                 <button onclick="deleteTeam('{{ team.id }}')" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                {% else %}
+                                <span class="text-gray-400 text-xs">-</span>
+                                {% endif %}
                             </td>
                             {% endif %}
                         </tr>
