@@ -1044,7 +1044,8 @@ def category(cat_id):
                          cat_id=cat_id,
                          videos=videos,
                          current_sub=subcategory,
-                         is_admin=session.get('role') == 'admin')
+                         is_admin=session.get('role') == 'admin',
+                         all_categories=CATEGORIES)
 
 
 @app.route('/video/<video_id>')

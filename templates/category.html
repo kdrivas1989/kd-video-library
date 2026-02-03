@@ -65,38 +65,43 @@
         {% if videos %}
         <div class="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {% for video in videos %}
-            <a href="/video/{{ video.id }}" class="block bg-gray-800 rounded-lg overflow-hidden hover:bg-gray-700 transition">
-                <div class="aspect-video bg-gray-700 relative">
-                    {% if video.thumbnail %}
-                    <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="w-full h-full object-cover">
-                    {% else %}
-                    <div class="w-full h-full flex items-center justify-center text-gray-500">
-                        <svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
-                        </svg>
+            <div class="bg-gray-800 rounded-lg overflow-hidden hover:bg-gray-700 transition">
+                <a href="/video/{{ video.id }}" class="block">
+                    <div class="aspect-video bg-gray-700 relative">
+                        {% if video.thumbnail %}
+                        <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="w-full h-full object-cover">
+                        {% else %}
+                        <div class="w-full h-full flex items-center justify-center text-gray-500">
+                            <svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        {% endif %}
+                        {% if video.duration %}
+                        <span class="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">{{ video.duration }}</span>
+                        {% endif %}
                     </div>
-                    {% endif %}
-                    {% if video.duration %}
-                    <span class="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">{{ video.duration }}</span>
-                    {% endif %}
-                </div>
+                </a>
                 <div class="p-4">
-                    <h3 class="font-semibold text-white line-clamp-2">{{ video.title }}</h3>
+                    <a href="/video/{{ video.id }}">
+                        <h3 class="font-semibold text-white line-clamp-2 hover:text-blue-400">{{ video.title }}</h3>
+                    </a>
                     <div class="flex justify-between items-center mt-2 text-sm text-gray-400">
-                        {% if video.subcategory %}
-                        {% for sub in category.subcategories %}
-                            {% if sub.id == video.subcategory %}
-                            <span>{{ sub.name }}</span>
-                            {% endif %}
-                        {% endfor %}
+                        {% if is_admin %}
+                        <select onchange="moveToCategory('{{ video.id }}', this.value)"
+                            class="bg-gray-700 text-white text-xs px-2 py-1 rounded cursor-pointer hover:bg-gray-600">
+                            {% for c_id, c in all_categories.items() %}
+                            <option value="{{ c_id }}" {% if c_id == video.category %}selected{% endif %}>{{ c.abbrev }}</option>
+                            {% endfor %}
+                        </select>
                         {% else %}
                         <span>{{ category.abbrev }}</span>
                         {% endif %}
                         <span>{{ video.views }} views</span>
                     </div>
                 </div>
-            </a>
+            </div>
             {% endfor %}
         </div>
         {% else %}
@@ -116,5 +121,31 @@
             <p>USPA Video Library - Competition footage for judges and competitors</p>
         </div>
     </footer>
+
+    {% if is_admin %}
+    <script>
+        async function moveToCategory(videoId, newCategory) {
+            try {
+                const response = await fetch('/admin/edit-video/' + videoId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category: newCategory })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    // Remove video card from current view if moved to different category
+                    const currentCategory = '{{ cat_id }}';
+                    if (newCategory !== currentCategory) {
+                        location.reload();
+                    }
+                } else {
+                    alert(result.error || 'Failed to move video');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+    </script>
+    {% endif %}
 </body>
 </html>

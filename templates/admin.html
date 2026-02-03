@@ -187,11 +187,23 @@
                                     onkeydown="if(event.key==='Enter'){this.blur();}">
                             </div>
                             <div class="flex items-center gap-2 mt-1 text-sm text-gray-400">
-                                <select onchange="quickChangeCategory('{{ video.id }}', this.value)"
-                                    class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-blue-500">
+                                <select onchange="quickChangeCategory('{{ video.id }}', this.value, this)"
+                                    class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-blue-500"
+                                    data-video-id="{{ video.id }}">
                                     {% for cat_id, cat in categories.items() %}
                                     <option value="{{ cat_id }}" {% if cat_id == video.category %}selected{% endif %}>{{ cat.abbrev }}</option>
                                     {% endfor %}
+                                </select>
+                                <select onchange="quickChangeSubcategory('{{ video.id }}', this.value)"
+                                    class="bg-gray-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-gray-500 subcategory-select"
+                                    data-video-id="{{ video.id }}" data-current="{{ video.subcategory|default('', true) }}"
+                                    {% if not categories.get(video.category, {}).get('subcategories') %}style="display:none"{% endif %}>
+                                    <option value="">--</option>
+                                    {% if categories.get(video.category, {}).get('subcategories') %}
+                                    {% for sub in categories.get(video.category, {}).get('subcategories', []) %}
+                                    <option value="{{ sub.id }}" {% if sub.id == video.subcategory %}selected{% endif %}>{{ sub.name }}</option>
+                                    {% endfor %}
+                                    {% endif %}
                                 </select>
                                 <span>{{ video.views }} views</span>
                             </div>
@@ -916,16 +928,47 @@
         }
 
         // Quick change category (inline)
-        async function quickChangeCategory(videoId, newCategory) {
+        async function quickChangeCategory(videoId, newCategory, selectEl) {
             try {
                 const response = await fetch(`/admin/edit-video/${videoId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ category: newCategory })
+                    body: JSON.stringify({ category: newCategory, subcategory: '' })
                 });
                 const result = await response.json();
                 if (!result.success) {
                     alert(result.error || 'Failed to change category');
+                } else {
+                    // Update subcategory dropdown
+                    const subSelect = selectEl.parentElement.querySelector('.subcategory-select');
+                    const cat = categories[newCategory];
+                    if (cat && cat.subcategories && cat.subcategories.length > 0) {
+                        subSelect.innerHTML = '<option value="">--</option>';
+                        cat.subcategories.forEach(sub => {
+                            subSelect.innerHTML += `<option value="${sub.id}">${sub.name}</option>`;
+                        });
+                        subSelect.style.display = '';
+                    } else {
+                        subSelect.style.display = 'none';
+                        subSelect.innerHTML = '<option value="">--</option>';
+                    }
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Quick change subcategory (inline)
+        async function quickChangeSubcategory(videoId, newSubcategory) {
+            try {
+                const response = await fetch(`/admin/edit-video/${videoId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subcategory: newSubcategory })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    alert(result.error || 'Failed to change subcategory');
                 }
             } catch (error) {
                 alert('Error: ' + error.message);
