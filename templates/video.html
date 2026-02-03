@@ -41,8 +41,8 @@
                 <!-- Video Player -->
                 <div class="aspect-video bg-black rounded-lg overflow-hidden mb-4">
                     {% if video.is_local or video.is_direct_url %}
-                    <video controls class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" crossorigin="anonymous">
-                        <source src="{{ video.video_src }}" type="video/mp4">
+                    <video controls class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" playsinline>
+                        <source src="{{ video.video_src }}">
                         Your browser does not support the video tag.
                     </video>
                     {% else %}

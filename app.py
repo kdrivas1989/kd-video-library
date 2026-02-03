@@ -386,8 +386,12 @@ def is_direct_video_url(url):
     """Check if URL is a direct video file."""
     if not url:
         return False
+    url_lower = url.lower()
+    # Dropbox direct links are always streamable
+    if 'dropboxusercontent.com' in url_lower or 'dropbox.com' in url_lower:
+        return True
     video_extensions = ('.mp4', '.webm', '.ogg', '.mov')
-    return any(url.lower().endswith(ext) or f'{ext}?' in url.lower() for ext in video_extensions)
+    return any(url_lower.endswith(ext) or f'{ext}?' in url_lower or f'{ext}&' in url_lower for ext in video_extensions)
 
 
 def get_video_embed_url(url):
