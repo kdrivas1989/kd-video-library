@@ -88,33 +88,11 @@
         <!-- Bulk Upload from Dropbox -->
         <div class="bg-gray-800 rounded-lg p-6 mb-8">
             <h2 class="text-xl font-bold mb-4">Bulk Upload from Dropbox</h2>
-            <p class="text-gray-400 text-sm mb-4">Select multiple videos from Dropbox to add them all at once.</p>
-            <div class="flex flex-wrap gap-4 items-end">
-                <div class="w-48">
-                    <label class="block text-gray-300 mb-2">Category *</label>
-                    <select id="bulkCategory" required
-                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        onchange="updateBulkSubcategories()">
-                        <option value="">Select</option>
-                        {% for cat_id, cat in categories.items() %}
-                        <option value="{{ cat_id }}">{{ cat.abbrev }} - {{ cat.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div id="bulkSubcategoryDiv" class="w-48 hidden">
-                    <label class="block text-gray-300 mb-2">Subcategory</label>
-                    <select id="bulkSubcategory"
-                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
-                        <option value="">All / None</option>
-                    </select>
-                </div>
-                <button type="button" onclick="chooseMultipleFromDropbox()"
-                    class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg font-semibold transition">
-                    Select Multiple from Dropbox
-                </button>
-            </div>
-            <div id="bulkProgress" class="mt-4 hidden"></div>
-            <div id="bulkMessage" class="mt-4 hidden"></div>
+            <p class="text-gray-400 text-sm mb-4">Select multiple videos from Dropbox, then choose category before uploading.</p>
+            <button type="button" onclick="chooseMultipleFromDropbox()"
+                class="bg-blue-500 hover:bg-blue-600 px-6 py-2 rounded-lg font-semibold transition">
+                Select Videos from Dropbox
+            </button>
         </div>
         {% endif %}
 
@@ -230,6 +208,46 @@
         </div>
     </div>
 
+    <!-- Bulk Upload Modal -->
+    <div id="bulkUploadModal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-xl font-bold mb-4">Upload Videos</h3>
+            <p id="bulkFileCount" class="text-gray-400 mb-4">0 videos selected</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-300 mb-2">Category *</label>
+                    <select id="modalCategory" required
+                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        onchange="updateModalSubcategories()">
+                        <option value="">Select category</option>
+                        {% for cat_id, cat in categories.items() %}
+                        <option value="{{ cat_id }}">{{ cat.abbrev }} - {{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div id="modalSubcategoryDiv" class="hidden">
+                    <label class="block text-gray-300 mb-2">Subcategory</label>
+                    <select id="modalSubcategory"
+                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">All / None</option>
+                    </select>
+                </div>
+                <div id="modalProgress" class="hidden"></div>
+                <div id="modalMessage" class="hidden"></div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeBulkUploadModal()"
+                        class="flex-1 bg-gray-600 hover:bg-gray-500 py-3 rounded-lg font-semibold transition">
+                        Cancel
+                    </button>
+                    <button type="button" onclick="confirmBulkUpload()"
+                        class="flex-1 bg-purple-600 hover:bg-purple-700 py-3 rounded-lg font-semibold transition">
+                        Upload Videos
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit Modal -->
     <div id="editModal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-50">
         <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
@@ -296,6 +314,7 @@
 
     <script>
         const categories = {{ categories | tojson }};
+        let pendingFiles = []; // Store files selected from Dropbox
 
         // Dropbox Chooser - Single file
         function chooseFromDropbox() {
@@ -318,71 +337,12 @@
             });
         }
 
-        // Dropbox Chooser - Folder import (multi-select from folder)
+        // Dropbox Chooser - Select files first, then choose category
         function chooseFolderFromDropbox() {
-            const category = document.getElementById('importCategory').value;
-            const subcategory = document.getElementById('importSubcategory').value;
-
-            if (!category) {
-                alert('Please select a category first');
-                return;
-            }
-
             Dropbox.choose({
-                success: async function(files) {
-                    const progressDiv = document.getElementById('importProgress');
-                    const messageDiv = document.getElementById('importMessage');
-
-                    progressDiv.classList.remove('hidden');
-                    progressDiv.innerHTML = `<div class="flex items-center gap-3"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div><span>Adding ${files.length} videos from Dropbox...</span></div>`;
-
-                    let added = 0;
-                    let errors = [];
-
-                    for (const file of files) {
-                        const url = file.link.replace('?dl=0', '?dl=1');
-                        const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
-
-                        try {
-                            const response = await fetch('/admin/add-video', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    title: title,
-                                    url: url,
-                                    category: category,
-                                    subcategory: subcategory,
-                                    description: '',
-                                    tags: '',
-                                    duration: ''
-                                })
-                            });
-
-                            const result = await response.json();
-                            if (result.success) {
-                                added++;
-                            } else {
-                                errors.push(file.name);
-                            }
-                        } catch (e) {
-                            errors.push(file.name);
-                        }
-
-                        progressDiv.innerHTML = `<div class="flex items-center gap-3"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div><span>Adding ${added}/${files.length} videos...</span></div>`;
-                    }
-
-                    progressDiv.classList.add('hidden');
-
-                    if (errors.length > 0) {
-                        messageDiv.className = 'mt-4 bg-yellow-900 border border-yellow-700 text-yellow-200 px-4 py-3 rounded';
-                        messageDiv.textContent = `Added ${added} videos. Failed: ${errors.length}`;
-                    } else {
-                        messageDiv.className = 'mt-4 bg-green-900 border border-green-700 text-green-200 px-4 py-3 rounded';
-                        messageDiv.textContent = `Successfully added ${added} videos from Dropbox!`;
-                    }
-                    messageDiv.classList.remove('hidden');
-
-                    setTimeout(() => location.reload(), 1500);
+                success: function(files) {
+                    pendingFiles = files;
+                    openBulkUploadModal(files.length);
                 },
                 linkType: 'direct',
                 multiselect: true,
@@ -391,77 +351,118 @@
             });
         }
 
-        // Dropbox Chooser - Multiple files
+        // Dropbox Chooser - Multiple files (same flow)
         function chooseMultipleFromDropbox() {
-            const category = document.getElementById('bulkCategory').value;
-            const subcategory = document.getElementById('bulkSubcategory').value;
-
-            if (!category) {
-                alert('Please select a category first');
-                return;
-            }
-
             Dropbox.choose({
-                success: async function(files) {
-                    const progressDiv = document.getElementById('bulkProgress');
-                    const messageDiv = document.getElementById('bulkMessage');
-
-                    progressDiv.classList.remove('hidden');
-                    progressDiv.innerHTML = `<div class="flex items-center gap-3"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-green-500"></div><span>Adding ${files.length} videos...</span></div>`;
-
-                    let added = 0;
-                    let errors = [];
-
-                    for (const file of files) {
-                        const url = file.link.replace('?dl=0', '?dl=1');
-                        const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
-
-                        try {
-                            const response = await fetch('/admin/add-video', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    title: title,
-                                    url: url,
-                                    category: category,
-                                    subcategory: subcategory,
-                                    description: '',
-                                    tags: '',
-                                    duration: ''
-                                })
-                            });
-
-                            const result = await response.json();
-                            if (result.success) {
-                                added++;
-                            } else {
-                                errors.push(file.name);
-                            }
-                        } catch (e) {
-                            errors.push(file.name);
-                        }
-
-                        progressDiv.innerHTML = `<div class="flex items-center gap-3"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-green-500"></div><span>Adding ${added}/${files.length} videos...</span></div>`;
-                    }
-
-                    progressDiv.classList.add('hidden');
-
-                    if (errors.length > 0) {
-                        messageDiv.className = 'mt-4 bg-yellow-900 border border-yellow-700 text-yellow-200 px-4 py-3 rounded';
-                        messageDiv.textContent = `Added ${added} videos. Failed: ${errors.length}`;
-                    } else {
-                        messageDiv.className = 'mt-4 bg-green-900 border border-green-700 text-green-200 px-4 py-3 rounded';
-                        messageDiv.textContent = `Successfully added ${added} videos!`;
-                    }
-                    messageDiv.classList.remove('hidden');
-
-                    setTimeout(() => location.reload(), 1500);
+                success: function(files) {
+                    pendingFiles = files;
+                    openBulkUploadModal(files.length);
                 },
                 linkType: 'direct',
                 multiselect: true,
                 extensions: ['video'],
                 folderselect: false
             });
+        }
+
+        // Modal functions
+        function openBulkUploadModal(fileCount) {
+            document.getElementById('bulkFileCount').textContent = `${fileCount} video${fileCount !== 1 ? 's' : ''} selected`;
+            document.getElementById('modalCategory').value = '';
+            document.getElementById('modalSubcategory').value = '';
+            document.getElementById('modalSubcategoryDiv').classList.add('hidden');
+            document.getElementById('modalProgress').classList.add('hidden');
+            document.getElementById('modalMessage').classList.add('hidden');
+            document.getElementById('bulkUploadModal').classList.remove('hidden');
+            document.getElementById('bulkUploadModal').classList.add('flex');
+        }
+
+        function closeBulkUploadModal() {
+            document.getElementById('bulkUploadModal').classList.add('hidden');
+            document.getElementById('bulkUploadModal').classList.remove('flex');
+            pendingFiles = [];
+        }
+
+        function updateModalSubcategories() {
+            const catId = document.getElementById('modalCategory').value;
+            const subDiv = document.getElementById('modalSubcategoryDiv');
+            const subSelect = document.getElementById('modalSubcategory');
+
+            const cat = categories[catId];
+            if (cat && cat.subcategories && cat.subcategories.length > 0) {
+                subSelect.innerHTML = '<option value="">All / None</option>';
+                cat.subcategories.forEach(sub => {
+                    subSelect.innerHTML += `<option value="${sub.id}">${sub.name}</option>`;
+                });
+                subDiv.classList.remove('hidden');
+            } else {
+                subDiv.classList.add('hidden');
+                subSelect.value = '';
+            }
+        }
+
+        async function confirmBulkUpload() {
+            const category = document.getElementById('modalCategory').value;
+            const subcategory = document.getElementById('modalSubcategory').value;
+
+            if (!category) {
+                alert('Please select a category');
+                return;
+            }
+
+            const progressDiv = document.getElementById('modalProgress');
+            const messageDiv = document.getElementById('modalMessage');
+
+            progressDiv.classList.remove('hidden');
+            progressDiv.innerHTML = `<div class="flex items-center gap-3"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-green-500"></div><span>Adding 0/${pendingFiles.length} videos...</span></div>`;
+
+            let added = 0;
+            let errors = [];
+
+            for (const file of pendingFiles) {
+                const url = file.link.replace('?dl=0', '?dl=1');
+                const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+
+                try {
+                    const response = await fetch('/admin/add-video', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            title: title,
+                            url: url,
+                            category: category,
+                            subcategory: subcategory,
+                            description: '',
+                            tags: '',
+                            duration: ''
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        added++;
+                    } else {
+                        errors.push(file.name);
+                    }
+                } catch (e) {
+                    errors.push(file.name);
+                }
+
+                progressDiv.innerHTML = `<div class="flex items-center gap-3"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-green-500"></div><span>Adding ${added}/${pendingFiles.length} videos...</span></div>`;
+            }
+
+            progressDiv.classList.add('hidden');
+
+            if (errors.length > 0) {
+                messageDiv.className = 'bg-yellow-900 border border-yellow-700 text-yellow-200 px-4 py-3 rounded';
+                messageDiv.textContent = `Added ${added} videos. Failed: ${errors.length}`;
+            } else {
+                messageDiv.className = 'bg-green-900 border border-green-700 text-green-200 px-4 py-3 rounded';
+                messageDiv.textContent = `Successfully added ${added} videos!`;
+            }
+            messageDiv.classList.remove('hidden');
+
+            setTimeout(() => location.reload(), 1500);
         }
 
         function updateBulkSubcategories() {
