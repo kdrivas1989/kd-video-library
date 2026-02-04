@@ -94,6 +94,10 @@
                 <button onclick="showEventDetailsModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
                     Event Details
                 </button>
+                <button onclick="showDrawGeneratorModal()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    Draw Generator
+                </button>
                 <button onclick="printResults()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                     Print PDF
@@ -1059,6 +1063,90 @@
                     <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Save</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Draw Generator Modal -->
+    <div id="drawGeneratorModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
+        <div class="bg-white rounded-lg p-6 w-full max-w-6xl mx-4 my-8 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-900">Draw Generator</h2>
+                <button onclick="hideDrawGeneratorModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+
+            <!-- Draw Generator Controls -->
+            <div class="grid grid-cols-4 gap-4 mb-4">
+                <div>
+                    <label class="block text-gray-600 text-sm mb-1">Event</label>
+                    <select id="drawEventType" onchange="updateDrawClassOptions()" class="w-full px-3 py-2 rounded bg-white text-gray-900 border border-gray-300">
+                        {% for et in event_types %}
+                        <option value="{{ et }}">{{ EVENT_DISPLAY_NAMES.get(et, et) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-gray-600 text-sm mb-1">Class</label>
+                    <select id="drawClass" class="w-full px-3 py-2 rounded bg-white text-gray-900 border border-gray-300">
+                        <option value="open">Open</option>
+                        <option value="advanced">Advanced</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="beginner">Beginner</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-gray-600 text-sm mb-1">Rounds</label>
+                    <select id="drawNumRounds" class="w-full px-3 py-2 rounded bg-white text-gray-900 border border-gray-300">
+                        <option value="6">6 Rounds</option>
+                        <option value="8">8 Rounds</option>
+                        <option value="10" selected>10 Rounds</option>
+                    </select>
+                </div>
+                <div class="flex items-end gap-2">
+                    <button onclick="generateCompetitionDraw()" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold">
+                        Generate
+                    </button>
+                    <button onclick="toggleDrawEditMode()" id="drawEditModeBtn" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded hidden">
+                        Edit
+                    </button>
+                </div>
+            </div>
+
+            <!-- Saved Draws Display -->
+            <div id="savedDrawsSection" class="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+                <h4 class="font-semibold text-gray-800 mb-2">Saved Draws</h4>
+                <div id="savedDrawsList" class="flex flex-wrap gap-2">
+                    <span class="text-gray-500 text-sm">No draws saved yet</span>
+                </div>
+            </div>
+
+            <!-- Draw Results -->
+            <div id="drawResultsArea" class="hidden">
+                <div id="drawEditModeNotice" class="hidden mb-3 p-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-800 text-sm">
+                    <strong>Edit Mode:</strong> Click any formation to change it, or click + to add formations.
+                </div>
+                <div id="drawContent" class="overflow-x-auto">
+                    <!-- Draw will be rendered here -->
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button onclick="saveCurrentDraw()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">
+                        Save Draw
+                    </button>
+                    <button onclick="printCurrentDraw()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded">
+                        Print
+                    </button>
+                </div>
+            </div>
+
+            <!-- Formation Picker (for editing) -->
+            <div id="drawFormationPicker" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[60]">
+                <div class="bg-white rounded-lg p-4 max-w-3xl max-h-[80vh] overflow-y-auto">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-gray-900">Select Formation</h4>
+                        <button onclick="closeDrawFormationPicker()" class="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
+                    </div>
+                    <div id="drawFormationPickerContent"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2461,6 +2549,461 @@
                 console.error('Error:', err);
                 alert('Error saving event details');
             }
+        }
+
+        // =====================
+        // DRAW GENERATOR
+        // =====================
+
+        // 4-Way FS Randoms and Blocks (USPA)
+        const fs4wayRandoms = {
+            'A': 'Unipod', 'B': 'Stairstep', 'C': 'Murphy', 'D': 'Yuan',
+            'E': 'Meeker', 'F': 'Open Accord', 'G': 'Cataccord', 'H': 'Bow',
+            'J': 'Donut', 'K': 'Hook', 'L': 'Adder', 'M': 'Star',
+            'N': 'Crank', 'O': 'Satellite', 'P': 'Sidebody', 'Q': 'Phalanx'
+        };
+
+        const fs4wayBlocks = {
+            1: 'Bipole-Opal', 2: 'Sidebody-Opal', 3: 'Caterpillar-Opal', 4: 'Monopod',
+            5: 'Sidebuddies', 6: 'Stardian', 7: 'Zig-Zag', 8: 'Marquis',
+            9: 'Lepton', 10: 'Dancer', 11: 'Bunyip', 12: 'Photon',
+            13: 'Ritz', 14: 'Piver', 15: 'Compressed', 16: 'Packer',
+            17: 'Meson', 18: 'Tango', 19: 'Icepick', 20: 'Zircon',
+            21: 'Firefly', 22: 'Turbo'
+        };
+
+        // Draw generation rules by event/class
+        const drawRules = {
+            'fs_4way_fs': {
+                open: { randoms: Object.keys(fs4wayRandoms), blocks: Object.keys(fs4wayBlocks).map(Number).filter(b => ![2,4,8,12,19].includes(b)), pointsPerRound: [5, 6] },
+                advanced: { randoms: Object.keys(fs4wayRandoms), blocks: [1, 6, 7, 9, 14, 15, 21], pointsPerRound: [4, 5] },
+                intermediate: { randoms: Object.keys(fs4wayRandoms), blocks: [7, 9, 14], pointsPerRound: [3, 4] },
+                beginner: { randoms: Object.keys(fs4wayRandoms).filter(r => r !== 'G'), blocks: [], pointsPerRound: [3, 3] }
+            },
+            'fs_8way': {
+                open: { randoms: Object.keys(fs4wayRandoms), blocks: Object.keys(fs4wayBlocks).map(Number), pointsPerRound: [5, 6] },
+                advanced: { randoms: Object.keys(fs4wayRandoms), blocks: Object.keys(fs4wayBlocks).map(Number), pointsPerRound: [5, 6] },
+                intermediate: { randoms: Object.keys(fs4wayRandoms), blocks: [1,3,4,5,6,7,8,10,13,14,16,17,18,19,21], pointsPerRound: [4, 5] }
+            }
+        };
+
+        let currentDrawData = null;
+        let drawEditMode = false;
+        let savedDraws = {};
+
+        function showDrawGeneratorModal() {
+            document.getElementById('drawGeneratorModal').classList.remove('hidden');
+            loadSavedDraws();
+            updateDrawClassOptions();
+        }
+
+        function hideDrawGeneratorModal() {
+            document.getElementById('drawGeneratorModal').classList.add('hidden');
+        }
+
+        async function loadSavedDraws() {
+            try {
+                const response = await fetch('/competition/' + compId + '/draws');
+                const result = await response.json();
+                if (result.success) {
+                    savedDraws = result.draws || {};
+                    renderSavedDrawsList();
+                }
+            } catch (err) {
+                console.error('Error loading draws:', err);
+            }
+        }
+
+        function renderSavedDrawsList() {
+            const container = document.getElementById('savedDrawsList');
+            const entries = [];
+
+            for (const eventType in savedDraws) {
+                for (const className in savedDraws[eventType]) {
+                    entries.push({ eventType, className, draw: savedDraws[eventType][className] });
+                }
+            }
+
+            if (entries.length === 0) {
+                container.innerHTML = '<span class="text-gray-500 text-sm">No draws saved yet</span>';
+                return;
+            }
+
+            container.innerHTML = entries.map(e => `
+                <div class="flex items-center gap-2 bg-white px-3 py-1 rounded border">
+                    <span class="text-sm font-medium text-gray-800">${e.eventType} - ${e.className}</span>
+                    <button onclick="viewSavedDraw('${e.eventType}', '${e.className}')" class="text-blue-600 hover:text-blue-800 text-sm">View</button>
+                    <button onclick="deleteSavedDraw('${e.eventType}', '${e.className}')" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        function viewSavedDraw(eventType, className) {
+            if (savedDraws[eventType] && savedDraws[eventType][className]) {
+                document.getElementById('drawEventType').value = eventType;
+                document.getElementById('drawClass').value = className;
+                currentDrawData = savedDraws[eventType][className];
+                drawEditMode = false;
+                renderDrawResults();
+            }
+        }
+
+        async function deleteSavedDraw(eventType, className) {
+            if (!confirm(`Delete draw for ${eventType} - ${className}?`)) return;
+
+            try {
+                const response = await fetch('/admin/competition/' + compId + '/delete-draw', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ event_type: eventType, class_name: className })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    loadSavedDraws();
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to delete'));
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Error deleting draw');
+            }
+        }
+
+        function updateDrawClassOptions() {
+            const eventType = document.getElementById('drawEventType').value;
+            // Update available rounds based on event type
+            const defaultRounds = {
+                'fs_4way_fs': 10, 'fs_4way_vfs': 10, 'fs_2way_mfs': 10, 'fs_8way': 10,
+                'fs_16way': 6, 'fs_10way': 6,
+                'cf_4way_rot': 8, 'cf_4way_seq': 8, 'cf_2way_open': 8
+            };
+            const rounds = defaultRounds[eventType] || 10;
+            document.getElementById('drawNumRounds').value = Math.min(parseInt(document.getElementById('drawNumRounds').value) || rounds, rounds);
+        }
+
+        function generateCompetitionDraw() {
+            const eventType = document.getElementById('drawEventType').value;
+            const className = document.getElementById('drawClass').value;
+            const numRounds = parseInt(document.getElementById('drawNumRounds').value);
+
+            // Get rules for this event/class
+            const eventRules = drawRules[eventType];
+            const classRules = eventRules ? (eventRules[className] || eventRules.open) : null;
+
+            if (!classRules) {
+                alert('Draw generation not available for this event type yet');
+                return;
+            }
+
+            const rounds = [];
+            for (let i = 0; i < numRounds; i++) {
+                rounds.push(generateRound(classRules));
+            }
+
+            currentDrawData = rounds;
+            drawEditMode = false;
+            renderDrawResults();
+        }
+
+        function generateRound(rules) {
+            const [minPts, maxPts] = rules.pointsPerRound;
+            const isOpenClass = (maxPts === 6 && minPts === 5);
+            const isAdvancedClass = (maxPts === 5 && minPts === 4);
+            const isIntermediateClass = (maxPts === 4 && minPts === 3);
+
+            const formations = [];
+            let currentPoints = 0;
+
+            const availableRandoms = [...rules.randoms];
+            const availableBlocks = [...rules.blocks];
+
+            while (currentPoints < maxPts) {
+                // Point stopping rules
+                if (isOpenClass && currentPoints === 5) break;
+                if (isAdvancedClass && currentPoints === 4) break;
+                if (isIntermediateClass && currentPoints === 3) break;
+
+                // Check if we should stop at minimum
+                if (isOpenClass && currentPoints >= minPts) {
+                    if (currentPoints === 4 && availableBlocks.length > 0 && Math.random() < 0.5) {
+                        const idx = Math.floor(Math.random() * availableBlocks.length);
+                        const block = availableBlocks.splice(idx, 1)[0];
+                        formations.push({ type: 'block', value: block, points: 2, name: fs4wayBlocks[block] });
+                        currentPoints += 2;
+                    }
+                    break;
+                }
+                if (isAdvancedClass && currentPoints >= minPts) {
+                    if (currentPoints === 3 && availableBlocks.length > 0 && Math.random() < 0.5) {
+                        const idx = Math.floor(Math.random() * availableBlocks.length);
+                        const block = availableBlocks.splice(idx, 1)[0];
+                        formations.push({ type: 'block', value: block, points: 2, name: fs4wayBlocks[block] });
+                        currentPoints += 2;
+                    }
+                    break;
+                }
+                if (isIntermediateClass && currentPoints >= minPts) {
+                    if (currentPoints === 2 && availableBlocks.length > 0 && Math.random() < 0.5) {
+                        const idx = Math.floor(Math.random() * availableBlocks.length);
+                        const block = availableBlocks.splice(idx, 1)[0];
+                        formations.push({ type: 'block', value: block, points: 2, name: fs4wayBlocks[block] });
+                        currentPoints += 2;
+                    }
+                    break;
+                }
+
+                const canAddRandom = availableRandoms.length > 0 && (currentPoints + 1 <= maxPts);
+                const canAddBlock = availableBlocks.length > 0 && (currentPoints + 2 <= maxPts);
+
+                if (!canAddRandom && !canAddBlock) break;
+
+                let addBlock = canAddBlock && (!canAddRandom || Math.random() < 0.4);
+
+                if (addBlock) {
+                    const idx = Math.floor(Math.random() * availableBlocks.length);
+                    const block = availableBlocks.splice(idx, 1)[0];
+                    formations.push({ type: 'block', value: block, points: 2, name: fs4wayBlocks[block] });
+                    currentPoints += 2;
+                } else if (canAddRandom) {
+                    const idx = Math.floor(Math.random() * availableRandoms.length);
+                    const random = availableRandoms.splice(idx, 1)[0];
+                    formations.push({ type: 'random', value: random, points: 1, name: fs4wayRandoms[random] });
+                    currentPoints += 1;
+                }
+            }
+
+            // Rotate Star to end if drawn first
+            if (formations.length > 0 && formations[0].value === 'M') {
+                const star = formations.shift();
+                formations.push(star);
+            }
+
+            return { formations, maxPoints: currentPoints };
+        }
+
+        function renderDrawResults() {
+            const resultsArea = document.getElementById('drawResultsArea');
+            const content = document.getElementById('drawContent');
+            const editBtn = document.getElementById('drawEditModeBtn');
+            const editNotice = document.getElementById('drawEditModeNotice');
+
+            if (!currentDrawData || currentDrawData.length === 0) {
+                resultsArea.classList.add('hidden');
+                return;
+            }
+
+            resultsArea.classList.remove('hidden');
+            editBtn.classList.remove('hidden');
+
+            if (drawEditMode) {
+                editBtn.textContent = 'Done';
+                editBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+                editBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                editNotice.classList.remove('hidden');
+            } else {
+                editBtn.textContent = 'Edit';
+                editBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+                editBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                editNotice.classList.add('hidden');
+            }
+
+            const maxFormations = Math.max(...currentDrawData.map(r => r.formations.length));
+
+            let html = `<table class="w-full border-collapse text-sm">
+                <thead>
+                    <tr class="border-b-2 border-gray-300">`;
+
+            currentDrawData.forEach((_, idx) => {
+                html += `<th class="text-center px-1 py-2 font-bold text-gray-800">Round ${idx + 1}</th>`;
+            });
+            html += `</tr></thead><tbody>`;
+
+            for (let formIdx = 0; formIdx < maxFormations; formIdx++) {
+                html += `<tr class="border-b border-gray-200">`;
+                currentDrawData.forEach((round, roundIdx) => {
+                    if (formIdx < round.formations.length) {
+                        const f = round.formations[formIdx];
+                        const imgSrc = `/static/formations/FS-${f.value}.png`;
+                        const isBlock = f.type === 'block';
+                        const editClass = drawEditMode ? 'ring-2 ring-yellow-500 cursor-pointer' : '';
+                        const clickHandler = drawEditMode ? `showDrawFormationPicker(${roundIdx}, ${formIdx})` : '';
+                        html += `
+                            <td class="text-center p-1">
+                                <div class="inline-block ${editClass}" ${clickHandler ? `onclick="${clickHandler}"` : ''}>
+                                    <img src="${imgSrc}" alt="${f.value}" class="w-12 ${isBlock ? 'h-16' : 'h-12'} object-contain bg-white rounded border mx-auto"
+                                         onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden')">
+                                    <span class="hidden font-bold text-gray-800">${f.value}</span>
+                                    <div class="text-xs text-gray-600">${f.value}</div>
+                                </div>
+                            </td>`;
+                    } else {
+                        html += `<td></td>`;
+                    }
+                });
+                html += `</tr>`;
+            }
+
+            // Add formation row (edit mode)
+            if (drawEditMode) {
+                html += `<tr class="border-b border-gray-200">`;
+                currentDrawData.forEach((_, roundIdx) => {
+                    html += `<td class="text-center p-2">
+                        <button onclick="showDrawFormationPicker(${roundIdx}, null)" class="w-8 h-8 rounded-full bg-green-600 hover:bg-green-700 text-white font-bold">+</button>
+                    </td>`;
+                });
+                html += `</tr>`;
+            }
+
+            // Points row
+            html += `<tr class="bg-gray-100 border-t-2 border-gray-300">`;
+            currentDrawData.forEach(round => {
+                html += `<td class="text-center py-2 font-bold text-gray-800">${round.maxPoints} pts</td>`;
+            });
+            html += `</tr></tbody></table>`;
+
+            content.innerHTML = html;
+        }
+
+        function toggleDrawEditMode() {
+            drawEditMode = !drawEditMode;
+            renderDrawResults();
+        }
+
+        function showDrawFormationPicker(roundIdx, formIdx) {
+            const picker = document.getElementById('drawFormationPicker');
+            const content = document.getElementById('drawFormationPickerContent');
+
+            const eventType = document.getElementById('drawEventType').value;
+            const className = document.getElementById('drawClass').value;
+            const eventRules = drawRules[eventType];
+            const rules = eventRules ? (eventRules[className] || eventRules.open) : { randoms: Object.keys(fs4wayRandoms), blocks: Object.keys(fs4wayBlocks).map(Number) };
+
+            let html = '<div class="grid grid-cols-2 gap-4">';
+
+            // Randoms
+            html += '<div><h5 class="font-semibold text-gray-800 mb-2">Randoms (1 pt)</h5><div class="flex flex-wrap gap-1">';
+            rules.randoms.forEach(r => {
+                html += `<div class="cursor-pointer hover:ring-2 hover:ring-blue-500 rounded p-1 bg-gray-100" onclick="selectDrawFormation(${roundIdx}, ${formIdx}, 'random', '${r}')">
+                    <img src="/static/formations/FS-${r}.png" alt="${r}" class="w-10 h-10 object-contain bg-white rounded">
+                    <div class="text-center text-xs">${r}</div>
+                </div>`;
+            });
+            html += '</div></div>';
+
+            // Blocks
+            if (rules.blocks.length > 0) {
+                html += '<div><h5 class="font-semibold text-gray-800 mb-2">Blocks (2 pts)</h5><div class="flex flex-wrap gap-1">';
+                rules.blocks.forEach(b => {
+                    html += `<div class="cursor-pointer hover:ring-2 hover:ring-purple-500 rounded p-1 bg-gray-100" onclick="selectDrawFormation(${roundIdx}, ${formIdx}, 'block', ${b})">
+                        <img src="/static/formations/FS-${b}.png" alt="${b}" class="w-10 h-12 object-contain bg-white rounded">
+                        <div class="text-center text-xs">${b}</div>
+                    </div>`;
+                });
+                html += '</div></div>';
+            }
+
+            html += '</div>';
+
+            // Remove button
+            if (formIdx !== null && currentDrawData[roundIdx].formations[formIdx]) {
+                html += `<div class="mt-4 pt-4 border-t">
+                    <button onclick="removeDrawFormation(${roundIdx}, ${formIdx})" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded">Remove</button>
+                </div>`;
+            }
+
+            content.innerHTML = html;
+            picker.classList.remove('hidden');
+        }
+
+        function closeDrawFormationPicker() {
+            document.getElementById('drawFormationPicker').classList.add('hidden');
+        }
+
+        function selectDrawFormation(roundIdx, formIdx, type, value) {
+            const formation = {
+                type: type,
+                value: value,
+                points: type === 'block' ? 2 : 1,
+                name: type === 'block' ? fs4wayBlocks[value] : fs4wayRandoms[value]
+            };
+
+            if (formIdx === null || formIdx >= currentDrawData[roundIdx].formations.length) {
+                currentDrawData[roundIdx].formations.push(formation);
+            } else {
+                currentDrawData[roundIdx].formations[formIdx] = formation;
+            }
+
+            currentDrawData[roundIdx].maxPoints = currentDrawData[roundIdx].formations.reduce((sum, f) => sum + f.points, 0);
+            closeDrawFormationPicker();
+            renderDrawResults();
+        }
+
+        function removeDrawFormation(roundIdx, formIdx) {
+            currentDrawData[roundIdx].formations.splice(formIdx, 1);
+            currentDrawData[roundIdx].maxPoints = currentDrawData[roundIdx].formations.reduce((sum, f) => sum + f.points, 0);
+            closeDrawFormationPicker();
+            renderDrawResults();
+        }
+
+        async function saveCurrentDraw() {
+            if (!currentDrawData) {
+                alert('No draw to save');
+                return;
+            }
+
+            const eventType = document.getElementById('drawEventType').value;
+            const className = document.getElementById('drawClass').value;
+
+            try {
+                const response = await fetch('/admin/competition/' + compId + '/save-draw', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event_type: eventType,
+                        class_name: className,
+                        draw: currentDrawData
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Draw saved successfully');
+                    loadSavedDraws();
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to save'));
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Error saving draw');
+            }
+        }
+
+        function printCurrentDraw() {
+            // Open draw in print window
+            const content = document.getElementById('drawContent').innerHTML;
+            const eventType = document.getElementById('drawEventType').value;
+            const className = document.getElementById('drawClass').value;
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Draw - ${eventType} ${className}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        table { width: 100%; border-collapse: collapse; }
+                        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+                        img { max-width: 50px; max-height: 60px; }
+                    </style>
+                </head>
+                <body>
+                    <h1>{{ competition.name }} - ${eventType} ${className}</h1>
+                    ${content}
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
         }
 
         function filterClass(className) {

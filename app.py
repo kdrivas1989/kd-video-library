@@ -1031,13 +1031,14 @@ def save_competition(comp_data):
     else:
         db = get_sqlite_db()
         db.execute('''
-            INSERT OR REPLACE INTO competitions (id, name, event_type, event_types, event_rounds, total_rounds, created_at, status, chief_judge, chief_judge_pin, event_locations, event_dates)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO competitions (id, name, event_type, event_types, event_rounds, total_rounds, created_at, status, chief_judge, chief_judge_pin, event_locations, event_dates, draws)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (comp_data['id'], comp_data['name'], comp_data['event_type'],
               comp_data.get('event_types', ''), comp_data.get('event_rounds', '{}'),
               comp_data.get('total_rounds', 10), comp_data['created_at'], comp_data.get('status', 'active'),
               comp_data.get('chief_judge', ''), comp_data.get('chief_judge_pin', ''),
-              comp_data.get('event_locations', '{}'), comp_data.get('event_dates', '{}')))
+              comp_data.get('event_locations', '{}'), comp_data.get('event_dates', '{}'),
+              comp_data.get('draws', '{}')))
         db.commit()
 
 
@@ -4702,6 +4703,90 @@ def set_event_details(comp_id):
 
     competition['event_locations'] = json.dumps(event_locations)
     competition['event_dates'] = json.dumps(event_dates)
+    save_competition(competition)
+
+    return jsonify({'success': True})
+
+
+@app.route('/admin/competition/<comp_id>/save-draw', methods=['POST'])
+@admin_required
+def save_competition_draw(comp_id):
+    """Save a draw for an event/class in the competition."""
+    data = request.json
+    event_type = data.get('event_type')
+    class_name = data.get('class_name', 'open')
+    draw_data = data.get('draw')  # Array of rounds with formations
+
+    if not event_type or not draw_data:
+        return jsonify({'success': False, 'error': 'Missing event_type or draw data'}), 400
+
+    competition = get_competition(comp_id)
+    if not competition:
+        return jsonify({'success': False, 'error': 'Competition not found'}), 404
+
+    # Get existing draws or initialize
+    draws = {}
+    if competition.get('draws'):
+        try:
+            draws = json.loads(competition['draws'])
+        except:
+            draws = {}
+
+    # Structure: draws[event_type][class_name] = draw_data
+    if event_type not in draws:
+        draws[event_type] = {}
+    draws[event_type][class_name] = draw_data
+
+    # Save back to competition
+    competition['draws'] = json.dumps(draws)
+    save_competition(competition)
+
+    return jsonify({'success': True})
+
+
+@app.route('/competition/<comp_id>/draws', methods=['GET'])
+def get_competition_draws(comp_id):
+    """Get all draws for a competition."""
+    competition = get_competition(comp_id)
+    if not competition:
+        return jsonify({'success': False, 'error': 'Competition not found'}), 404
+
+    draws = {}
+    if competition.get('draws'):
+        try:
+            draws = json.loads(competition['draws'])
+        except:
+            draws = {}
+
+    return jsonify({'success': True, 'draws': draws})
+
+
+@app.route('/admin/competition/<comp_id>/delete-draw', methods=['POST'])
+@admin_required
+def delete_competition_draw(comp_id):
+    """Delete a draw for an event/class in the competition."""
+    data = request.json
+    event_type = data.get('event_type')
+    class_name = data.get('class_name', 'open')
+
+    competition = get_competition(comp_id)
+    if not competition:
+        return jsonify({'success': False, 'error': 'Competition not found'}), 404
+
+    draws = {}
+    if competition.get('draws'):
+        try:
+            draws = json.loads(competition['draws'])
+        except:
+            draws = {}
+
+    # Remove the draw
+    if event_type in draws and class_name in draws[event_type]:
+        del draws[event_type][class_name]
+        if not draws[event_type]:
+            del draws[event_type]
+
+    competition['draws'] = json.dumps(draws)
     save_competition(competition)
 
     return jsonify({'success': True})
