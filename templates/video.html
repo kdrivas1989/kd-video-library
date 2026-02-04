@@ -1315,6 +1315,13 @@
             // Scoring controls - work for all videos (including embedded)
             switch(e.code) {
                 case 'KeyX':
+                    // Check if freeze frame is active - if so, ignore X key
+                    const freezeOverlay = document.getElementById('freezeOverlay');
+                    if (freezeOverlay && !freezeOverlay.classList.contains('hidden')) {
+                        // Freeze frame is showing - don't allow timer restart or points
+                        return true;
+                    }
+
                     // Check if in sync mode
                     if (isSyncMode && currentSyncState === 'playing') {
                         // In sync mode, X marks working time start - send to server for validation
