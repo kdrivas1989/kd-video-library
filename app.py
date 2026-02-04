@@ -1193,6 +1193,9 @@ def is_direct_video_url(url):
     if not url:
         return False
     url_lower = url.lower()
+    # Supabase Storage URLs are always streamable
+    if 'supabase.co/storage' in url_lower or 'supabase.in/storage' in url_lower:
+        return True
     # Dropbox direct links are always streamable
     if 'dropboxusercontent.com' in url_lower or 'dropbox.com' in url_lower:
         return True
@@ -1871,16 +1874,22 @@ def video(video_id):
         return "Video not found", 404
 
     # Determine video source
-    if video.get('video_type') == 'local' and video.get('local_file'):
-        video['video_src'] = f'/static/videos/{video["local_file"]}'
-        video['is_local'] = True
-        video['is_direct_url'] = False
-    elif is_direct_video_url(video.get('url', '')):
+    # Check URL first (Supabase Storage, Dropbox, direct video URLs)
+    if video.get('url') and is_direct_video_url(video.get('url', '')):
         video['video_src'] = video['url']
         video['is_local'] = False
         video['is_direct_url'] = True
-    else:
+    elif video.get('video_type') == 'local' and video.get('local_file'):
+        video['video_src'] = f'/static/videos/{video["local_file"]}'
+        video['is_local'] = True
+        video['is_direct_url'] = False
+    elif video.get('url'):
         video['embed_url'] = get_video_embed_url(video.get('url', ''))
+        video['is_local'] = False
+        video['is_direct_url'] = False
+    else:
+        # No valid video source
+        video['video_src'] = ''
         video['is_local'] = False
         video['is_direct_url'] = False
 
