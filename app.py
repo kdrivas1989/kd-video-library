@@ -965,11 +965,21 @@ def save_user(user_data):
     email = user_data.get('email', '')
     signature_pin = user_data.get('signature_pin', '')
     if USE_SUPABASE:
+        # Only send fields that exist in Supabase users table
+        supabase_data = {
+            'username': user_data['username'],
+            'password': user_data['password'],
+            'role': user_data['role'],
+            'name': user_data['name'],
+            'email': email,
+            'must_change_password': must_change,
+            'signature_pin': signature_pin
+        }
         existing = supabase.table('users').select('username').eq('username', user_data['username']).execute()
         if existing.data:
-            supabase.table('users').update(user_data).eq('username', user_data['username']).execute()
+            supabase.table('users').update(supabase_data).eq('username', user_data['username']).execute()
         else:
-            supabase.table('users').insert(user_data).execute()
+            supabase.table('users').insert(supabase_data).execute()
     else:
         db = get_sqlite_db()
         db.execute('''
