@@ -1006,42 +1006,25 @@
         document.body.tabIndex = -1;
         document.body.focus();
 
-        // For embedded videos, detect when iframe takes focus and help user regain it
+        // For embedded videos, auto-focus page when mouse moves to enable keyboard shortcuts
         if (isEmbeddedVideo) {
-            // Add pulse animation style
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes pulse-hint {
-                    0%, 100% { transform: scale(1); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-                    50% { transform: scale(1.05); box-shadow: 0 6px 12px rgba(59,130,246,0.5); }
+            // Auto-focus body when mouse moves over the page (outside iframe)
+            document.addEventListener('mousemove', () => {
+                if (document.activeElement && document.activeElement.tagName === 'IFRAME') {
+                    document.body.focus();
                 }
-            `;
-            document.head.appendChild(style);
-
-            // Show keyboard hint message
-            const keyboardHint = document.createElement('div');
-            keyboardHint.id = 'keyboardHint';
-            keyboardHint.className = 'fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm z-50 transition-opacity duration-300';
-            keyboardHint.innerHTML = 'Click here to enable keyboard shortcuts (X, C, Q)';
-            keyboardHint.style.cursor = 'pointer';
-            keyboardHint.onclick = () => {
-                document.body.focus();
-                keyboardHint.classList.add('opacity-50');
-                keyboardHint.innerHTML = 'Keyboard shortcuts enabled!';
-                setTimeout(() => {
-                    keyboardHint.classList.remove('opacity-50');
-                    keyboardHint.innerHTML = 'Click here to enable keyboard shortcuts (X, C, Q)';
-                }, 2000);
-            };
-            document.body.appendChild(keyboardHint);
-
-            // Detect when focus leaves the window (goes to iframe)
-            window.addEventListener('blur', () => {
-                keyboardHint.classList.remove('opacity-50');
-                keyboardHint.style.animation = 'pulse-hint 1s ease-in-out infinite';
             });
+
+            // Auto-focus when window regains focus
             window.addEventListener('focus', () => {
-                keyboardHint.style.animation = '';
+                document.body.focus();
+            });
+
+            // Also focus on any click outside the iframe
+            document.addEventListener('click', (e) => {
+                if (e.target.tagName !== 'IFRAME') {
+                    document.body.focus();
+                }
             });
         }
 
