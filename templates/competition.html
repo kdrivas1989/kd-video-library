@@ -6535,6 +6535,14 @@
                 const result = await response.json();
                 if (result.success) {
                     document.getElementById('uploadBar').style.width = '100%';
+                    // Update currentScoreId so delete works for newly saved scores
+                    if (result.score_id) {
+                        currentScoreId = result.score_id;
+                        // Show delete button now that we have a score
+                        const deleteScoreBtn = document.getElementById('deleteScoreBtn');
+                        if (deleteScoreBtn) deleteScoreBtn.style.display = 'block';
+                    }
+
                     if (result.penalty_applied) {
                         document.getElementById('uploadStatus').textContent =
                             `Score saved! (Raw: ${result.raw_score}, Penalty: -${result.penalty_amount}, Final: ${result.final_score})`;

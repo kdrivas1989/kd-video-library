@@ -6207,7 +6207,7 @@ def save_team_score(team_id):
         'created_at': datetime.now().isoformat()
     })
 
-    response_data = {'success': True, 'message': 'Score saved'}
+    response_data = {'success': True, 'message': 'Score saved', 'score_id': score_id}
     if exit_time_penalty and penalty_amount > 0:
         response_data['penalty_applied'] = True
         response_data['raw_score'] = int(raw_score)
