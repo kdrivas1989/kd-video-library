@@ -577,6 +577,22 @@ def init_db():
         except:
             pass
 
+        # Add WS Performance columns
+        try:
+            cursor.execute('ALTER TABLE competitions ADD COLUMN ws_reference_points TEXT')
+        except:
+            pass
+
+        try:
+            cursor.execute('ALTER TABLE competitions ADD COLUMN ws_validation_window TEXT')
+        except:
+            pass
+
+        try:
+            cursor.execute('ALTER TABLE competitions ADD COLUMN ws_competitor_ref_points TEXT')
+        except:
+            pass
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS competition_teams (
                 id TEXT PRIMARY KEY,
@@ -1031,14 +1047,17 @@ def save_competition(comp_data):
     else:
         db = get_sqlite_db()
         db.execute('''
-            INSERT OR REPLACE INTO competitions (id, name, event_type, event_types, event_rounds, total_rounds, created_at, status, chief_judge, chief_judge_pin, event_locations, event_dates, draws)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO competitions (id, name, event_type, event_types, event_rounds, total_rounds, created_at, status, chief_judge, chief_judge_pin, event_locations, event_dates, draws, ws_reference_points, ws_validation_window, ws_competitor_ref_points)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (comp_data['id'], comp_data['name'], comp_data['event_type'],
               comp_data.get('event_types', ''), comp_data.get('event_rounds', '{}'),
               comp_data.get('total_rounds', 10), comp_data['created_at'], comp_data.get('status', 'active'),
               comp_data.get('chief_judge', ''), comp_data.get('chief_judge_pin', ''),
               comp_data.get('event_locations', '{}'), comp_data.get('event_dates', '{}'),
-              comp_data.get('draws', '{}')))
+              comp_data.get('draws', '{}'),
+              comp_data.get('ws_reference_points'),
+              comp_data.get('ws_validation_window'),
+              comp_data.get('ws_competitor_ref_points')))
         db.commit()
 
 
@@ -6921,26 +6940,53 @@ def ws_performance_save_score(team_id):
 @app.route('/ws-performance/reference-points/<competition_id>', methods=['GET', 'POST'])
 @chief_judge_required
 def ws_performance_reference_points(competition_id):
-    """Get or set ground reference points for WS Performance competition."""
+    """Get or set ground reference points and validation window for WS Performance competition."""
     competition = get_competition(competition_id)
     if not competition:
         return jsonify({'error': 'Competition not found'}), 404
 
     if request.method == 'GET':
-        # Return existing reference points
+        # Return existing reference points, validation window, and competitor assignments
         ref_points = competition.get('ws_reference_points', [])
+        validation_window = competition.get('ws_validation_window')
+        competitor_assignments = competition.get('ws_competitor_ref_points', {})
+
+        # Parse if stored as JSON string
+        if isinstance(ref_points, str):
+            try:
+                ref_points = json.loads(ref_points)
+            except:
+                ref_points = []
+        if isinstance(validation_window, str):
+            try:
+                validation_window = json.loads(validation_window)
+            except:
+                validation_window = None
+        if isinstance(competitor_assignments, str):
+            try:
+                competitor_assignments = json.loads(competitor_assignments)
+            except:
+                competitor_assignments = {}
+
         return jsonify({
             'success': True,
-            'points': ref_points
+            'points': ref_points,
+            'validation_window': validation_window,
+            'competitor_assignments': competitor_assignments
         })
 
     elif request.method == 'POST':
-        # Save reference points
+        # Save reference points, validation window, and competitor assignments
         data = request.json
         points = data.get('points', [])
+        validation_window = data.get('validation_window')
+        competitor_assignments = data.get('competitor_assignments', {})
 
-        if len(points) != 4:
-            return jsonify({'error': 'Exactly 4 reference points are required'}), 400
+        if len(points) == 0:
+            return jsonify({'error': 'At least one reference point is required'}), 400
+
+        if len(points) > 4:
+            return jsonify({'error': 'Maximum 4 reference points allowed'}), 400
 
         # Validate points
         validated_points = []
@@ -6963,14 +7009,28 @@ def ws_performance_reference_points(competition_id):
                 'lng': float(lng)
             })
 
+        # Validate validation window if provided
+        validated_vw = None
+        if validation_window:
+            vw_lat = validation_window.get('lat')
+            vw_lng = validation_window.get('lng')
+            if vw_lat is not None and vw_lng is not None:
+                if not (-90 <= vw_lat <= 90) or not (-180 <= vw_lng <= 180):
+                    return jsonify({'error': 'Invalid validation window coordinates'}), 400
+                validated_vw = {'lat': float(vw_lat), 'lng': float(vw_lng)}
+
         # Save to competition
-        competition['ws_reference_points'] = validated_points
+        competition['ws_reference_points'] = json.dumps(validated_points)
+        competition['ws_validation_window'] = json.dumps(validated_vw) if validated_vw else None
+        competition['ws_competitor_ref_points'] = json.dumps(competitor_assignments)
         save_competition(competition)
 
         return jsonify({
             'success': True,
-            'message': 'Reference points saved',
-            'points': validated_points
+            'message': 'Flight path configuration saved',
+            'points': validated_points,
+            'validation_window': validated_vw,
+            'competitor_assignments': competitor_assignments
         })
 
 

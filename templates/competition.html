@@ -2048,12 +2048,20 @@
     <div id="wsRefPointsModal" class="hidden fixed inset-0 bg-black/50 items-center justify-center z-50 overflow-y-auto py-2">
         <div class="bg-white rounded-lg p-6 w-full max-w-6xl mx-4 my-auto">
             <div class="flex justify-between items-center mb-3">
-                <h2 class="text-xl font-bold">WS Performance - Ground Reference Points</h2>
+                <h2 class="text-xl font-bold">WS Performance - Flight Paths & Reference Points</h2>
                 <button onclick="closeWsRefPointsModal()" class="text-gray-600 hover:text-gray-900 text-2xl">&times;</button>
             </div>
 
+            <div class="bg-blue-50 border border-blue-200 rounded p-3 mb-3 text-sm">
+                <div class="font-semibold text-blue-800 mb-1">Competition Window Specifications:</div>
+                <ul class="text-blue-700 space-y-1">
+                    <li><strong>Vertical Window:</strong> 1000m (2500m / 8202ft to 1500m / 4921ft geometric altitude)</li>
+                    <li><strong>Designated Lane:</strong> 600m wide corridor centered on the Designated Flight Path</li>
+                    <li><strong>Flight Path:</strong> Straight ground track from Validation Window start to designated ground reference point</li>
+                </ul>
+            </div>
             <p class="text-gray-600 text-sm mb-3">
-                Click on the map to place 4 ground reference points. Drag markers to adjust position.
+                Set the Validation Window start point and up to 4 ground reference points. Each competitor can be assigned a specific reference point for their Designated Flight Path.
             </p>
 
             <!-- Location Search -->
@@ -2074,9 +2082,13 @@
                         class="w-28 px-2 py-2 border rounded text-sm">
                     <input type="text" id="wsRefLngInput" placeholder="Longitude"
                         class="w-28 px-2 py-2 border rounded text-sm">
+                    <select id="wsRefPointType" class="px-2 py-2 border rounded text-sm">
+                        <option value="validation">Validation Window</option>
+                        <option value="reference">Reference Point</option>
+                    </select>
                     <button onclick="addWsRefPointManual()"
                         class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm whitespace-nowrap">
-                        Add Point
+                        Add
                     </button>
                 </div>
             </div>
@@ -2086,17 +2098,36 @@
                 <!-- Map -->
                 <div class="flex-1">
                     <div id="wsRefMap" style="height: 450px; border-radius: 8px; border: 2px solid #e5e7eb;"></div>
+                    <div class="flex gap-4 mt-2 text-xs">
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-orange-500"></span> Validation Window</span>
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-500"></span> Reference Points</span>
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-300 opacity-50"></span> 600m Designated Lane</span>
+                    </div>
                 </div>
 
                 <!-- Reference Points Panel -->
-                <div class="w-72 flex flex-col">
+                <div class="w-80 flex flex-col">
+                    <!-- Validation Window -->
+                    <div class="mb-3">
+                        <div class="flex items-center justify-between mb-1">
+                            <h3 class="font-medium text-orange-600">Validation Window Start</h3>
+                        </div>
+                        <div id="wsValidationWindowCard" class="bg-orange-50 rounded p-3 border-2 border-dashed border-orange-300">
+                            <div class="flex items-center justify-between">
+                                <span class="font-medium text-orange-700">Start Point</span>
+                                <button onclick="removeValidationWindow()" class="text-red-500 hover:text-red-700 text-xs hidden" id="wsValidationRemove">Remove</button>
+                            </div>
+                            <div id="wsValidationCoords" class="text-sm text-orange-500 mt-1">Click map or enter coords</div>
+                        </div>
+                    </div>
+
                     <div class="flex items-center justify-between mb-2">
                         <h3 class="font-medium text-gray-700">Reference Points</h3>
                         <span id="wsRefPointsConfigStatus" class="text-sm font-medium text-yellow-600">0/4</span>
                     </div>
 
                     <!-- 4 Reference Point Cards -->
-                    <div class="grid grid-cols-1 gap-2 flex-1">
+                    <div class="grid grid-cols-1 gap-2 flex-1 overflow-y-auto" style="max-height: 280px;">
                         <div id="wsRefPoint1Card" class="bg-gray-100 rounded p-3 border-2 border-dashed border-gray-300">
                             <div class="flex items-center justify-between">
                                 <span class="font-medium text-gray-700">Point 1</span>
@@ -2126,6 +2157,14 @@
                             <div id="wsRefPoint4Coords" class="text-sm text-gray-500 mt-1">Click map to set</div>
                         </div>
                     </div>
+
+                    <!-- Competitor Assignment Section -->
+                    <div class="mt-3 pt-3 border-t border-gray-200">
+                        <h4 class="font-medium text-gray-700 mb-2">Assign Reference Points to Competitors</h4>
+                        <div id="wsCompetitorAssignments" class="text-sm text-gray-500 max-h-32 overflow-y-auto">
+                            Save reference points first to assign to competitors
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -2134,7 +2173,7 @@
                     Cancel
                 </button>
                 <button onclick="saveWsReferencePoints()" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white">
-                    Save Reference Points
+                    Save Configuration
                 </button>
             </div>
         </div>
@@ -4325,6 +4364,10 @@
         let wsReferencePoints = [];
         let wsRefMap = null;
         let wsRefMarkers = [];
+        let wsValidationMarker = null;
+        let wsFlightPaths = [];
+        let wsFlightLanes = [];
+        let wsCompetitorRefPoints = {}; // competitor_id -> ref_point_index
 
         function openWsReferencePointsModal() {
             document.getElementById('wsRefPointsModal').classList.remove('hidden');
@@ -4354,11 +4397,149 @@
 
             // Add click handler to place markers
             wsRefMap.on('click', function(e) {
-                if (wsRefMarkers.length < 4) {
-                    addWsRefMarker(e.latlng.lat, e.latlng.lng);
+                const pointType = document.getElementById('wsRefPointType').value;
+                if (pointType === 'validation') {
+                    setValidationWindow(e.latlng.lat, e.latlng.lng);
                 } else {
-                    alert('Maximum 4 reference points. Remove one to add a new point.');
+                    if (wsRefMarkers.length < 4) {
+                        addWsRefMarker(e.latlng.lat, e.latlng.lng);
+                    } else {
+                        alert('Maximum 4 reference points. Remove one to add a new point.');
+                    }
                 }
+            });
+        }
+
+        // Custom orange icon for validation window
+        const validationIcon = L.divIcon({
+            className: 'validation-marker',
+            html: '<div style="background-color: #f97316; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        function setValidationWindow(lat, lng) {
+            // Remove existing validation marker
+            if (wsValidationMarker) {
+                wsRefMap.removeLayer(wsValidationMarker);
+            }
+
+            wsValidationMarker = L.marker([lat, lng], {
+                draggable: true,
+                icon: validationIcon
+            }).addTo(wsRefMap);
+
+            wsValidationMarker.bindPopup(`<div class="text-center"><b>Validation Window</b><br><span class="font-mono text-xs">${lat.toFixed(6)}, ${lng.toFixed(6)}</span></div>`);
+
+            wsValidationMarker.on('dragend', function(e) {
+                const latlng = e.target.getLatLng();
+                wsValidationMarker.setPopupContent(`<div class="text-center"><b>Validation Window</b><br><span class="font-mono text-xs">${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}</span></div>`);
+                updateValidationWindowUI();
+                drawFlightPaths();
+            });
+
+            updateValidationWindowUI();
+            drawFlightPaths();
+        }
+
+        function removeValidationWindow() {
+            if (wsValidationMarker) {
+                wsRefMap.removeLayer(wsValidationMarker);
+                wsValidationMarker = null;
+                updateValidationWindowUI();
+                drawFlightPaths();
+            }
+        }
+
+        function updateValidationWindowUI() {
+            const card = document.getElementById('wsValidationWindowCard');
+            const coordsEl = document.getElementById('wsValidationCoords');
+            const removeBtn = document.getElementById('wsValidationRemove');
+
+            if (wsValidationMarker) {
+                const latlng = wsValidationMarker.getLatLng();
+                card.className = 'bg-orange-100 rounded p-3 border-2 border-orange-500';
+                coordsEl.innerHTML = `<span class="font-mono text-orange-700">${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}</span>`;
+                removeBtn.classList.remove('hidden');
+            } else {
+                card.className = 'bg-orange-50 rounded p-3 border-2 border-dashed border-orange-300';
+                coordsEl.innerHTML = '<span class="text-orange-400">Click map or enter coords</span>';
+                removeBtn.classList.add('hidden');
+            }
+        }
+
+        // Calculate offset point perpendicular to a line (for creating lane polygon)
+        function offsetPoint(lat1, lng1, lat2, lng2, distanceMeters, side) {
+            // Calculate bearing from point 1 to point 2
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const lat1Rad = lat1 * Math.PI / 180;
+            const lat2Rad = lat2 * Math.PI / 180;
+            const y = Math.sin(dLng) * Math.cos(lat2Rad);
+            const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+            let bearing = Math.atan2(y, x);
+
+            // Perpendicular bearing (90 degrees offset)
+            const perpBearing = side === 'left' ? bearing - Math.PI / 2 : bearing + Math.PI / 2;
+
+            // Earth's radius in meters
+            const R = 6371000;
+
+            // Calculate new point at distance
+            const d = distanceMeters / R;
+            const lat1R = lat1 * Math.PI / 180;
+            const lng1R = lng1 * Math.PI / 180;
+
+            const newLat = Math.asin(Math.sin(lat1R) * Math.cos(d) + Math.cos(lat1R) * Math.sin(d) * Math.cos(perpBearing));
+            const newLng = lng1R + Math.atan2(Math.sin(perpBearing) * Math.sin(d) * Math.cos(lat1R), Math.cos(d) - Math.sin(lat1R) * Math.sin(newLat));
+
+            return [newLat * 180 / Math.PI, newLng * 180 / Math.PI];
+        }
+
+        function drawFlightPaths() {
+            // Clear existing paths and lanes
+            wsFlightPaths.forEach(p => wsRefMap.removeLayer(p));
+            wsFlightLanes.forEach(l => wsRefMap.removeLayer(l));
+            wsFlightPaths = [];
+            wsFlightLanes = [];
+
+            if (!wsValidationMarker || wsRefMarkers.length === 0) return;
+
+            const validationLatLng = wsValidationMarker.getLatLng();
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444']; // blue, green, amber, red
+
+            wsRefMarkers.forEach((marker, idx) => {
+                const refLatLng = marker.getLatLng();
+
+                // Draw the Designated Flight Path (line)
+                const flightPath = L.polyline([
+                    [validationLatLng.lat, validationLatLng.lng],
+                    [refLatLng.lat, refLatLng.lng]
+                ], {
+                    color: colors[idx % colors.length],
+                    weight: 3,
+                    opacity: 0.8,
+                    dashArray: '10, 5'
+                }).addTo(wsRefMap);
+                wsFlightPaths.push(flightPath);
+
+                // Draw the 600m Designated Lane (polygon)
+                const laneWidth = 300; // 300m on each side = 600m total
+                const p1Left = offsetPoint(validationLatLng.lat, validationLatLng.lng, refLatLng.lat, refLatLng.lng, laneWidth, 'left');
+                const p1Right = offsetPoint(validationLatLng.lat, validationLatLng.lng, refLatLng.lat, refLatLng.lng, laneWidth, 'right');
+                const p2Left = offsetPoint(refLatLng.lat, refLatLng.lng, validationLatLng.lat, validationLatLng.lng, laneWidth, 'right');
+                const p2Right = offsetPoint(refLatLng.lat, refLatLng.lng, validationLatLng.lat, validationLatLng.lng, laneWidth, 'left');
+
+                const lane = L.polygon([
+                    p1Left, p1Right, p2Right, p2Left
+                ], {
+                    color: colors[idx % colors.length],
+                    weight: 1,
+                    opacity: 0.5,
+                    fillColor: colors[idx % colors.length],
+                    fillOpacity: 0.15
+                }).addTo(wsRefMap);
+                lane.bindPopup(`<b>Designated Lane ${idx + 1}</b><br>600m wide corridor`);
+                wsFlightLanes.push(lane);
             });
         }
 
@@ -4415,8 +4596,17 @@
             const pointNum = wsRefMarkers.length + 1;
             const pointLabel = label || 'Point ' + pointNum;
 
+            // Custom blue icon for reference points
+            const refIcon = L.divIcon({
+                className: 'ref-marker',
+                html: `<div style="background-color: #3b82f6; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px;">${pointNum}</div>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            });
+
             const marker = L.marker([lat, lng], {
-                draggable: true
+                draggable: true,
+                icon: refIcon
             }).addTo(wsRefMap);
 
             // Store the point number on the marker for reference
@@ -4428,10 +4618,12 @@
                 const latlng = e.target.getLatLng();
                 updateMarkerPopup(e.target, e.target.pointNum, latlng.lat, latlng.lng);
                 updateWsRefPointsList();
+                drawFlightPaths();
             });
 
             wsRefMarkers.push(marker);
             updateWsRefPointsList();
+            drawFlightPaths();
         }
 
         function updateMarkerPopup(marker, pointNum, lat, lng) {
@@ -4443,14 +4635,23 @@
                 wsRefMap.removeLayer(wsRefMarkers[index]);
                 wsRefMarkers.splice(index, 1);
 
-                // Update point numbers for remaining markers
+                // Update point numbers for remaining markers and recreate icons
                 wsRefMarkers.forEach((marker, idx) => {
                     marker.pointNum = idx + 1;
                     const latlng = marker.getLatLng();
                     updateMarkerPopup(marker, idx + 1, latlng.lat, latlng.lng);
+                    // Update icon with new number
+                    const newIcon = L.divIcon({
+                        className: 'ref-marker',
+                        html: `<div style="background-color: #3b82f6; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px;">${idx + 1}</div>`,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
+                    marker.setIcon(newIcon);
                 });
 
                 updateWsRefPointsList();
+                drawFlightPaths();
             }
         }
 
@@ -4485,8 +4686,8 @@
         }
 
         async function saveWsReferencePoints() {
-            if (wsRefMarkers.length !== 4) {
-                alert('Please configure exactly 4 reference points');
+            if (wsRefMarkers.length === 0) {
+                alert('Please configure at least one reference point');
                 return;
             }
 
@@ -4500,18 +4701,36 @@
                 };
             });
 
+            // Include validation window if set
+            let validationWindow = null;
+            if (wsValidationMarker) {
+                const vwLatLng = wsValidationMarker.getLatLng();
+                validationWindow = {
+                    lat: vwLatLng.lat,
+                    lng: vwLatLng.lng
+                };
+            }
+
             try {
                 const response = await fetch(`/ws-performance/reference-points/${competitionId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ points: points })
+                    body: JSON.stringify({
+                        points: points,
+                        validation_window: validationWindow,
+                        competitor_assignments: wsCompetitorRefPoints
+                    })
                 });
 
                 const result = await response.json();
 
                 if (result.success) {
-                    alert('Reference points saved successfully');
-                    document.getElementById('wsRefPointsStatus').textContent = '4 ground reference points configured';
+                    alert('Flight path configuration saved successfully');
+                    const statusText = validationWindow
+                        ? `Validation window + ${points.length} reference points configured`
+                        : `${points.length} reference points configured`;
+                    const statusEl = document.getElementById('wsRefPointsStatus');
+                    if (statusEl) statusEl.textContent = statusText;
                     closeWsRefPointsModal();
                 } else {
                     alert('Error: ' + result.error);
@@ -4528,32 +4747,110 @@
                 const response = await fetch(`/ws-performance/reference-points/${competitionId}`);
                 const result = await response.json();
 
-                if (result.success && result.points && result.points.length > 0) {
+                if (result.success) {
                     // Clear existing markers
                     wsRefMarkers.forEach(m => wsRefMap.removeLayer(m));
                     wsRefMarkers = [];
 
+                    // Clear validation window
+                    if (wsValidationMarker) {
+                        wsRefMap.removeLayer(wsValidationMarker);
+                        wsValidationMarker = null;
+                    }
+
+                    // Load validation window
+                    if (result.validation_window) {
+                        setValidationWindow(result.validation_window.lat, result.validation_window.lng);
+                    }
+
+                    // Load competitor assignments
+                    wsCompetitorRefPoints = result.competitor_assignments || {};
+
                     // Add markers for loaded points
-                    result.points.forEach((point, idx) => {
-                        addWsRefMarker(point.lat, point.lng, 'Point ' + (idx + 1));
-                    });
+                    if (result.points && result.points.length > 0) {
+                        result.points.forEach((point, idx) => {
+                            addWsRefMarker(point.lat, point.lng, 'Point ' + (idx + 1));
+                        });
+                    }
 
                     // Fit map to show all markers
-                    if (wsRefMarkers.length > 0) {
-                        const group = new L.featureGroup(wsRefMarkers);
+                    const allMarkers = [...wsRefMarkers];
+                    if (wsValidationMarker) allMarkers.push(wsValidationMarker);
+
+                    if (allMarkers.length > 0) {
+                        const group = new L.featureGroup(allMarkers);
                         wsRefMap.fitBounds(group.getBounds().pad(0.1));
                     }
 
-                    document.getElementById('wsRefPointsStatus').textContent = '4 ground reference points configured';
+                    // Update status
+                    const statusEl = document.getElementById('wsRefPointsStatus');
+                    if (statusEl) {
+                        statusEl.textContent = `${wsRefMarkers.length}/4`;
+                    }
+
+                    // Render competitor assignments
+                    renderCompetitorAssignments();
                 }
             } catch (err) {
                 console.error('Error loading reference points:', err);
             }
         }
 
+        function renderCompetitorAssignments() {
+            const container = document.getElementById('wsCompetitorAssignments');
+            if (!container) return;
+
+            // Get WS Performance competitors from the page
+            const wsTeams = [];
+            document.querySelectorAll('[data-event="ws_performance"] tr[data-team-id]').forEach(row => {
+                const teamId = row.dataset.teamId;
+                const teamName = row.querySelector('td:nth-child(4)')?.textContent?.trim() || 'Unknown';
+                const teamNum = row.querySelector('td:nth-child(3)')?.textContent?.trim() || '';
+                wsTeams.push({ id: teamId, name: teamName, num: teamNum });
+            });
+
+            if (wsTeams.length === 0) {
+                container.innerHTML = '<span class="text-gray-400">No WS Performance competitors found</span>';
+                return;
+            }
+
+            if (wsRefMarkers.length === 0) {
+                container.innerHTML = '<span class="text-gray-400">Add reference points first</span>';
+                return;
+            }
+
+            let html = '<div class="space-y-2">';
+            wsTeams.forEach(team => {
+                const currentAssignment = wsCompetitorRefPoints[team.id] || '';
+                html += `
+                    <div class="flex items-center justify-between gap-2 bg-gray-50 p-2 rounded">
+                        <span class="text-sm text-gray-700 truncate flex-1">${team.num ? '#' + team.num + ' ' : ''}${team.name}</span>
+                        <select onchange="assignCompetitorRefPoint('${team.id}', this.value)"
+                                class="px-2 py-1 border rounded text-sm">
+                            <option value="">Not assigned</option>
+                            ${wsRefMarkers.map((_, idx) => `
+                                <option value="${idx}" ${currentAssignment === idx ? 'selected' : ''}>Point ${idx + 1}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function assignCompetitorRefPoint(competitorId, refPointIndex) {
+            if (refPointIndex === '' || refPointIndex === null) {
+                delete wsCompetitorRefPoints[competitorId];
+            } else {
+                wsCompetitorRefPoints[competitorId] = parseInt(refPointIndex);
+            }
+        }
+
         function addWsRefPointManual() {
             const lat = parseFloat(document.getElementById('wsRefLatInput').value);
             const lng = parseFloat(document.getElementById('wsRefLngInput').value);
+            const pointType = document.getElementById('wsRefPointType').value;
 
             if (isNaN(lat) || isNaN(lng)) {
                 alert('Please enter valid latitude and longitude values');
@@ -4570,12 +4867,16 @@
                 return;
             }
 
-            if (wsRefMarkers.length >= 4) {
-                alert('Maximum 4 reference points. Remove one to add a new point.');
-                return;
+            if (pointType === 'validation') {
+                setValidationWindow(lat, lng);
+            } else {
+                if (wsRefMarkers.length >= 4) {
+                    alert('Maximum 4 reference points. Remove one to add a new point.');
+                    return;
+                }
+                addWsRefMarker(lat, lng);
             }
 
-            addWsRefMarker(lat, lng);
             wsRefMap.setView([lat, lng], 15);
 
             // Clear inputs
