@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Video Library - Video database for skydiving disciplines."""
 
+# Load environment variables from .env file (for local development)
+from dotenv import load_dotenv
+load_dotenv()
+
 import os
 import re
 import uuid
@@ -41,7 +45,7 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
 
-# Database support - Supabase for production, SQLite for local dev
+# Database support - Supabase required for all environments
 try:
     from supabase import create_client, Client
     SUPABASE_URL = os.environ.get('SUPABASE_URL')
@@ -53,11 +57,15 @@ try:
     else:
         USE_SUPABASE = False
         supabase = None
-        print(f"[STARTUP] Supabase NOT configured - using SQLite. URL={SUPABASE_URL}, KEY={'set' if SUPABASE_KEY else 'not set'}")
+        print(f"[STARTUP] WARNING: Supabase NOT configured!")
+        print(f"[STARTUP] Create a .env file with SUPABASE_URL and SUPABASE_KEY")
+        print(f"[STARTUP] Falling back to SQLite (data will NOT sync to production)")
 except ImportError as e:
     USE_SUPABASE = False
     supabase = None
-    print(f"[STARTUP] Supabase import failed: {e} - using SQLite")
+    print(f"[STARTUP] Supabase import failed: {e}")
+    print(f"[STARTUP] Install with: pip install supabase")
+    print(f"[STARTUP] Falling back to SQLite (data will NOT sync to production)")
 
 # Supabase Storage bucket name
 SUPABASE_BUCKET = 'videos'
