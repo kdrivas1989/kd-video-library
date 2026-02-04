@@ -4109,8 +4109,19 @@
             document.getElementById('cpGate2').checked = true;
             document.getElementById('cpGate3').checked = true;
             document.getElementById('cpGate4').checked = true;
-            document.getElementById('cpLandingZone').value = '0';
-            document.getElementById('cpZoneTotal').textContent = '50';
+            document.getElementById('cpStandUp').checked = true;
+            document.getElementById('cpLandingZone').value = '3';
+            // Reset zone button styles
+            document.querySelectorAll('.cp-zone-btn').forEach(btn => {
+                const btnZone = parseInt(btn.dataset.zone);
+                btn.classList.remove('bg-blue-500', 'hover:bg-blue-600', 'text-white', 'ring-2', 'ring-blue-400', 'bg-green-600', 'ring-green-400');
+                if (btnZone === 50) {
+                    btn.classList.add('bg-green-500', 'hover:bg-green-600', 'text-white');
+                } else {
+                    btn.classList.add('bg-gray-200', 'hover:bg-gray-300', 'text-gray-800');
+                }
+            });
+            document.getElementById('cpZoneTotal').textContent = '53';
 
             // Reset Distance - gates checked by default
             document.getElementById('cpDistEntry').checked = true;
@@ -6427,9 +6438,12 @@
             const cfScoreSection = document.getElementById('cfScoreSection');
             const isCfScoring = cfScoreSection && !cfScoreSection.classList.contains('hidden');
 
+            console.log('isCpScoring:', isCpScoring, 'isCfScoring:', isCfScoring);
+
             if (isCpScoring) {
                 // Get CP score (Zone Accuracy or Distance)
                 const cpScoreValue = document.getElementById('cpScoreValue').value;
+                console.log('CP Score Value:', cpScoreValue);
                 const cpPenalty = document.getElementById('cpPenaltyValue').value;
                 const cpEventType = currentCpEvent || 'zone';
 
@@ -6583,6 +6597,7 @@
                 const cfPenaltyCheckbox = document.getElementById('cfPenaltyCheckbox');
                 const exitTimePenalty = cfPenaltyCheckbox && cfPenaltyCheckbox.checked ? 1 : 0;
 
+                console.log('Saving score:', { teamId, roundNum, score, scoreData, videoId });
                 const response = await fetch('/admin/team/' + teamId + '/score', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -6596,6 +6611,7 @@
                 });
 
                 const result = await response.json();
+                console.log('Save result:', result);
                 if (result.success) {
                     document.getElementById('uploadBar').style.width = '100%';
                     // Update currentScoreId so delete works for newly saved scores
@@ -6615,7 +6631,14 @@
 
                     // For CP scoring, auto-navigate to next competitor
                     if (isCpScoring) {
+                        // Rebuild team list in case it wasn't built
+                        if (cpTeamList.length === 0) {
+                            buildCpTeamList();
+                        }
+                        console.log('CP Team List:', cpTeamList);
+                        console.log('Current Team ID:', teamId);
                         const nextTeam = getNextCpTeam(teamId, parseInt(roundNum));
+                        console.log('Next Team:', nextTeam);
                         if (nextTeam) {
                             document.getElementById('uploadStatus').textContent += ' Loading next competitor...';
                             setTimeout(() => {
