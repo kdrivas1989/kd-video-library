@@ -1286,6 +1286,9 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
+            # For API requests (JSON), return JSON error instead of redirect
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': False, 'error': 'Login required. Please log in.'}), 401
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -1295,6 +1298,9 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session or session.get('role') != 'admin':
+            # For API requests (JSON), return JSON error instead of redirect
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': False, 'error': 'Admin access required. Please log in.'}), 401
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
