@@ -2610,6 +2610,29 @@
         let currentClass = 'all';
         let currentEvent = eventTypes.length > 0 ? eventTypes[0] : '';
 
+        // Audio feedback for score saves
+        function playDingSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.value = 880; // A5 note
+                oscillator.type = 'sine';
+
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            } catch (e) {
+                console.log('Audio not available:', e);
+            }
+        }
+
         // Country code to flag emoji conversion
         const COUNTRY_TO_ISO = {
             'USA': 'US', 'US': 'US', 'UNITED STATES': 'US', 'AMERICA': 'US',
@@ -7598,8 +7621,9 @@
                         document.getElementById('uploadStatus').textContent = 'Score saved!';
                     }
 
-                    // For CP scoring, auto-navigate to next competitor
+                    // For CP scoring, play ding sound and auto-navigate to next competitor
                     if (isCpScoring) {
+                        playDingSound(); // Audio feedback for judge
                         // Rebuild team list in case it wasn't built
                         if (cpTeamList.length === 0) {
                             buildCpTeamList();
