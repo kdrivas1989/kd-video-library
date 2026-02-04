@@ -293,9 +293,17 @@ https://www.youtube.com/watch?v=xxxxx"
             <div class="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="block text-gray-300 mb-2">Vimeo Access Token</label>
-                    <input type="password" id="vimeoAccessToken" placeholder="Enter your Vimeo access token"
-                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
-                    <p class="text-xs text-gray-500 mt-1">Token is not stored - only used for this session</p>
+                    <div class="flex gap-2">
+                        <input type="password" id="vimeoAccessToken" placeholder="Enter your Vimeo access token"
+                            class="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <button type="button" onclick="toggleVimeoTokenVisibility()" class="px-3 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 text-sm">
+                            Show
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Token saved in browser
+                        <button type="button" onclick="clearVimeoToken()" class="text-red-400 hover:text-red-300 ml-2">[Clear]</button>
+                    </p>
                 </div>
                 <div>
                     <label class="block text-gray-300 mb-2">Folder/Showcase (optional)</label>
@@ -745,6 +753,17 @@ https://www.youtube.com/watch?v=xxxxx"
 
         let vimeoVideos = [];
 
+        // Load saved Vimeo token on page load
+        (function loadSavedVimeoToken() {
+            const savedToken = localStorage.getItem('vimeoAccessToken');
+            if (savedToken) {
+                const tokenInput = document.getElementById('vimeoAccessToken');
+                if (tokenInput) {
+                    tokenInput.value = savedToken;
+                }
+            }
+        })();
+
         async function fetchVimeoVideos() {
             const token = document.getElementById('vimeoAccessToken').value.trim();
             const folder = document.getElementById('vimeoFolder').value.trim();
@@ -775,6 +794,9 @@ https://www.youtube.com/watch?v=xxxxx"
                     displayVimeoVideos();
                     statusEl.textContent = '';
                     statusEl.classList.remove('text-red-400');
+
+                    // Save token to localStorage on successful fetch
+                    localStorage.setItem('vimeoAccessToken', token);
                 } else {
                     outputEl.value = 'Error: ' + result.error;
                     statusEl.textContent = result.error;
@@ -846,6 +868,25 @@ https://www.youtube.com/watch?v=xxxxx"
             document.getElementById('bulkUrlsInput').scrollIntoView({ behavior: 'smooth', block: 'center' });
 
             alert(`${vimeoVideos.length} Vimeo URLs copied to Bulk Import section. Set your category and click Import.`);
+        }
+
+        function toggleVimeoTokenVisibility() {
+            const input = document.getElementById('vimeoAccessToken');
+            const btn = input.nextElementSibling;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                btn.textContent = 'Show';
+            }
+        }
+
+        function clearVimeoToken() {
+            if (confirm('Clear saved Vimeo token?')) {
+                localStorage.removeItem('vimeoAccessToken');
+                document.getElementById('vimeoAccessToken').value = '';
+            }
         }
 
         // Update display when checkbox changes
