@@ -2966,6 +2966,25 @@ def fetch_vimeo_account():
         videos = []
         page = 1
         per_page = 100  # Max allowed by Vimeo API
+        folder_name = ''
+        detected_category = None
+        detected_subcategory = None
+
+        # If folder ID provided, first fetch folder name for category detection
+        if folder:
+            try:
+                folder_url = f"https://api.vimeo.com/me/projects/{folder}"
+                folder_req = urllib.request.Request(folder_url)
+                folder_req.add_header('Authorization', f'Bearer {token}')
+                folder_req.add_header('Accept', 'application/vnd.vimeo.*+json;version=3.4')
+                with urllib.request.urlopen(folder_req, timeout=10) as response:
+                    folder_data = json.loads(response.read().decode('utf-8'))
+                    folder_name = folder_data.get('name', '')
+                    # Detect category from folder name
+                    if folder_name:
+                        detected_category, detected_subcategory, _ = detect_category_from_filename(folder_name)
+            except:
+                pass  # Folder name fetch failed, continue without it
 
         while True:
             # Build API URL
@@ -3037,7 +3056,75 @@ def fetch_vimeo_account():
         return jsonify({
             'success': True,
             'videos': videos,
-            'total': len(videos)
+            'total': len(videos),
+            'folder_name': folder_name,
+            'detected_category': detected_category,
+            'detected_subcategory': detected_subcategory
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/admin/fetch-vimeo-folders', methods=['POST'])
+@admin_required
+def fetch_vimeo_folders():
+    """Fetch all folders from a Vimeo account."""
+    data = request.json
+    token = data.get('token', '').strip()
+
+    if not token:
+        return jsonify({'success': False, 'error': 'Access token is required'}), 400
+
+    try:
+        folders = []
+        page = 1
+        per_page = 100
+
+        while True:
+            api_url = f"https://api.vimeo.com/me/projects?page={page}&per_page={per_page}"
+            req = urllib.request.Request(api_url)
+            req.add_header('Authorization', f'Bearer {token}')
+            req.add_header('Accept', 'application/vnd.vimeo.*+json;version=3.4')
+
+            try:
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    result = json.loads(response.read().decode('utf-8'))
+            except urllib.error.HTTPError as e:
+                if e.code == 401:
+                    return jsonify({'success': False, 'error': 'Invalid access token'}), 401
+                else:
+                    return jsonify({'success': False, 'error': f'Vimeo API error: {e.code}'}), e.code
+
+            for folder in result.get('data', []):
+                folder_uri = folder.get('uri', '')
+                folder_id = folder_uri.split('/')[-1] if folder_uri else ''
+                folder_name = folder.get('name', 'Untitled')
+
+                # Detect category from folder name
+                detected_cat, detected_subcat, _ = detect_category_from_filename(folder_name)
+
+                folders.append({
+                    'id': folder_id,
+                    'name': folder_name,
+                    'video_count': folder.get('metadata', {}).get('connections', {}).get('videos', {}).get('total', 0),
+                    'detected_category': detected_cat,
+                    'detected_subcategory': detected_subcat
+                })
+
+            paging = result.get('paging', {})
+            if paging.get('next'):
+                page += 1
+            else:
+                break
+
+            if page > 10:
+                break
+
+        return jsonify({
+            'success': True,
+            'folders': folders,
+            'total': len(folders)
         })
 
     except Exception as e:

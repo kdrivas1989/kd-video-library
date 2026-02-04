@@ -714,6 +714,11 @@ https://www.youtube.com/watch?v=xxxxx"
             }
         })();
 
+        // Store detected category from Vimeo folder
+        let vimeoDetectedCategory = null;
+        let vimeoDetectedSubcategory = null;
+        let vimeoFolderName = '';
+
         async function fetchVimeoVideos() {
             const token = document.getElementById('vimeoAccessToken').value.trim();
             const folder = document.getElementById('vimeoFolder').value.trim();
@@ -741,9 +746,20 @@ https://www.youtube.com/watch?v=xxxxx"
 
                 if (result.success) {
                     vimeoVideos = result.videos;
+                    vimeoDetectedCategory = result.detected_category;
+                    vimeoDetectedSubcategory = result.detected_subcategory;
+                    vimeoFolderName = result.folder_name || '';
                     displayVimeoVideos();
-                    statusEl.textContent = '';
-                    statusEl.classList.remove('text-red-400');
+
+                    // Show detected category info
+                    if (vimeoDetectedCategory) {
+                        statusEl.textContent = `Detected category: ${vimeoDetectedCategory}${vimeoDetectedSubcategory ? ' / ' + vimeoDetectedSubcategory : ''} (from folder: ${vimeoFolderName})`;
+                        statusEl.classList.add('text-green-400');
+                        statusEl.classList.remove('text-red-400');
+                    } else {
+                        statusEl.textContent = '';
+                        statusEl.classList.remove('text-red-400', 'text-green-400');
+                    }
 
                     // Save token to localStorage on successful fetch
                     localStorage.setItem('vimeoAccessToken', token);
@@ -814,10 +830,36 @@ https://www.youtube.com/watch?v=xxxxx"
             const urls = vimeoVideos.map(v => v.url).join('\n');
             document.getElementById('bulkUrlsInput').value = urls;
 
+            // Auto-select detected category if available
+            if (vimeoDetectedCategory) {
+                const categorySelect = document.getElementById('bulkUrlCategory');
+                if (categorySelect) {
+                    categorySelect.value = vimeoDetectedCategory;
+                    // Trigger change event to update subcategories
+                    categorySelect.dispatchEvent(new Event('change'));
+
+                    // Auto-select subcategory after a brief delay
+                    if (vimeoDetectedSubcategory) {
+                        setTimeout(() => {
+                            const subcatSelect = document.getElementById('bulkUrlSubcategory');
+                            if (subcatSelect) {
+                                subcatSelect.value = vimeoDetectedSubcategory;
+                            }
+                        }, 100);
+                    }
+                }
+            }
+
             // Scroll to the bulk import section
             document.getElementById('bulkUrlsInput').scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-            alert(`${vimeoVideos.length} Vimeo URLs copied to Bulk Import section. Set your category and click Import.`);
+            let msg = `${vimeoVideos.length} Vimeo URLs copied to Bulk Import section.`;
+            if (vimeoDetectedCategory) {
+                msg += ` Category auto-set to "${vimeoDetectedCategory}"${vimeoDetectedSubcategory ? ' / ' + vimeoDetectedSubcategory : ''} based on folder name.`;
+            } else {
+                msg += ' Set your category and click Import.';
+            }
+            alert(msg);
         }
 
         function toggleVimeoTokenVisibility() {
