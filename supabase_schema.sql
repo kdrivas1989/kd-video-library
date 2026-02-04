@@ -1,6 +1,17 @@
 -- Supabase Schema for USPA Video Library
 -- Run this in your Supabase SQL Editor (https://supabase.com/dashboard)
 
+-- ============================================
+-- IMPORTANT: STORAGE BUCKET SETUP
+-- ============================================
+-- Before running this SQL, create a storage bucket in Supabase:
+-- 1. Go to Storage in your Supabase dashboard
+-- 2. Click "New bucket"
+-- 3. Name it "videos" (must be exactly this name)
+-- 4. Make it PUBLIC (check the "Public bucket" option)
+-- 5. Click "Create bucket"
+-- ============================================
+
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     username TEXT PRIMARY KEY,

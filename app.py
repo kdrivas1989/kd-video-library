@@ -53,6 +53,65 @@ except ImportError:
     USE_SUPABASE = False
     supabase = None
 
+# Supabase Storage bucket name
+SUPABASE_BUCKET = 'videos'
+
+def upload_to_supabase_storage(file_path, storage_path):
+    """Upload a file to Supabase Storage."""
+    if not USE_SUPABASE or not supabase:
+        return None
+    try:
+        with open(file_path, 'rb') as f:
+            file_data = f.read()
+
+        # Determine content type
+        ext = os.path.splitext(storage_path)[1].lower()
+        content_types = {
+            '.mp4': 'video/mp4',
+            '.webm': 'video/webm',
+            '.mov': 'video/quicktime',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.csv': 'text/csv'
+        }
+        content_type = content_types.get(ext, 'application/octet-stream')
+
+        # Upload to Supabase Storage
+        result = supabase.storage.from_(SUPABASE_BUCKET).upload(
+            storage_path,
+            file_data,
+            file_options={"content-type": content_type, "upsert": "true"}
+        )
+
+        # Get public URL
+        public_url = supabase.storage.from_(SUPABASE_BUCKET).get_public_url(storage_path)
+        return public_url
+    except Exception as e:
+        print(f"Supabase Storage upload error: {e}")
+        return None
+
+def delete_from_supabase_storage(storage_path):
+    """Delete a file from Supabase Storage."""
+    if not USE_SUPABASE or not supabase:
+        return False
+    try:
+        supabase.storage.from_(SUPABASE_BUCKET).remove([storage_path])
+        return True
+    except Exception as e:
+        print(f"Supabase Storage delete error: {e}")
+        return False
+
+def get_supabase_storage_url(storage_path):
+    """Get public URL for a file in Supabase Storage."""
+    if not USE_SUPABASE or not supabase:
+        return None
+    try:
+        return supabase.storage.from_(SUPABASE_BUCKET).get_public_url(storage_path)
+    except Exception as e:
+        print(f"Supabase Storage URL error: {e}")
+        return None
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'uspa-video-library-secret-key')
 DROPBOX_APP_KEY = os.environ.get('DROPBOX_APP_KEY', '')
@@ -1640,8 +1699,36 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
         with conversion_lock:
             conversion_jobs[job_id]['progress'] = 90
 
+        # Upload to Supabase Storage if enabled
+        if USE_SUPABASE:
+            with conversion_lock:
+                conversion_jobs[job_id]['status'] = 'uploading'
+
+            # Upload video file
+            video_filename = os.path.basename(output_path)
+            video_url = upload_to_supabase_storage(output_path, f"videos/{video_filename}")
+            if video_url:
+                video_data['url'] = video_url
+                video_data['video_type'] = 'url'
+                video_data['local_file'] = ''
+                # Clean up local file after upload
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+            else:
+                # Fallback to local if upload fails
+                video_data['local_file'] = video_filename
+
+            # Upload thumbnail
+            if os.path.exists(thumbnail_path):
+                thumb_url = upload_to_supabase_storage(thumbnail_path, f"thumbnails/{thumbnail_filename}")
+                if thumb_url:
+                    video_data['thumbnail'] = thumb_url
+                    os.remove(thumbnail_path)
+        else:
+            # Local storage
+            video_data['local_file'] = os.path.basename(output_path)
+
         # Save video to database
-        video_data['local_file'] = os.path.basename(output_path)
         save_video(video_data)
 
         with conversion_lock:
@@ -2625,12 +2712,35 @@ def upload_video():
         # Get duration
         duration = get_video_duration(output_path)
 
+        # Upload to Supabase Storage if enabled
+        video_url = ''
+        video_type = 'local'
+        final_local_file = local_file
+
+        if USE_SUPABASE:
+            # Upload video file
+            supabase_video_url = upload_to_supabase_storage(output_path, f"videos/{local_file}")
+            if supabase_video_url:
+                video_url = supabase_video_url
+                video_type = 'url'
+                final_local_file = ''
+                # Clean up local file after upload
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+
+            # Upload thumbnail
+            if thumbnail and os.path.exists(thumbnail_path):
+                thumb_url = upload_to_supabase_storage(thumbnail_path, f"thumbnails/{thumbnail_filename}")
+                if thumb_url:
+                    thumbnail = thumb_url
+                    os.remove(thumbnail_path)
+
         # Save to database
         save_video({
             'id': video_id,
             'title': title,
             'description': '',
-            'url': '',
+            'url': video_url,
             'thumbnail': thumbnail,
             'category': category,
             'subcategory': subcategory,
@@ -2638,8 +2748,8 @@ def upload_video():
             'duration': duration,
             'created_at': datetime.now().isoformat(),
             'views': 0,
-            'video_type': 'local',
-            'local_file': local_file,
+            'video_type': video_type,
+            'local_file': final_local_file,
             'event': event,
             'category_auto': category_auto
         })
@@ -5796,12 +5906,35 @@ def videographer_upload_video():
         # Get duration
         duration = get_video_duration(output_path)
 
+        # Upload to Supabase Storage if enabled
+        video_url = ''
+        video_type = 'local'
+        final_local_file = local_file
+
+        if USE_SUPABASE:
+            # Upload video file
+            supabase_video_url = upload_to_supabase_storage(output_path, f"videos/{local_file}")
+            if supabase_video_url:
+                video_url = supabase_video_url
+                video_type = 'url'
+                final_local_file = ''
+                # Clean up local file after upload
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+
+            # Upload thumbnail
+            if thumbnail and os.path.exists(thumbnail_path):
+                thumb_url = upload_to_supabase_storage(thumbnail_path, f"thumbnails/{thumbnail_filename}")
+                if thumb_url:
+                    thumbnail = thumb_url
+                    os.remove(thumbnail_path)
+
         # Save to database
         save_video({
             'id': video_id,
             'title': title,
             'description': '',
-            'url': '',
+            'url': video_url,
             'thumbnail': thumbnail,
             'category': category,
             'subcategory': subcategory,
@@ -5809,8 +5942,8 @@ def videographer_upload_video():
             'duration': duration,
             'created_at': datetime.now().isoformat(),
             'views': 0,
-            'video_type': 'local',
-            'local_file': local_file,
+            'video_type': video_type,
+            'local_file': final_local_file,
             'event': event,
             'category_auto': False  # Videographer uploads are manually assigned
         })
