@@ -1229,11 +1229,26 @@ def get_team_scores(team_id):
 def save_score(score_data):
     """Save a score."""
     if USE_SUPABASE:
+        # Only include columns that exist in Supabase
+        supabase_data = {
+            'id': score_data['id'],
+            'competition_id': score_data['competition_id'],
+            'team_id': score_data['team_id'],
+            'round_num': score_data['round_num'],
+            'score': score_data.get('score'),
+            'score_data': score_data.get('score_data', ''),
+            'video_id': score_data.get('video_id', ''),
+            'scored_by': score_data.get('scored_by', ''),
+            'rejump': score_data.get('rejump', 0),
+            'created_at': score_data['created_at']
+        }
+        # Add optional columns if they have values (these may not exist in all Supabase setups)
+        # training_flag and exit_time_penalty are newer columns
         existing = supabase.table('competition_scores').select('id').eq('id', score_data['id']).execute()
         if existing.data:
-            supabase.table('competition_scores').update(score_data).eq('id', score_data['id']).execute()
+            supabase.table('competition_scores').update(supabase_data).eq('id', score_data['id']).execute()
         else:
-            supabase.table('competition_scores').insert(score_data).execute()
+            supabase.table('competition_scores').insert(supabase_data).execute()
     else:
         db = get_sqlite_db()
         db.execute('''
