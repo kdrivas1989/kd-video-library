@@ -121,10 +121,14 @@
                 <button onclick="showEventDetailsModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
                     Event Details
                 </button>
+                {% set ns = namespace(has_draw_events=false) %}
+                {% for et in event_types %}{% if et.startswith('fs_') or et.startswith('cf_') %}{% set ns.has_draw_events = true %}{% endif %}{% endfor %}
+                {% if ns.has_draw_events or competition.event_type.startswith('fs_') or competition.event_type.startswith('cf_') %}
                 <button onclick="showDrawGeneratorModal()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                     Draw Generator
                 </button>
+                {% endif %}
                 {% if competition.event_type == 'ws_performance' or 'ws_performance' in event_types %}
                 <button onclick="openWsReferencePointsModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -1236,7 +1240,9 @@
                     <label class="block text-gray-600 text-sm mb-1">Event</label>
                     <select id="drawEventType" onchange="updateDrawClassOptions()" class="w-full px-3 py-2 rounded bg-white text-gray-900 border border-gray-300">
                         {% for et in event_types %}
+                        {% if et.startswith('fs_') or et.startswith('cf_') %}
                         <option value="{{ et }}">{{ EVENT_DISPLAY_NAMES.get(et, et) }}</option>
+                        {% endif %}
                         {% endfor %}
                     </select>
                 </div>
