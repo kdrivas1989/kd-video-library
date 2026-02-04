@@ -1377,6 +1377,10 @@
         let qCount = 0;
         let nvPenalty = false;
 
+        // Formations/Draw tracking (declared early to avoid initialization errors)
+        let formations = [];
+        let maxPossiblePoints = 0;
+
         // Panel mode variables
         let panelSize = 1; // 1 = solo, 3 = 3-judge panel, 5 = 5-judge panel
         let currentJudge = 1; // Which judge is currently scoring (1-based)
@@ -2675,10 +2679,6 @@
                 }
             }
         }
-
-        // Formations/Draw tracking (must be declared before updateEventType is called)
-        let formations = [];
-        let maxPossiblePoints = 0;
 
         // Initialize event type on page load (after timer variables are declared)
         autoSelectEventType();
