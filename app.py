@@ -7052,6 +7052,61 @@ def ws_performance_reference_points(competition_id):
         })
 
 
+@app.route('/ws-performance/assign-ref-point/<competition_id>', methods=['POST'])
+@chief_judge_required
+def ws_performance_assign_ref_point(competition_id):
+    """Quickly assign a reference point to a competitor for WS Performance."""
+    competition = get_competition(competition_id)
+    if not competition:
+        return jsonify({'error': 'Competition not found'}), 404
+
+    data = request.json
+    team_id = data.get('team_id')
+    ref_point_index = data.get('ref_point_index')
+
+    if team_id is None:
+        return jsonify({'error': 'Team ID is required'}), 400
+
+    if ref_point_index is None:
+        return jsonify({'error': 'Reference point index is required'}), 400
+
+    # Get existing reference points and assignments
+    ref_points = competition.get('ws_reference_points', [])
+    if isinstance(ref_points, str):
+        try:
+            ref_points = json.loads(ref_points)
+        except:
+            ref_points = []
+
+    if not ref_points:
+        return jsonify({'error': 'No reference points configured'}), 400
+
+    if ref_point_index < 0 or ref_point_index >= len(ref_points):
+        return jsonify({'error': 'Invalid reference point index'}), 400
+
+    # Get existing competitor assignments
+    competitor_assignments = competition.get('ws_competitor_ref_points', {})
+    if isinstance(competitor_assignments, str):
+        try:
+            competitor_assignments = json.loads(competitor_assignments)
+        except:
+            competitor_assignments = {}
+
+    # Update the assignment
+    competitor_assignments[str(team_id)] = ref_point_index
+
+    # Save back to competition
+    competition['ws_competitor_ref_points'] = json.dumps(competitor_assignments)
+    save_competition(competition)
+
+    return jsonify({
+        'success': True,
+        'message': 'Reference point assigned',
+        'team_id': team_id,
+        'ref_point_index': ref_point_index
+    })
+
+
 @app.route('/videographer/team/<team_id>/score', methods=['POST'])
 @event_judge_required
 def videographer_link_video(team_id):
