@@ -1093,6 +1093,13 @@
         let workingTimeVideoStart = null; // Captured when judge first starts timer
         const videoId = '{{ video.id }}';
 
+        // Related videos for auto-navigation after saving score
+        const relatedVideos = [
+            {% for rv in related_videos %}
+            { id: '{{ rv.id }}', title: '{{ rv.title|replace("'", "\\'") }}' }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
         // Apply start time when video loads (only for local videos)
         if (video) {
             video.addEventListener('loadedmetadata', () => {
@@ -2449,13 +2456,23 @@
             document.getElementById('saveScoreStatus').textContent = 'Saved!';
             document.getElementById('saveScoreStatus').classList.remove('text-gray-500');
             document.getElementById('saveScoreStatus').classList.add('text-green-400');
-            setTimeout(() => {
-                document.getElementById('saveScoreStatus').textContent = '';
-                document.getElementById('saveScoreStatus').classList.remove('text-green-400');
-            }, 2000);
 
             document.getElementById('scoreRoundLabel').value = '';
             displaySavedScores();
+
+            // Auto-navigate to next video after a short delay
+            if (relatedVideos.length > 0) {
+                document.getElementById('saveScoreStatus').textContent = 'Saved! Going to next video...';
+                setTimeout(() => {
+                    const nextVideo = relatedVideos[0];
+                    window.location.href = '/video/' + nextVideo.id;
+                }, 1500);
+            } else {
+                setTimeout(() => {
+                    document.getElementById('saveScoreStatus').textContent = '';
+                    document.getElementById('saveScoreStatus').classList.remove('text-green-400');
+                }, 2000);
+            }
         }
 
         function displaySavedScores() {
