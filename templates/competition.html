@@ -1982,22 +1982,22 @@
                                 <button type="button" onclick="clearWsFlysightFile()" class="text-red-400 text-sm hover:underline">Remove</button>
                             </div>
                             <div id="wsFlysightResult" class="hidden mt-2">
-                                <!-- All Values Display -->
-                                <div class="grid grid-cols-3 gap-2 text-center mb-3">
-                                    <div id="wsTimeCard" class="bg-white rounded p-2 border-2 border-blue-500">
+                                <!-- Single Value Display (based on selected task) -->
+                                <div class="text-center mb-3">
+                                    <div id="wsTimeCard" class="bg-white rounded p-3 border-2 border-blue-500 inline-block min-w-32">
                                         <div class="text-xs text-gray-500">Time</div>
-                                        <span class="text-xl font-mono text-blue-600" id="wsFlysightTime">--</span>
-                                        <span class="text-gray-500 text-xs">s</span>
+                                        <span class="text-3xl font-mono text-blue-600" id="wsFlysightTime">--</span>
+                                        <span class="text-gray-500 text-sm">s</span>
                                     </div>
-                                    <div id="wsDistanceCard" class="bg-white rounded p-2 border">
+                                    <div id="wsDistanceCard" class="hidden bg-white rounded p-3 border-2 border-green-500 inline-block min-w-32">
                                         <div class="text-xs text-gray-500">Distance</div>
-                                        <span class="text-xl font-mono text-green-600" id="wsFlysightDistance">--</span>
-                                        <span class="text-gray-500 text-xs">m</span>
+                                        <span class="text-3xl font-mono text-green-600" id="wsFlysightDistance">--</span>
+                                        <span class="text-gray-500 text-sm">m</span>
                                     </div>
-                                    <div id="wsSpeedCard" class="bg-white rounded p-2 border">
+                                    <div id="wsSpeedCard" class="hidden bg-white rounded p-3 border-2 border-orange-500 inline-block min-w-32">
                                         <div class="text-xs text-gray-500">Speed</div>
-                                        <span class="text-xl font-mono text-orange-600" id="wsFlysightSpeed">--</span>
-                                        <span class="text-gray-500 text-xs">km/h</span>
+                                        <span class="text-3xl font-mono text-orange-600" id="wsFlysightSpeed">--</span>
+                                        <span class="text-gray-500 text-sm">km/h</span>
                                     </div>
                                 </div>
 
@@ -4542,33 +4542,23 @@
             if (iconEl) iconEl.textContent = taskIcons[task] || '⏱️';
             if (labelEl) labelEl.textContent = taskLabels[task] || 'Time';
 
-            // Update card highlights (only if cards exist - they appear after CSV upload)
+            // Show only the relevant card for the selected task
             const wsTimeCard = document.getElementById('wsTimeCard');
             const wsDistanceCard = document.getElementById('wsDistanceCard');
             const wsSpeedCard = document.getElementById('wsSpeedCard');
 
-            if (wsTimeCard) {
-                wsTimeCard.classList.remove('border-2', 'border-blue-500');
-                wsTimeCard.classList.add('border');
-            }
-            if (wsDistanceCard) {
-                wsDistanceCard.classList.remove('border-2', 'border-green-500');
-                wsDistanceCard.classList.add('border');
-            }
-            if (wsSpeedCard) {
-                wsSpeedCard.classList.remove('border-2', 'border-orange-500');
-                wsSpeedCard.classList.add('border');
-            }
+            // Hide all cards first
+            if (wsTimeCard) wsTimeCard.classList.add('hidden');
+            if (wsDistanceCard) wsDistanceCard.classList.add('hidden');
+            if (wsSpeedCard) wsSpeedCard.classList.add('hidden');
 
+            // Show only the selected task's card
             if (task === 'time' && wsTimeCard) {
-                wsTimeCard.classList.remove('border');
-                wsTimeCard.classList.add('border-2', 'border-blue-500');
+                wsTimeCard.classList.remove('hidden');
             } else if (task === 'distance' && wsDistanceCard) {
-                wsDistanceCard.classList.remove('border');
-                wsDistanceCard.classList.add('border-2', 'border-green-500');
+                wsDistanceCard.classList.remove('hidden');
             } else if (task === 'speed' && wsSpeedCard) {
-                wsSpeedCard.classList.remove('border');
-                wsSpeedCard.classList.add('border-2', 'border-orange-500');
+                wsSpeedCard.classList.remove('hidden');
             }
 
             updateWsSelectedDisplay();
