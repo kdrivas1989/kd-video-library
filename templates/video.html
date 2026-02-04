@@ -111,7 +111,7 @@
                         </div>
                     </div>
                     {% if video.is_local or video.is_direct_url %}
-                    <video controls class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" playsinline preload="metadata" tabindex="-1">
+                    <video class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" playsinline preload="metadata" tabindex="-1">
                         {% if '.webm' in video.video_src|lower %}
                         <source src="{{ video.video_src }}" type="video/webm">
                         {% elif '.ogg' in video.video_src|lower or '.ogv' in video.video_src|lower %}
@@ -1064,14 +1064,10 @@
                 }
             });
 
-            // Prevent video from handling click to play/pause (we control via keyboard)
+            // Prevent video from handling click - require spacebar for play/pause
             video.addEventListener('click', (e) => {
-                // Toggle play/pause on click
-                if (video.paused) {
-                    video.play();
-                } else {
-                    video.pause();
-                }
+                // Do nothing - spacebar required for play/pause
+                e.preventDefault();
             });
         }
 
