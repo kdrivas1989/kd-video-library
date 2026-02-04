@@ -2172,27 +2172,27 @@ def example_csv(csv_type):
 
     if csv_type == 'teams':
         content = """name,class,event,team_number,members
-Skydivers United,open,fs_4way_fs,101,"John Smith, Jane Doe, Bob Wilson, Alice Brown"
-Flying Aces,open,fs_4way_fs,102,"Mike Johnson, Sarah Davis, Tom Anderson, Lisa White"
-Blue Sky Team,advanced,fs_4way_vfs,103,"Chris Martin, Emma Taylor, David Lee, Amy Chen"
-Cloud Jumpers,intermediate,cf_4way_seq,104,"James Wilson, Mary Jones, Robert Garcia, Jennifer Miller"
-Air Force One,open,fs_8way,105,"William Brown, Elizabeth Davis, Michael Moore, Patricia Taylor"
+Skydivers United,open,4 way FS,101,"John Smith, Jane Doe, Bob Wilson, Alice Brown"
+Flying Aces,open,4 way FS,102,"Mike Johnson, Sarah Davis, Tom Anderson, Lisa White"
+Blue Sky Team,advanced,4 way VFS,103,"Chris Martin, Emma Taylor, David Lee, Amy Chen"
+Cloud Jumpers,intermediate,4 way sequential,104,"James Wilson, Mary Jones, Robert Garcia, Jennifer Miller"
+Air Force One,open,8 way FS,105,"William Brown, Elizabeth Davis, Michael Moore, Patricia Taylor"
 """
-        filename = 'example_teams_import.csv'
+        filename = 'teams_import_template.csv'
     else:  # competitors
         content = """name,class,event,number,country
-John Smith,open,cp_dsz,1,USA
-Maria Garcia,open,cp_dsz,2,ESP
-Hans Mueller,open,sp_individual,3,GER
-Yuki Tanaka,open,sp_individual,4,JPN
-Pierre Dubois,open,al_individual,5,FRA
-Anna Kowalski,open,al_individual,6,POL
-James Wilson,open,ws_performance,7,GBR
-Sofia Rossi,open,ws_performance,8,ITA
-Lars Andersson,open,cp_dsz,9,SWE
-Emma Chen,open,sp_individual,10,CHN
+John Smith,open,WS Performance,1,USA
+Maria Garcia,open,WS Performance,2,ESP
+Hans Mueller,open,Speed,3,GER
+Yuki Tanaka,open,Speed,4,JPN
+Pierre Dubois,open,Accuracy,5,FRA
+Anna Kowalski,open,Accuracy,6,POL
+James Wilson,open,Distance,7,GBR
+Sofia Rossi,open,Distance,8,ITA
+Lars Andersson,open,Canopy Piloting,9,SWE
+Emma Chen,open,Canopy Piloting,10,CHN
 """
-        filename = 'example_competitors_import.csv'
+        filename = 'competitors_import_template.csv'
 
     return Response(
         content,
