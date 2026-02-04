@@ -1204,6 +1204,53 @@ def is_direct_video_url(url):
     return any(url_lower.endswith(ext) or f'{ext}?' in url_lower or f'{ext}&' in url_lower for ext in video_extensions)
 
 
+def fetch_vimeo_metadata(url):
+    """Fetch title and thumbnail from Vimeo using oEmbed API."""
+    try:
+        import urllib.request
+        import urllib.parse
+        oembed_url = f"https://vimeo.com/api/oembed.json?url={urllib.parse.quote(url, safe='')}"
+        req = urllib.request.Request(oembed_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            return {
+                'title': data.get('title', ''),
+                'thumbnail': data.get('thumbnail_url', ''),
+                'duration': data.get('duration', 0)
+            }
+    except Exception as e:
+        print(f"Vimeo metadata fetch error: {e}")
+        return None
+
+
+def fetch_youtube_metadata(url):
+    """Fetch title and thumbnail from YouTube using oEmbed API."""
+    try:
+        import urllib.request
+        import urllib.parse
+        oembed_url = f"https://www.youtube.com/oembed?url={urllib.parse.quote(url, safe='')}&format=json"
+        req = urllib.request.Request(oembed_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+
+            # Get video ID for high-quality thumbnail
+            yt_id = None
+            if 'youtu.be/' in url:
+                yt_id = url.split('youtu.be/')[-1].split('?')[0]
+            elif 'v=' in url:
+                yt_id = url.split('v=')[-1].split('&')[0]
+
+            thumbnail = f"https://img.youtube.com/vi/{yt_id}/hqdefault.jpg" if yt_id else ''
+
+            return {
+                'title': data.get('title', ''),
+                'thumbnail': thumbnail
+            }
+    except Exception as e:
+        print(f"YouTube metadata fetch error: {e}")
+        return None
+
+
 # Formats that browsers can play natively
 BROWSER_PLAYABLE_FORMATS = ('.mp4', '.webm', '.ogg', '.ogv', '.mov', '.m4v')
 # Formats that need conversion
@@ -2612,8 +2659,10 @@ def bulk_import_urls():
         try:
             # Extract title from URL
             # For Dropbox: get filename from URL
-            # For YouTube: use URL as placeholder (user can edit later)
+            # For YouTube/Vimeo: fetch from API
             title = ''
+            yt_meta = None
+            vimeo_meta = None
 
             if 'dropbox.com' in url.lower() or 'dropboxusercontent.com' in url.lower():
                 # Extract filename from Dropbox URL
@@ -2628,11 +2677,20 @@ def bulk_import_urls():
                     title = os.path.splitext(filename)[0].replace('_', ' ').replace('-', ' ')
 
             elif 'youtube.com' in url.lower() or 'youtu.be' in url.lower():
-                # For YouTube, extract video ID as placeholder
-                title = f"YouTube Video"
+                # Fetch YouTube metadata
+                yt_meta = fetch_youtube_metadata(url)
+                if yt_meta:
+                    title = yt_meta.get('title', 'YouTube Video')
+                else:
+                    title = 'YouTube Video'
 
             elif 'vimeo.com' in url.lower():
-                title = f"Vimeo Video"
+                # Fetch Vimeo metadata
+                vimeo_meta = fetch_vimeo_metadata(url)
+                if vimeo_meta:
+                    title = vimeo_meta.get('title', 'Vimeo Video')
+                else:
+                    title = 'Vimeo Video'
 
             else:
                 # Generic URL - try to get filename
@@ -2670,17 +2728,31 @@ def bulk_import_urls():
 
             video_id = str(uuid.uuid4())[:8]
 
-            # Get thumbnail for YouTube/Vimeo
+            # Get thumbnail and duration for YouTube/Vimeo
             thumbnail = None
+            duration = ''
             if 'youtube.com' in url.lower() or 'youtu.be' in url.lower():
-                # Extract YouTube video ID
-                yt_id = None
-                if 'youtu.be/' in url:
-                    yt_id = url.split('youtu.be/')[-1].split('?')[0]
-                elif 'v=' in url:
-                    yt_id = url.split('v=')[-1].split('&')[0]
-                if yt_id:
-                    thumbnail = f"https://img.youtube.com/vi/{yt_id}/hqdefault.jpg"
+                # Use metadata if already fetched, otherwise get thumbnail
+                if yt_meta:
+                    thumbnail = yt_meta.get('thumbnail', '')
+                else:
+                    yt_id = None
+                    if 'youtu.be/' in url:
+                        yt_id = url.split('youtu.be/')[-1].split('?')[0]
+                    elif 'v=' in url:
+                        yt_id = url.split('v=')[-1].split('&')[0]
+                    if yt_id:
+                        thumbnail = f"https://img.youtube.com/vi/{yt_id}/hqdefault.jpg"
+
+            elif 'vimeo.com' in url.lower():
+                # Use metadata if already fetched
+                if vimeo_meta:
+                    thumbnail = vimeo_meta.get('thumbnail', '')
+                    dur_seconds = vimeo_meta.get('duration', 0)
+                    if dur_seconds:
+                        mins = dur_seconds // 60
+                        secs = dur_seconds % 60
+                        duration = f"{mins}:{secs:02d}"
 
             save_video({
                 'id': video_id,
@@ -2691,7 +2763,7 @@ def bulk_import_urls():
                 'category': final_category,
                 'subcategory': final_subcategory,
                 'tags': '',
-                'duration': '',
+                'duration': duration,
                 'created_at': datetime.now().isoformat(),
                 'views': 0,
                 'video_type': 'url',
