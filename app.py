@@ -2811,6 +2811,35 @@ def bulk_import_urls():
     return jsonify(result)
 
 
+@app.route('/admin/export-urls', methods=['GET'])
+@admin_required
+def export_urls():
+    """Export all video URLs for copying."""
+    try:
+        videos = get_all_videos()
+        video_list = []
+
+        for video in videos:
+            url = video.get('url', '')
+            if url:
+                video_list.append({
+                    'id': video.get('id', ''),
+                    'title': video.get('title', 'Untitled'),
+                    'url': url,
+                    'category': video.get('category', 'uncategorized'),
+                    'subcategory': video.get('subcategory', ''),
+                    'event': video.get('event', '')
+                })
+
+        return jsonify({
+            'success': True,
+            'videos': video_list,
+            'total': len(video_list)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/admin/upload-video', methods=['POST'])
 @admin_required
 def upload_video():

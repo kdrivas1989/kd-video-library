@@ -249,6 +249,219 @@
                         10-Way Speed: X to start, X again to stop. Max score: 35.00s. Freeze 6s after completion.
                     </div>
 
+                    <!-- Multi-Judge Scoring Panel -->
+                    <div id="multiJudgePanel" class="mt-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-gray-400 text-sm font-medium">Judge Panel</span>
+                            <div class="flex items-center gap-2">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="multiJudgeMode" onchange="toggleMultiJudgeMode()"
+                                        class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-blue-600">
+                                    <span class="text-gray-400 text-sm">Multi-Judge Mode</span>
+                                </label>
+                                <select id="judgeCount" onchange="updateJudgeCount()" class="px-2 py-1 rounded bg-gray-700 text-white text-sm hidden">
+                                    <option value="3">3 Judges</option>
+                                    <option value="5" selected>5 Judges</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- FS/VFS Multi-Judge Panel -->
+                        <div id="fsMultiJudgePanel" class="hidden">
+                            <p class="text-xs text-gray-500 mb-3">Enter each judge's point count. Average will be calculated automatically.</p>
+                            <div class="grid grid-cols-5 gap-2 mb-3" id="fsJudgeInputs">
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J1</label>
+                                    <input type="number" id="fsJ1" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J2</label>
+                                    <input type="number" id="fsJ2" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J3</label>
+                                    <input type="number" id="fsJ3" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J4</label>
+                                    <input type="number" id="fsJ4" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J5</label>
+                                    <input type="number" id="fsJ5" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between bg-gray-900 rounded p-3">
+                                <div class="flex items-center gap-4">
+                                    <span class="text-gray-400 text-sm">Average:</span>
+                                    <span id="fsJudgeAverage" class="text-2xl font-mono font-bold text-yellow-400">0.0</span>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <span class="text-gray-400 text-sm">Spread:</span>
+                                    <span id="fsJudgeSpread" class="font-mono text-gray-300">0</span>
+                                    <span id="fsSpreadWarning" class="text-red-400 text-sm hidden">⚠️ Large spread</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CF Multi-Judge Panel -->
+                        <div id="cfMultiJudgePanel" class="hidden">
+                            <p class="text-xs text-gray-500 mb-3">Enter each judge's formation count for CF events.</p>
+                            <div class="grid grid-cols-5 gap-2 mb-3" id="cfJudgeInputs">
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J1</label>
+                                    <input type="number" id="cfJ1" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J2</label>
+                                    <input type="number" id="cfJ2" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J3</label>
+                                    <input type="number" id="cfJ3" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J4</label>
+                                    <input type="number" id="cfJ4" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J5</label>
+                                    <input type="number" id="cfJ5" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between bg-gray-900 rounded p-3">
+                                <div class="flex items-center gap-4">
+                                    <span class="text-gray-400 text-sm">Average:</span>
+                                    <span id="cfJudgeAverage" class="text-2xl font-mono font-bold text-yellow-400">0.0</span>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <span class="text-gray-400 text-sm">Spread:</span>
+                                    <span id="cfJudgeSpread" class="font-mono text-gray-300">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Artistic Events Multi-Judge Panel -->
+                        <div id="artisticMultiJudgePanel" class="hidden">
+                            <p class="text-xs text-gray-500 mb-3">Score Presentation (0-10), Technical (0-10), and Difficulty (0-2.5).</p>
+
+                            <!-- Presentation Scores -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-gray-300 text-sm font-medium">Presentation</span>
+                                    <span class="text-xs text-gray-500">Execution, form, control</span>
+                                </div>
+                                <div class="grid grid-cols-5 gap-2 mb-2" id="artPresInputs">
+                                    <div class="text-center">
+                                        <label class="text-xs text-gray-500">J1</label>
+                                        <input type="number" id="artPresJ1" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-xs text-gray-500">J2</label>
+                                        <input type="number" id="artPresJ2" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-xs text-gray-500">J3</label>
+                                        <input type="number" id="artPresJ3" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-xs text-gray-500">J4</label>
+                                        <input type="number" id="artPresJ4" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-xs text-gray-500">J5</label>
+                                        <input type="number" id="artPresJ5" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    </div>
+                                </div>
+                                <div class="text-right text-sm">
+                                    Avg: <span id="artPresAvg" class="text-cyan-400 font-mono font-bold">0.00</span>
+                                </div>
+                            </div>
+
+                            <!-- Technical Scores -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-gray-300 text-sm font-medium">Technical</span>
+                                    <span class="text-xs text-gray-500">Variety, creativity, choreography</span>
+                                </div>
+                                <div class="grid grid-cols-5 gap-2 mb-2" id="artTechInputs">
+                                    <div class="text-center">
+                                        <label class="text-xs text-gray-500">J1</label>
+                                        <input type="number" id="artTechJ1" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-xs text-gray-500">J2</label>
+                                        <input type="number" id="artTechJ2" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-xs text-gray-500">J3</label>
+                                        <input type="number" id="artTechJ3" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-xs text-gray-500">J4</label>
+                                        <input type="number" id="artTechJ4" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-xs text-gray-500">J5</label>
+                                        <input type="number" id="artTechJ5" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    </div>
+                                </div>
+                                <div class="text-right text-sm">
+                                    Avg: <span id="artTechAvg" class="text-cyan-400 font-mono font-bold">0.00</span>
+                                </div>
+                            </div>
+
+                            <!-- Difficulty -->
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-gray-300 text-sm font-medium">Difficulty</span>
+                                    <span class="text-xs text-gray-500">0.0 - 2.5 (from difficulty sheet)</span>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <input type="number" id="artDifficulty" min="0" max="2.5" step="0.1" placeholder="0.0"
+                                        class="w-24 px-3 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    <span class="text-gray-500 text-sm">Based on declared difficulty</span>
+                                </div>
+                            </div>
+
+                            <!-- Total Score -->
+                            <div class="bg-gray-900 rounded p-4 mt-4">
+                                <div class="grid grid-cols-4 gap-4 text-center">
+                                    <div>
+                                        <div class="text-xs text-gray-500 mb-1">Presentation</div>
+                                        <div id="artPresFinal" class="text-lg font-mono font-bold text-cyan-400">0.00</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs text-gray-500 mb-1">Technical</div>
+                                        <div id="artTechFinal" class="text-lg font-mono font-bold text-cyan-400">0.00</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs text-gray-500 mb-1">Difficulty</div>
+                                        <div id="artDiffFinal" class="text-lg font-mono font-bold text-cyan-400">0.00</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs text-gray-500 mb-1">TOTAL</div>
+                                        <div id="artTotalScore" class="text-2xl font-mono font-bold text-yellow-400">0.00</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Save Multi-Judge Score -->
+                        <div id="multiJudgeSaveSection" class="hidden mt-4 pt-4 border-t border-gray-700">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <input type="text" id="multiJudgeRoundLabel" placeholder="Round #"
+                                        class="w-24 px-3 py-1 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <button onclick="saveMultiJudgeScore()" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
+                                        Save Judge Panel Score
+                                    </button>
+                                </div>
+                                <span id="multiJudgeSaveStatus" class="text-sm text-gray-500"></span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Wingsuit FlySight Upload (hidden by default) -->
                     <div id="wingsuitSection" class="hidden mt-4 pt-4 border-t border-gray-700">
                         <!-- Competition/Library Mode Toggle -->
@@ -2631,6 +2844,313 @@
             const teamTotal = myScore + partnerScore;
             document.getElementById('speedTeamTotal').textContent = teamTotal.toFixed(2) + ' km/h';
         }
+
+        // ============================================
+        // MULTI-JUDGE SCORING FUNCTIONS
+        // ============================================
+
+        let multiJudgeModeEnabled = false;
+        let currentJudgeCount = 5;
+
+        function toggleMultiJudgeMode() {
+            multiJudgeModeEnabled = document.getElementById('multiJudgeMode').checked;
+            const judgeCountSelect = document.getElementById('judgeCount');
+            const saveSection = document.getElementById('multiJudgeSaveSection');
+
+            // Show/hide judge count selector and save section
+            if (multiJudgeModeEnabled) {
+                judgeCountSelect.classList.remove('hidden');
+                saveSection.classList.remove('hidden');
+            } else {
+                judgeCountSelect.classList.add('hidden');
+                saveSection.classList.add('hidden');
+            }
+
+            // Update which panel is visible based on event type
+            updateMultiJudgePanelVisibility();
+        }
+
+        function updateMultiJudgePanelVisibility() {
+            const eventType = document.getElementById('eventType').value;
+
+            // Hide all panels first
+            document.getElementById('fsMultiJudgePanel').classList.add('hidden');
+            document.getElementById('cfMultiJudgePanel').classList.add('hidden');
+            document.getElementById('artisticMultiJudgePanel').classList.add('hidden');
+
+            if (!multiJudgeModeEnabled) return;
+
+            // Determine which panel to show based on event type
+            // FS/VFS events: 4way, 8way, 4way-vfs, vfs
+            // CF events: 2way-cf, 4way-cf, 4way-cf-rotation, 8way-cf
+            // Artistic events: freefly, freestyle, artistic-freefly, artistic-freestyle
+
+            const fsEvents = ['4way', '8way', '4way-vfs', 'vfs', '4way-inter', '8way-inter', '10way'];
+            const cfEvents = ['2way-cf', '4way-cf', '4way-cf-rotation', '8way-cf', 'cf-2way', 'cf-4way', 'cf-8way'];
+            const artisticEvents = ['freefly', 'freestyle', 'artistic-freefly', 'artistic-freestyle',
+                                    'fs-artistic', 'artistic', 'freefly-ae', 'freestyle-ae'];
+
+            if (fsEvents.includes(eventType)) {
+                document.getElementById('fsMultiJudgePanel').classList.remove('hidden');
+            } else if (cfEvents.includes(eventType)) {
+                document.getElementById('cfMultiJudgePanel').classList.remove('hidden');
+            } else if (artisticEvents.includes(eventType)) {
+                document.getElementById('artisticMultiJudgePanel').classList.remove('hidden');
+            } else {
+                // Default to FS panel for unlisted events
+                document.getElementById('fsMultiJudgePanel').classList.remove('hidden');
+            }
+        }
+
+        function updateJudgeCount() {
+            currentJudgeCount = parseInt(document.getElementById('judgeCount').value);
+
+            // Update FS panel visibility
+            for (let i = 1; i <= 5; i++) {
+                const input = document.getElementById('fsJ' + i);
+                const cfInput = document.getElementById('cfJ' + i);
+                const artPresInput = document.getElementById('artPresJ' + i);
+                const artTechInput = document.getElementById('artTechJ' + i);
+
+                if (input) {
+                    const parent = input.closest('.text-center');
+                    if (i <= currentJudgeCount) {
+                        parent.classList.remove('hidden');
+                    } else {
+                        parent.classList.add('hidden');
+                        input.value = '';
+                    }
+                }
+
+                if (cfInput) {
+                    const parent = cfInput.closest('.text-center');
+                    if (i <= currentJudgeCount) {
+                        parent.classList.remove('hidden');
+                    } else {
+                        parent.classList.add('hidden');
+                        cfInput.value = '';
+                    }
+                }
+
+                if (artPresInput) {
+                    const parent = artPresInput.closest('.text-center');
+                    if (i <= currentJudgeCount) {
+                        parent.classList.remove('hidden');
+                    } else {
+                        parent.classList.add('hidden');
+                        artPresInput.value = '';
+                    }
+                }
+
+                if (artTechInput) {
+                    const parent = artTechInput.closest('.text-center');
+                    if (i <= currentJudgeCount) {
+                        parent.classList.remove('hidden');
+                    } else {
+                        parent.classList.add('hidden');
+                        artTechInput.value = '';
+                    }
+                }
+            }
+
+            // Recalculate averages
+            calculateFsAverage();
+            calculateCfAverage();
+            calculateArtisticScores();
+        }
+
+        function calculateFsAverage() {
+            const scores = [];
+            for (let i = 1; i <= currentJudgeCount; i++) {
+                const input = document.getElementById('fsJ' + i);
+                if (input && input.value !== '') {
+                    scores.push(parseInt(input.value) || 0);
+                }
+            }
+
+            if (scores.length === 0) {
+                document.getElementById('fsJudgeAverage').textContent = '0.0';
+                document.getElementById('fsJudgeSpread').textContent = '0';
+                document.getElementById('fsSpreadWarning').classList.add('hidden');
+                return;
+            }
+
+            // Calculate average
+            const sum = scores.reduce((a, b) => a + b, 0);
+            const avg = sum / scores.length;
+            document.getElementById('fsJudgeAverage').textContent = avg.toFixed(1);
+
+            // Calculate spread (max - min)
+            const spread = Math.max(...scores) - Math.min(...scores);
+            document.getElementById('fsJudgeSpread').textContent = spread;
+
+            // Show warning if spread is >= 3 (indicating disagreement)
+            if (spread >= 3) {
+                document.getElementById('fsSpreadWarning').classList.remove('hidden');
+            } else {
+                document.getElementById('fsSpreadWarning').classList.add('hidden');
+            }
+        }
+
+        function calculateCfAverage() {
+            const scores = [];
+            for (let i = 1; i <= currentJudgeCount; i++) {
+                const input = document.getElementById('cfJ' + i);
+                if (input && input.value !== '') {
+                    scores.push(parseInt(input.value) || 0);
+                }
+            }
+
+            if (scores.length === 0) {
+                document.getElementById('cfJudgeAverage').textContent = '0.0';
+                document.getElementById('cfJudgeSpread').textContent = '0';
+                return;
+            }
+
+            // Calculate average
+            const sum = scores.reduce((a, b) => a + b, 0);
+            const avg = sum / scores.length;
+            document.getElementById('cfJudgeAverage').textContent = avg.toFixed(1);
+
+            // Calculate spread (max - min)
+            const spread = Math.max(...scores) - Math.min(...scores);
+            document.getElementById('cfJudgeSpread').textContent = spread;
+        }
+
+        function calculateArtisticScores() {
+            // Calculate Presentation average
+            const presScores = [];
+            for (let i = 1; i <= currentJudgeCount; i++) {
+                const input = document.getElementById('artPresJ' + i);
+                if (input && input.value !== '') {
+                    presScores.push(parseFloat(input.value) || 0);
+                }
+            }
+
+            const presAvg = presScores.length > 0 ?
+                presScores.reduce((a, b) => a + b, 0) / presScores.length : 0;
+            document.getElementById('artPresAvg').textContent = presAvg.toFixed(2);
+            document.getElementById('artPresFinal').textContent = presAvg.toFixed(2);
+
+            // Calculate Technical average
+            const techScores = [];
+            for (let i = 1; i <= currentJudgeCount; i++) {
+                const input = document.getElementById('artTechJ' + i);
+                if (input && input.value !== '') {
+                    techScores.push(parseFloat(input.value) || 0);
+                }
+            }
+
+            const techAvg = techScores.length > 0 ?
+                techScores.reduce((a, b) => a + b, 0) / techScores.length : 0;
+            document.getElementById('artTechAvg').textContent = techAvg.toFixed(2);
+            document.getElementById('artTechFinal').textContent = techAvg.toFixed(2);
+
+            // Get Difficulty score
+            const difficulty = parseFloat(document.getElementById('artDifficulty').value) || 0;
+            document.getElementById('artDiffFinal').textContent = difficulty.toFixed(2);
+
+            // Calculate total (Presentation + Technical + Difficulty)
+            const total = presAvg + techAvg + difficulty;
+            document.getElementById('artTotalScore').textContent = total.toFixed(2);
+        }
+
+        function saveMultiJudgeScore() {
+            const eventType = document.getElementById('eventType').value;
+            let scoreData = {
+                id: Date.now(),
+                timestamp: new Date().toLocaleString(),
+                eventType: eventType,
+                multiJudge: true,
+                judgeCount: currentJudgeCount
+            };
+
+            // Determine which type of score to save based on visible panel
+            const fsPanel = document.getElementById('fsMultiJudgePanel');
+            const cfPanel = document.getElementById('cfMultiJudgePanel');
+            const artisticPanel = document.getElementById('artisticMultiJudgePanel');
+
+            if (!fsPanel.classList.contains('hidden')) {
+                // Save FS/VFS score
+                const judges = [];
+                for (let i = 1; i <= currentJudgeCount; i++) {
+                    const input = document.getElementById('fsJ' + i);
+                    if (input) judges.push(parseInt(input.value) || 0);
+                }
+                scoreData.type = 'fs-multijudge';
+                scoreData.judges = judges;
+                scoreData.average = parseFloat(document.getElementById('fsJudgeAverage').textContent);
+                scoreData.spread = parseInt(document.getElementById('fsJudgeSpread').textContent);
+                scoreData.round = 'FS Round ' + (savedScores.filter(s => s.type === 'fs-multijudge').length + 1);
+            } else if (!cfPanel.classList.contains('hidden')) {
+                // Save CF score
+                const judges = [];
+                for (let i = 1; i <= currentJudgeCount; i++) {
+                    const input = document.getElementById('cfJ' + i);
+                    if (input) judges.push(parseInt(input.value) || 0);
+                }
+                scoreData.type = 'cf-multijudge';
+                scoreData.judges = judges;
+                scoreData.average = parseFloat(document.getElementById('cfJudgeAverage').textContent);
+                scoreData.spread = parseInt(document.getElementById('cfJudgeSpread').textContent);
+                scoreData.round = 'CF Round ' + (savedScores.filter(s => s.type === 'cf-multijudge').length + 1);
+            } else if (!artisticPanel.classList.contains('hidden')) {
+                // Save Artistic score
+                const presJudges = [];
+                const techJudges = [];
+                for (let i = 1; i <= currentJudgeCount; i++) {
+                    const presInput = document.getElementById('artPresJ' + i);
+                    const techInput = document.getElementById('artTechJ' + i);
+                    if (presInput) presJudges.push(parseFloat(presInput.value) || 0);
+                    if (techInput) techJudges.push(parseFloat(techInput.value) || 0);
+                }
+                scoreData.type = 'artistic-multijudge';
+                scoreData.presentationJudges = presJudges;
+                scoreData.technicalJudges = techJudges;
+                scoreData.presentation = parseFloat(document.getElementById('artPresFinal').textContent);
+                scoreData.technical = parseFloat(document.getElementById('artTechFinal').textContent);
+                scoreData.difficulty = parseFloat(document.getElementById('artDiffFinal').textContent);
+                scoreData.total = parseFloat(document.getElementById('artTotalScore').textContent);
+                scoreData.round = 'Artistic Round ' + (savedScores.filter(s => s.type === 'artistic-multijudge').length + 1);
+            }
+
+            savedScores.push(scoreData);
+            localStorage.setItem('practiceScores_' + videoId, JSON.stringify(savedScores));
+            displaySavedScores();
+
+            // Clear inputs after saving
+            clearMultiJudgeInputs();
+
+            alert('Score saved! ' + (scoreData.average || scoreData.total).toFixed(2));
+        }
+
+        function clearMultiJudgeInputs() {
+            // Clear FS inputs
+            for (let i = 1; i <= 5; i++) {
+                const fsInput = document.getElementById('fsJ' + i);
+                const cfInput = document.getElementById('cfJ' + i);
+                const presInput = document.getElementById('artPresJ' + i);
+                const techInput = document.getElementById('artTechJ' + i);
+
+                if (fsInput) fsInput.value = '';
+                if (cfInput) cfInput.value = '';
+                if (presInput) presInput.value = '';
+                if (techInput) techInput.value = '';
+            }
+            document.getElementById('artDifficulty').value = '';
+
+            // Reset displays
+            calculateFsAverage();
+            calculateCfAverage();
+            calculateArtisticScores();
+        }
+
+        // Update multi-judge panel when event type changes
+        const originalUpdateEventType = updateEventType;
+        updateEventType = function() {
+            originalUpdateEventType();
+            updateMultiJudgePanelVisibility();
+        };
     </script>
     {% endif %}
 
