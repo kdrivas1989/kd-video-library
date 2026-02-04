@@ -2031,6 +2031,27 @@
                                     class="w-full mt-3 px-4 py-3 rounded bg-green-600 hover:bg-green-700 text-white font-medium">
                                     Save Score
                                 </button>
+
+                                <!-- Flight Track Map -->
+                                <div class="mt-4 pt-4 border-t border-gray-200">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <label class="text-gray-700 font-medium text-sm">Flight Track Visualization</label>
+                                        <button type="button" onclick="toggleFlightTrackMap()" id="wsFlightTrackToggle" class="text-blue-600 hover:text-blue-700 text-xs">
+                                            Show Map
+                                        </button>
+                                    </div>
+                                    <div id="wsFlightTrackMapContainer" class="hidden">
+                                        <div id="wsFlightTrackMap" style="height: 300px; border-radius: 8px; border: 2px solid #e5e7eb;"></div>
+                                        <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs">
+                                            <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-purple-600"></span> Flight Track</span>
+                                            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-500 opacity-60"></span> Safe Lane</span>
+                                            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-500 opacity-60"></span> 10%</span>
+                                            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-orange-500 opacity-60"></span> 20%</span>
+                                            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-600 opacity-60"></span> 50%</span>
+                                        </div>
+                                        <div id="wsFlightTrackInfo" class="mt-2 text-xs text-gray-600"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -4263,8 +4284,211 @@
         // WS Performance FlySight handling
         let selectedWsFlysightFile = null;
         let wsFlysightParsedData = null;
+        let wsFlysightTrackPoints = []; // Store GPS track points from FlySight
+        let wsFlightTrackMap = null;
+        let wsFlightTrackLayers = [];
         let selectedWsTask = 'time';  // 'time', 'distance', 'speed'
         let selectedWsRound = 1;      // 1, 2, 3
+
+        function toggleFlightTrackMap() {
+            const container = document.getElementById('wsFlightTrackMapContainer');
+            const toggleBtn = document.getElementById('wsFlightTrackToggle');
+
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                toggleBtn.textContent = 'Hide Map';
+                initFlightTrackMap();
+            } else {
+                container.classList.add('hidden');
+                toggleBtn.textContent = 'Show Map';
+            }
+        }
+
+        function initFlightTrackMap() {
+            if (wsFlightTrackMap) {
+                wsFlightTrackMap.invalidateSize();
+                return;
+            }
+
+            // Initialize the map
+            wsFlightTrackMap = L.map('wsFlightTrackMap').setView([38.5, -98.0], 4);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(wsFlightTrackMap);
+
+            // Draw the flight track if we have data
+            if (wsFlysightTrackPoints.length > 0) {
+                drawFlightTrackOnMap();
+            }
+        }
+
+        async function drawFlightTrackOnMap() {
+            if (!wsFlightTrackMap) return;
+
+            // Clear existing layers
+            wsFlightTrackLayers.forEach(layer => wsFlightTrackMap.removeLayer(layer));
+            wsFlightTrackLayers = [];
+
+            // Load reference points configuration
+            const competitionId = '{{ competition.id }}';
+            let validationWindow = null;
+            let refPoints = [];
+            let competitorRefPoint = null;
+            const teamId = document.getElementById('roundTeamId')?.value;
+
+            try {
+                const response = await fetch(`/ws-performance/reference-points/${competitionId}`);
+                const result = await response.json();
+                if (result.success) {
+                    validationWindow = result.validation_window;
+                    refPoints = result.points || [];
+                    // Get assigned reference point for this competitor
+                    if (teamId && result.competitor_assignments && result.competitor_assignments[teamId] !== undefined) {
+                        const refIdx = result.competitor_assignments[teamId];
+                        if (refPoints[refIdx]) {
+                            competitorRefPoint = refPoints[refIdx];
+                        }
+                    }
+                    // Default to first reference point if not assigned
+                    if (!competitorRefPoint && refPoints.length > 0) {
+                        competitorRefPoint = refPoints[0];
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading reference points:', err);
+            }
+
+            // Draw designated lane if we have validation window and reference point
+            if (validationWindow && competitorRefPoint) {
+                drawDesignatedLaneOnTrackMap(validationWindow, competitorRefPoint);
+            }
+
+            // Draw the flight track
+            if (wsFlysightTrackPoints.length > 0) {
+                const trackCoords = wsFlysightTrackPoints.map(p => [p.lat, p.lon]);
+
+                // Draw the flight track line
+                const trackLine = L.polyline(trackCoords, {
+                    color: '#9333ea', // purple
+                    weight: 3,
+                    opacity: 0.9
+                }).addTo(wsFlightTrackMap);
+                wsFlightTrackLayers.push(trackLine);
+
+                // Add start and end markers
+                if (trackCoords.length > 0) {
+                    const startMarker = L.circleMarker(trackCoords[0], {
+                        radius: 8,
+                        fillColor: '#22c55e',
+                        color: '#fff',
+                        weight: 2,
+                        fillOpacity: 1
+                    }).addTo(wsFlightTrackMap);
+                    startMarker.bindPopup('<b>Window Start</b><br>3000m altitude');
+                    wsFlightTrackLayers.push(startMarker);
+
+                    const endMarker = L.circleMarker(trackCoords[trackCoords.length - 1], {
+                        radius: 8,
+                        fillColor: '#ef4444',
+                        color: '#fff',
+                        weight: 2,
+                        fillOpacity: 1
+                    }).addTo(wsFlightTrackMap);
+                    endMarker.bindPopup('<b>Window End</b><br>2000m altitude');
+                    wsFlightTrackLayers.push(endMarker);
+                }
+
+                // Fit map to show all layers
+                const allLayers = wsFlightTrackLayers.filter(l => l.getBounds || l.getLatLng);
+                if (allLayers.length > 0) {
+                    const group = new L.featureGroup(allLayers);
+                    wsFlightTrackMap.fitBounds(group.getBounds().pad(0.1));
+                }
+
+                // Update info
+                const infoEl = document.getElementById('wsFlightTrackInfo');
+                if (infoEl) {
+                    infoEl.innerHTML = `Track: ${wsFlysightTrackPoints.length} points | ` +
+                        `Start: ${trackCoords[0][0].toFixed(4)}, ${trackCoords[0][1].toFixed(4)} | ` +
+                        `End: ${trackCoords[trackCoords.length-1][0].toFixed(4)}, ${trackCoords[trackCoords.length-1][1].toFixed(4)}`;
+                }
+            }
+        }
+
+        function drawDesignatedLaneOnTrackMap(validationWindow, refPoint) {
+            if (!wsFlightTrackMap) return;
+
+            const vwLat = validationWindow.lat;
+            const vwLng = validationWindow.lng;
+            const refLat = refPoint.lat;
+            const refLng = refPoint.lng;
+
+            // Draw penalty zones from outermost to innermost
+            // Red zone: 50% penalty (600-900m from center)
+            const redWidth = 900;
+            const redP1Left = offsetPoint(vwLat, vwLng, refLat, refLng, redWidth, 'left');
+            const redP1Right = offsetPoint(vwLat, vwLng, refLat, refLng, redWidth, 'right');
+            const redP2Left = offsetPoint(refLat, refLng, vwLat, vwLng, redWidth, 'right');
+            const redP2Right = offsetPoint(refLat, refLng, vwLat, vwLng, redWidth, 'left');
+            const redZone = L.polygon([redP1Left, redP1Right, redP2Right, redP2Left], {
+                color: '#dc2626', weight: 1, opacity: 0.3, fillColor: '#dc2626', fillOpacity: 0.2
+            }).addTo(wsFlightTrackMap);
+            wsFlightTrackLayers.push(redZone);
+
+            // Orange zone: 20% penalty (450-600m from center)
+            const orangeWidth = 600;
+            const orangeP1Left = offsetPoint(vwLat, vwLng, refLat, refLng, orangeWidth, 'left');
+            const orangeP1Right = offsetPoint(vwLat, vwLng, refLat, refLng, orangeWidth, 'right');
+            const orangeP2Left = offsetPoint(refLat, refLng, vwLat, vwLng, orangeWidth, 'right');
+            const orangeP2Right = offsetPoint(refLat, refLng, vwLat, vwLng, orangeWidth, 'left');
+            const orangeZone = L.polygon([orangeP1Left, orangeP1Right, orangeP2Right, orangeP2Left], {
+                color: '#f97316', weight: 1, opacity: 0.3, fillColor: '#f97316', fillOpacity: 0.25
+            }).addTo(wsFlightTrackMap);
+            wsFlightTrackLayers.push(orangeZone);
+
+            // Yellow zone: 10% penalty (300-450m from center)
+            const yellowWidth = 450;
+            const yellowP1Left = offsetPoint(vwLat, vwLng, refLat, refLng, yellowWidth, 'left');
+            const yellowP1Right = offsetPoint(vwLat, vwLng, refLat, refLng, yellowWidth, 'right');
+            const yellowP2Left = offsetPoint(refLat, refLng, vwLat, vwLng, yellowWidth, 'right');
+            const yellowP2Right = offsetPoint(refLat, refLng, vwLat, vwLng, yellowWidth, 'left');
+            const yellowZone = L.polygon([yellowP1Left, yellowP1Right, yellowP2Right, yellowP2Left], {
+                color: '#eab308', weight: 1, opacity: 0.3, fillColor: '#eab308', fillOpacity: 0.3
+            }).addTo(wsFlightTrackMap);
+            wsFlightTrackLayers.push(yellowZone);
+
+            // Green zone: Safe lane (300m from center = 600m total)
+            const greenWidth = 300;
+            const greenP1Left = offsetPoint(vwLat, vwLng, refLat, refLng, greenWidth, 'left');
+            const greenP1Right = offsetPoint(vwLat, vwLng, refLat, refLng, greenWidth, 'right');
+            const greenP2Left = offsetPoint(refLat, refLng, vwLat, vwLng, greenWidth, 'right');
+            const greenP2Right = offsetPoint(refLat, refLng, vwLat, vwLng, greenWidth, 'left');
+            const greenZone = L.polygon([greenP1Left, greenP1Right, greenP2Right, greenP2Left], {
+                color: '#16a34a', weight: 2, opacity: 0.8, fillColor: '#22c55e', fillOpacity: 0.35
+            }).addTo(wsFlightTrackMap);
+            wsFlightTrackLayers.push(greenZone);
+
+            // Center line
+            const centerLine = L.polyline([[vwLat, vwLng], [refLat, refLng]], {
+                color: '#000', weight: 2, opacity: 0.7, dashArray: '5, 5'
+            }).addTo(wsFlightTrackMap);
+            wsFlightTrackLayers.push(centerLine);
+
+            // Validation window marker
+            const vwMarker = L.circleMarker([vwLat, vwLng], {
+                radius: 6, fillColor: '#f97316', color: '#fff', weight: 2, fillOpacity: 1
+            }).addTo(wsFlightTrackMap);
+            vwMarker.bindPopup('<b>Validation Window</b>');
+            wsFlightTrackLayers.push(vwMarker);
+
+            // Reference point marker
+            const refMarker = L.circleMarker([refLat, refLng], {
+                radius: 6, fillColor: '#3b82f6', color: '#fff', weight: 2, fillOpacity: 1
+            }).addTo(wsFlightTrackMap);
+            refMarker.bindPopup('<b>Reference Point</b>');
+            wsFlightTrackLayers.push(refMarker);
+        }
 
         function selectWsTask(task) {
             selectedWsTask = task;
@@ -4367,10 +4591,23 @@
         function clearWsFlysightFile() {
             selectedWsFlysightFile = null;
             wsFlysightParsedData = null;
+            wsFlysightTrackPoints = [];
             document.getElementById('wsFlysightFile').value = '';
             document.getElementById('selectedWsFlysightInfo').classList.add('hidden');
             document.getElementById('wsFlysightResult').classList.add('hidden');
             document.getElementById('wsFlysightProgress').classList.add('hidden');
+
+            // Hide and reset flight track map
+            const mapContainer = document.getElementById('wsFlightTrackMapContainer');
+            const toggleBtn = document.getElementById('wsFlightTrackToggle');
+            if (mapContainer) mapContainer.classList.add('hidden');
+            if (toggleBtn) toggleBtn.textContent = 'Show Map';
+
+            // Clear map layers
+            if (wsFlightTrackMap) {
+                wsFlightTrackLayers.forEach(layer => wsFlightTrackMap.removeLayer(layer));
+                wsFlightTrackLayers = [];
+            }
         }
 
         async function parseWsFlysightCSV(file) {
@@ -4474,6 +4711,9 @@
                     validationAlt: validationPoint.alt
                 };
 
+                // Store track points for map visualization
+                wsFlysightTrackPoints = windowPoints.filter(p => p.lat && p.lon);
+
                 // Update display
                 document.getElementById('wsFlysightTime').textContent = wsFlysightParsedData.time;
                 document.getElementById('wsFlysightDistance').textContent = wsFlysightParsedData.distance;
@@ -4484,6 +4724,11 @@
                 // Auto-set validation window on the map if coordinates are valid
                 if (validationPoint.lat && validationPoint.lon) {
                     setValidationWindowFromFlysight(validationPoint.lat, validationPoint.lon);
+                }
+
+                // Update flight track map if visible
+                if (wsFlightTrackMap && wsFlysightTrackPoints.length > 0) {
+                    drawFlightTrackOnMap();
                 }
 
                 // Update selected value display
