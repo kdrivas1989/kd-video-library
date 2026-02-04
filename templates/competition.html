@@ -181,7 +181,7 @@
         {% if is_multi_event %}
         <!-- Multi-Event Competition: Teams organized by Event then Class -->
         {% for event_type, classes in teams_by_event.items() %}
-        <div class="event-section mb-8" data-event="{{ event_type }}">
+        <div id="event-{{ event_type }}" class="event-section mb-8" data-event="{{ event_type }}">
             <h2 class="text-2xl font-bold mb-4 text-blue-400">{{ event_type|event_name }}</h2>
             {% for class_name, teams in classes.items() %}
             <div id="event-{{ event_type }}-class-{{ class_name }}" class="class-section mb-6" data-class="{{ class_name }}">
@@ -2333,8 +2333,20 @@
             sessionStorage.removeItem('competition_currentClass');
             sessionStorage.removeItem('competition_multiEventClass');
 
-            // Restore state if saved
-            if (savedEvent && eventTypes.includes(savedEvent)) {
+            // Check URL hash for event navigation
+            const hash = window.location.hash.slice(1); // Remove the # symbol
+            if (hash && eventTypes.includes(hash)) {
+                setTimeout(() => {
+                    showEvent(hash, false); // Don't update hash since it's already there
+                    // Scroll to the event section
+                    const eventSection = document.getElementById('event-' + hash);
+                    if (eventSection) {
+                        eventSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 100);
+            }
+            // Restore state if saved (from reload)
+            else if (savedEvent && eventTypes.includes(savedEvent)) {
                 setTimeout(() => {
                     showEvent(savedEvent);
                     if (savedMultiClass) {
@@ -2346,12 +2358,25 @@
             }
         });
 
-        function showEvent(eventType) {
+        // Handle browser back/forward navigation with hash changes
+        window.addEventListener('hashchange', function() {
+            const hash = window.location.hash.slice(1);
+            if (hash && eventTypes.includes(hash)) {
+                showEvent(hash, false);
+            }
+        });
+
+        function showEvent(eventType, updateHash = true) {
             currentEvent = eventType;
             // Update dropdown selection
             const eventSelector = document.getElementById('eventSelector');
             if (eventSelector) {
                 eventSelector.value = eventType;
+            }
+
+            // Update URL hash
+            if (updateHash && eventType) {
+                history.replaceState(null, null, '#' + eventType);
             }
 
             // Show/hide event sections
