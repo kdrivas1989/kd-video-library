@@ -1764,34 +1764,6 @@
                             </div>
                         </div>
 
-                        <!-- Designated Lane Violation -->
-                        <div class="mb-4 bg-orange-50 border border-orange-200 rounded p-3">
-                            <label class="block text-gray-700 font-semibold text-sm mb-2">Designated Lane (DL) Violation</label>
-                            <p class="text-xs text-gray-500 mb-3">Distance outside the 600m Designated Lane (measured perpendicular to DL boundary)</p>
-                            <div class="space-y-2">
-                                <label class="flex items-center gap-3 bg-white px-4 py-2 rounded cursor-pointer hover:bg-gray-50 border">
-                                    <input type="radio" name="wsDlViolation" value="none" checked onchange="calculateWsScore()">
-                                    <span class="text-sm text-gray-700">No violation (within DL)</span>
-                                    <span class="ml-auto text-green-600 font-medium">100%</span>
-                                </label>
-                                <label class="flex items-center gap-3 bg-white px-4 py-2 rounded cursor-pointer hover:bg-yellow-50 border border-yellow-200">
-                                    <input type="radio" name="wsDlViolation" value="under150" onchange="calculateWsScore()">
-                                    <span class="text-sm text-gray-700">&lt; 150m outside DL</span>
-                                    <span class="ml-auto text-yellow-600 font-medium">-10%</span>
-                                </label>
-                                <label class="flex items-center gap-3 bg-white px-4 py-2 rounded cursor-pointer hover:bg-orange-50 border border-orange-200">
-                                    <input type="radio" name="wsDlViolation" value="150to300" onchange="calculateWsScore()">
-                                    <span class="text-sm text-gray-700">150-300m outside DL</span>
-                                    <span class="ml-auto text-orange-600 font-medium">-20%</span>
-                                </label>
-                                <label class="flex items-center gap-3 bg-white px-4 py-2 rounded cursor-pointer hover:bg-red-50 border border-red-300">
-                                    <input type="radio" name="wsDlViolation" value="over300" onchange="calculateWsScore()">
-                                    <span class="text-sm text-gray-700">&gt; 300m outside DL</span>
-                                    <span class="ml-auto text-red-600 font-medium">-50%</span>
-                                </label>
-                            </div>
-                        </div>
-
                         <!-- WS Score Calculation Display -->
                         <div class="bg-white rounded p-4 mt-4">
                             <div class="grid grid-cols-3 gap-4 text-center">
@@ -2062,6 +2034,34 @@
                                             <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-600 opacity-60"></span> 50%</span>
                                         </div>
                                         <div id="wsFlightTrackInfo" class="mt-2 text-xs text-gray-600"></div>
+
+                                        <!-- Designated Lane Violation (below map) -->
+                                        <div class="mt-4 bg-orange-50 border border-orange-200 rounded p-3">
+                                            <label class="block text-gray-700 font-semibold text-sm mb-2">Designated Lane (DL) Violation</label>
+                                            <p class="text-xs text-gray-500 mb-3">Distance outside the 600m Designated Lane (auto-detected from flight track)</p>
+                                            <div class="space-y-2">
+                                                <label class="flex items-center gap-3 bg-white px-4 py-2 rounded cursor-pointer hover:bg-gray-50 border">
+                                                    <input type="radio" name="wsDlViolation" value="none" checked onchange="calculateWsScore()">
+                                                    <span class="text-sm text-gray-700">No violation (within DL)</span>
+                                                    <span class="ml-auto text-green-600 font-medium">100%</span>
+                                                </label>
+                                                <label class="flex items-center gap-3 bg-white px-4 py-2 rounded cursor-pointer hover:bg-yellow-50 border border-yellow-200">
+                                                    <input type="radio" name="wsDlViolation" value="under150" onchange="calculateWsScore()">
+                                                    <span class="text-sm text-gray-700">&lt; 150m outside DL</span>
+                                                    <span class="ml-auto text-yellow-600 font-medium">-10%</span>
+                                                </label>
+                                                <label class="flex items-center gap-3 bg-white px-4 py-2 rounded cursor-pointer hover:bg-orange-50 border border-orange-200">
+                                                    <input type="radio" name="wsDlViolation" value="150to300" onchange="calculateWsScore()">
+                                                    <span class="text-sm text-gray-700">150-300m outside DL</span>
+                                                    <span class="ml-auto text-orange-600 font-medium">-20%</span>
+                                                </label>
+                                                <label class="flex items-center gap-3 bg-white px-4 py-2 rounded cursor-pointer hover:bg-red-50 border border-red-300">
+                                                    <input type="radio" name="wsDlViolation" value="over300" onchange="calculateWsScore()">
+                                                    <span class="text-sm text-gray-700">&gt; 300m outside DL</span>
+                                                    <span class="ml-auto text-red-600 font-medium">-50%</span>
+                                                </label>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
