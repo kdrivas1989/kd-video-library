@@ -571,6 +571,12 @@ def init_db():
         except:
             pass
 
+        # Add draws column if it doesn't exist (JSON: event_type -> class -> rounds -> formations)
+        try:
+            cursor.execute('ALTER TABLE competitions ADD COLUMN draws TEXT')
+        except:
+            pass
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS competition_teams (
                 id TEXT PRIMARY KEY,

@@ -22,6 +22,23 @@
 
         <!-- Generator Controls -->
         <div class="bg-gray-800 rounded-lg p-6 mb-8">
+            <!-- Competition Info -->
+            <div class="grid md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Competition Name</label>
+                    <input type="text" id="competitionName" value="" class="w-full px-3 py-2 rounded bg-gray-700 text-white" placeholder="Competition Name (optional)">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Start Date</label>
+                    <input type="date" id="startDate" class="w-full px-3 py-2 rounded bg-gray-700 text-white">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">End Date</label>
+                    <input type="date" id="endDate" class="w-full px-3 py-2 rounded bg-gray-700 text-white">
+                </div>
+            </div>
+
+            <!-- Event Selection -->
             <div class="grid md:grid-cols-4 gap-4 mb-6">
                 <div>
                     <label class="block text-gray-400 text-sm mb-2">Event</label>
@@ -295,6 +312,31 @@
             displayDraw(rounds);
         }
 
+        function formatDateRange(startStr, endStr) {
+            if (!startStr && !endStr) return '';
+            if (!startStr) startStr = endStr;
+            if (!endStr) endStr = startStr;
+
+            const start = new Date(startStr + 'T00:00:00');
+            const end = new Date(endStr + 'T00:00:00');
+            const options = { month: 'long', day: 'numeric', year: 'numeric' };
+
+            if (startStr === endStr) {
+                return start.toLocaleDateString('en-US', options);
+            }
+
+            const startMonth = start.toLocaleDateString('en-US', { month: 'long' });
+            const endMonth = end.toLocaleDateString('en-US', { month: 'long' });
+            const startDay = start.getDate();
+            const endDay = end.getDate();
+            const year = end.getFullYear();
+
+            if (startMonth === endMonth) {
+                return `${startMonth} ${startDay} - ${endDay}, ${year}`;
+            }
+            return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
+        }
+
         // Display generated draw - columnar layout like reference PDF
         function displayDraw(rounds) {
             const resultsEl = document.getElementById('drawResults');
@@ -306,6 +348,16 @@
             const eventClass = document.getElementById('eventClass').value;
             const rules = divePoolRules[eventType][eventClass] || divePoolRules[eventType].open;
 
+            // Get competition info from inputs
+            const competitionName = document.getElementById('competitionName').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const dateRange = formatDateRange(startDate, endDate);
+
+            // Build title
+            const title = competitionName ? `${competitionName} - ${rules.name}` : rules.name;
+            const subtitle = dateRange ? `${dateRange} | Working Time: ${rules.workingTime}s` : `Working Time: ${rules.workingTime}s`;
+
             // Find max formations in any round for row count
             const maxFormations = Math.max(...rounds.map(r => r.formations.length));
 
@@ -314,8 +366,8 @@
                 <div id="printHeader" class="mb-4">
                     <div class="flex justify-between items-center border-b-2 border-gray-600 pb-2 print:border-black">
                         <div>
-                            <h1 class="text-xl font-bold print:text-black">${rules.name}</h1>
-                            <p class="text-sm text-gray-400 print:text-gray-600">Working Time: ${rules.workingTime}s</p>
+                            <h1 class="text-xl font-bold print:text-black">${title}</h1>
+                            <p class="text-sm text-gray-400 print:text-gray-600">${subtitle}</p>
                         </div>
                         <div class="text-right text-sm text-gray-400 print:text-gray-600">
                             <div>${new Date().toLocaleDateString()}</div>

@@ -20,11 +20,28 @@
     <div class="container mx-auto px-4 py-8">
         <div class="mb-6">
             <h1 class="text-3xl font-bold">SkyVenture NH Draw Generator</h1>
-            <p class="text-gray-400">16th Annual 4-way & 2-way VFS Meet - January 31 - February 1, 2026</p>
+            <p class="text-gray-400">16th Annual 4-way & 2-way VFS Meet</p>
         </div>
 
         <!-- Generator Controls -->
         <div class="bg-gray-800 rounded-lg p-6 mb-8">
+            <!-- Competition Info -->
+            <div class="grid md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Competition Name</label>
+                    <input type="text" id="competitionName" value="SkyVenture NH 2026" class="w-full px-3 py-2 rounded bg-gray-700 text-white" placeholder="Competition Name">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Start Date</label>
+                    <input type="date" id="startDate" value="2026-01-31" class="w-full px-3 py-2 rounded bg-gray-700 text-white">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">End Date</label>
+                    <input type="date" id="endDate" value="2026-02-01" class="w-full px-3 py-2 rounded bg-gray-700 text-white">
+                </div>
+            </div>
+
+            <!-- Event Selection -->
             <div class="grid md:grid-cols-3 gap-4 mb-6">
                 <div>
                     <label class="block text-gray-400 text-sm mb-2">Event</label>
@@ -73,10 +90,16 @@
             <div class="flex justify-between items-center mb-4 print:hidden">
                 <h2 class="text-2xl font-bold">Draw Sheet</h2>
                 <div class="flex gap-2">
+                    <button id="editModeBtn" onclick="toggleEditMode()" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded">
+                        Edit Draw
+                    </button>
                     <button onclick="copyDraw()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Copy All</button>
                     <button onclick="printCompact()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded">Print Compact (1 page)</button>
                     <button onclick="printWithImages()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded">Print with Images (2 pages)</button>
                 </div>
+            </div>
+            <div id="editModeNotice" class="hidden mb-4 p-3 bg-yellow-600/20 border border-yellow-600 rounded text-yellow-400 print:hidden">
+                <strong>Edit Mode Active:</strong> Click on any formation to change it, or click the + button to add formations to a round.
             </div>
 
             <div id="drawContent" class="space-y-4">
@@ -123,11 +146,11 @@
                     <h4 class="font-bold text-green-400 mb-3">🔄 Back/Belly Pool</h4>
                     <div class="mb-4">
                         <h5 class="text-sm text-gray-400 mb-2">Randoms (1 pt each):</h5>
-                        <div id="bbRandomsPool" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2"></div>
+                        <div id="bbRandomsPool" class="flex flex-wrap gap-2"></div>
                     </div>
                     <div>
                         <h5 class="text-sm text-gray-400 mb-2">Blocks (2 pts each):</h5>
-                        <div id="bbBlocksPool" class="grid grid-cols-2 md:grid-cols-3 gap-2"></div>
+                        <div id="bbBlocksPool" class="flex flex-wrap gap-2"></div>
                     </div>
                 </div>
 
@@ -136,11 +159,11 @@
                     <h4 class="font-bold text-cyan-400 mb-3">⬆️ Head-Up Pool</h4>
                     <div class="mb-4">
                         <h5 class="text-sm text-gray-400 mb-2">Randoms (1 pt each):</h5>
-                        <div id="huRandomsPool" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2"></div>
+                        <div id="huRandomsPool" class="flex flex-wrap gap-2"></div>
                     </div>
                     <div>
                         <h5 class="text-sm text-gray-400 mb-2">Blocks (2 pts each):</h5>
-                        <div id="huBlocksPool" class="grid grid-cols-2 md:grid-cols-4 gap-2"></div>
+                        <div id="huBlocksPool" class="flex flex-wrap gap-2"></div>
                     </div>
                 </div>
 
@@ -149,11 +172,11 @@
                     <h4 class="font-bold text-purple-400 mb-3">⬇️ Head-Down Pool</h4>
                     <div class="mb-4">
                         <h5 class="text-sm text-gray-400 mb-2">Randoms (1 pt each):</h5>
-                        <div id="hdRandomsPool" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2"></div>
+                        <div id="hdRandomsPool" class="flex flex-wrap gap-2"></div>
                     </div>
                     <div>
                         <h5 class="text-sm text-gray-400 mb-2">Blocks (2 pts each):</h5>
-                        <div id="hdBlocksPool" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2"></div>
+                        <div id="hdBlocksPool" class="flex flex-wrap gap-2"></div>
                     </div>
                 </div>
             </div>
@@ -559,13 +582,8 @@
             const bbRandomsEl = document.getElementById('bbRandomsPool');
             if (bbRandomsEl) {
                 bbRandomsEl.innerHTML = Object.entries(vfs2wayBBRandoms).map(([code, info]) => `
-                    <div class="p-2 rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
-                        <div class="flex items-center justify-between gap-2 mb-1">
-                            <span class="px-2 py-1 rounded font-mono text-sm font-bold" style="background-color: ${info.color}">${code}</span>
-                            <div class="flex gap-0.5">${formatClassBadges(info.classes)}</div>
-                        </div>
-                        <img src="/static/formations/${code}.png" alt="${code}" class="w-full h-16 object-contain bg-white rounded my-1">
-                        <div class="text-sm text-gray-300">${info.name}</div>
+                    <div class="inline-block rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
+                        <img src="/static/formations/${code}.png" alt="${code}" class="h-16 rounded">
                     </div>
                 `).join('');
             }
@@ -574,14 +592,8 @@
             const bbBlocksEl = document.getElementById('bbBlocksPool');
             if (bbBlocksEl) {
                 bbBlocksEl.innerHTML = Object.entries(vfs2wayBBBlocks).map(([code, info]) => `
-                    <div class="p-2 rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
-                        <div class="flex items-center justify-between gap-2 mb-1">
-                            <span class="px-2 py-1 rounded font-mono text-sm font-bold" style="background-color: ${info.color}">${code}</span>
-                            <div class="flex gap-0.5">${formatClassBadges(info.classes)}</div>
-                        </div>
-                        <img src="/static/formations/${code}.png" alt="${code}" class="w-full h-20 object-contain bg-white rounded my-1">
-                        <div class="text-sm text-gray-300">${info.name}</div>
-                        <div class="text-xs text-yellow-400">↔ ${info.inter}</div>
+                    <div class="inline-block rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
+                        <img src="/static/formations/${code}.png" alt="${code}" class="h-40 rounded">
                     </div>
                 `).join('');
             }
@@ -590,13 +602,8 @@
             const huRandomsEl = document.getElementById('huRandomsPool');
             if (huRandomsEl) {
                 huRandomsEl.innerHTML = Object.entries(vfs2wayHURandoms).map(([code, info]) => `
-                    <div class="p-2 rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
-                        <div class="flex items-center justify-between gap-2 mb-1">
-                            <span class="px-2 py-1 rounded font-mono text-sm font-bold" style="background-color: ${info.color}">${code}</span>
-                            <div class="flex gap-0.5">${formatClassBadges(info.classes)}</div>
-                        </div>
-                        <img src="/static/formations/${code}.png" alt="${code}" class="w-full h-16 object-contain bg-white rounded my-1">
-                        <div class="text-sm text-gray-300">${info.name}</div>
+                    <div class="inline-block rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
+                        <img src="/static/formations/${code}.png" alt="${code}" class="h-16 rounded">
                     </div>
                 `).join('');
             }
@@ -605,14 +612,8 @@
             const huBlocksEl = document.getElementById('huBlocksPool');
             if (huBlocksEl) {
                 huBlocksEl.innerHTML = Object.entries(vfs2wayHUBlocks).map(([code, info]) => `
-                    <div class="p-2 rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
-                        <div class="flex items-center justify-between gap-2 mb-1">
-                            <span class="px-2 py-1 rounded font-mono text-sm font-bold" style="background-color: ${info.color}">${code}</span>
-                            <div class="flex gap-0.5">${formatClassBadges(info.classes)}</div>
-                        </div>
-                        <img src="/static/formations/${code}.png" alt="${code}" class="w-full h-20 object-contain bg-white rounded my-1">
-                        <div class="text-sm text-gray-300">${info.name}</div>
-                        <div class="text-xs text-yellow-400">↔ ${info.inter}</div>
+                    <div class="inline-block rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
+                        <img src="/static/formations/${code}.png" alt="${code}" class="h-40 rounded">
                     </div>
                 `).join('');
             }
@@ -621,13 +622,8 @@
             const hdRandomsEl = document.getElementById('hdRandomsPool');
             if (hdRandomsEl) {
                 hdRandomsEl.innerHTML = Object.entries(vfs2wayHDRandoms).map(([code, info]) => `
-                    <div class="p-2 rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
-                        <div class="flex items-center justify-between gap-2 mb-1">
-                            <span class="px-2 py-1 rounded font-mono text-sm font-bold" style="background-color: ${info.color}">${code}</span>
-                            <div class="flex gap-0.5">${formatClassBadges(info.classes)}</div>
-                        </div>
-                        <img src="/static/formations/${code}.png" alt="${code}" class="w-full h-16 object-contain bg-white rounded my-1">
-                        <div class="text-sm text-gray-300">${info.name}</div>
+                    <div class="inline-block rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
+                        <img src="/static/formations/${code}.png" alt="${code}" class="h-16 rounded">
                     </div>
                 `).join('');
             }
@@ -636,14 +632,8 @@
             const hdBlocksEl = document.getElementById('hdBlocksPool');
             if (hdBlocksEl) {
                 hdBlocksEl.innerHTML = Object.entries(vfs2wayHDBlocks).map(([code, info]) => `
-                    <div class="p-2 rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
-                        <div class="flex items-center justify-between gap-2 mb-1">
-                            <span class="px-2 py-1 rounded font-mono text-sm font-bold" style="background-color: ${info.color}">${code}</span>
-                            <div class="flex gap-0.5">${formatClassBadges(info.classes)}</div>
-                        </div>
-                        <img src="/static/formations/${code}.png" alt="${code}" class="w-full h-20 object-contain bg-white rounded my-1">
-                        <div class="text-sm text-gray-300">${info.name}</div>
-                        <div class="text-xs text-yellow-400">↔ ${info.inter}</div>
+                    <div class="inline-block rounded cursor-pointer hover:ring-2 hover:ring-white/50 transition-all" style="background-color: ${info.color}20; border: 1px solid ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">
+                        <img src="/static/formations/${code}.png" alt="${code}" class="h-40 rounded">
                     </div>
                 `).join('');
             }
@@ -698,7 +688,18 @@
 
         function generateRound4Way(rules, usedInRound = new Set()) {
             const [minPts, maxPts] = rules.pointsPerRound;
-            const targetPoints = minPts + Math.floor(Math.random() * (maxPts - minPts + 1));
+
+            // For Open class (5-6 points): can only reach 6 if at 4 points + block
+            // Otherwise must stop at 5
+            const isOpenClass = (maxPts === 6 && minPts === 5);
+
+            // For Advanced class (4-5 points): can only reach 5 if at 3 points + block
+            // Otherwise must stop at 4
+            const isAdvancedClass = (maxPts === 5 && minPts === 4);
+
+            // For Intermediate class (3-4 points): can only reach 4 if at 2 points + block
+            // Otherwise must stop at 3
+            const isIntermediateClass = (maxPts === 4 && minPts === 3);
 
             const round = [];
             let currentPoints = 0;
@@ -706,14 +707,89 @@
             const availableRandoms = rules.randoms.filter(r => !usedInRound.has('R' + r));
             const availableBlocks = rules.blocks.filter(b => !usedInRound.has('B' + b));
 
-            while (currentPoints < targetPoints) {
-                const canAddRandom = availableRandoms.length > 0 && (currentPoints + 1 <= targetPoints);
-                const canAddBlock = availableBlocks.length > 0 && (currentPoints + 2 <= targetPoints);
+            while (currentPoints < maxPts) {
+                // Open class special rule: at 5 points, must stop (can't add 1 to make 6)
+                // Can only reach 6 by being at 4 and adding a block
+                if (isOpenClass && currentPoints === 5) {
+                    break;
+                }
+
+                // Advanced class special rule: at 4 points, must stop (can't add 1 to make 5)
+                // Can only reach 5 by being at 3 and adding a block
+                if (isAdvancedClass && currentPoints === 4) {
+                    break;
+                }
+
+                // Intermediate class special rule: at 3 points, must stop (can't add 1 to make 4)
+                // Can only reach 4 by being at 2 and adding a block
+                if (isIntermediateClass && currentPoints === 3) {
+                    break;
+                }
+
+                // Check if we've reached minimum and should maybe stop (Open class)
+                if (isOpenClass && currentPoints >= minPts) {
+                    if (currentPoints === 4 && availableBlocks.length > 0) {
+                        // Can add block to reach 6 - 50% chance to do so
+                        if (Math.random() < 0.5) {
+                            const idx = Math.floor(Math.random() * availableBlocks.length);
+                            const block = availableBlocks.splice(idx, 1)[0];
+                            round.push({ type: 'block', value: block, points: 2, name: fs4wayBlocks[block] });
+                            usedInRound.add('B' + block);
+                            currentPoints += 2;
+                        }
+                        break;
+                    } else {
+                        break; // Stop at 5 or if no blocks available at 4
+                    }
+                }
+
+                // Check if we've reached minimum and should maybe stop (Advanced class)
+                if (isAdvancedClass && currentPoints >= minPts) {
+                    if (currentPoints === 3 && availableBlocks.length > 0) {
+                        // Can add block to reach 5 - 50% chance to do so
+                        if (Math.random() < 0.5) {
+                            const idx = Math.floor(Math.random() * availableBlocks.length);
+                            const block = availableBlocks.splice(idx, 1)[0];
+                            round.push({ type: 'block', value: block, points: 2, name: fs4wayBlocks[block] });
+                            usedInRound.add('B' + block);
+                            currentPoints += 2;
+                        }
+                        break;
+                    } else {
+                        break; // Stop at 4 or if no blocks available at 3
+                    }
+                }
+
+                // Check if we've reached minimum and should maybe stop (Intermediate class)
+                if (isIntermediateClass && currentPoints >= minPts) {
+                    if (currentPoints === 2 && availableBlocks.length > 0) {
+                        // Can add block to reach 4 - 50% chance to do so
+                        if (Math.random() < 0.5) {
+                            const idx = Math.floor(Math.random() * availableBlocks.length);
+                            const block = availableBlocks.splice(idx, 1)[0];
+                            round.push({ type: 'block', value: block, points: 2, name: fs4wayBlocks[block] });
+                            usedInRound.add('B' + block);
+                            currentPoints += 2;
+                        }
+                        break;
+                    } else {
+                        break; // Stop at 3 or if no blocks available at 2
+                    }
+                }
+
+                const canAddRandom = availableRandoms.length > 0 && (currentPoints + 1 <= maxPts);
+                const canAddBlock = availableBlocks.length > 0 && (currentPoints + 2 <= maxPts);
 
                 if (!canAddRandom && !canAddBlock) break;
 
-                // Prefer blocks if we have room and they're available
-                const addBlock = canAddBlock && (!canAddRandom || (Math.random() < 0.4 && currentPoints + 2 <= targetPoints));
+                // For Open at 4 points: prefer block to reach 6
+                let addBlock = false;
+                if (isOpenClass && currentPoints === 4 && canAddBlock) {
+                    addBlock = true;
+                } else {
+                    // Prefer blocks if we have room and they're available
+                    addBlock = canAddBlock && (!canAddRandom || (Math.random() < 0.4));
+                }
 
                 if (addBlock) {
                     const idx = Math.floor(Math.random() * availableBlocks.length);
@@ -754,7 +830,15 @@
             const rules = svnhRules[eventType];
             const pool = getVFSPool(eventType, roundNum);
             const [minPts, maxPts] = rules.pointsPerRound;
-            const targetPoints = minPts + Math.floor(Math.random() * (maxPts - minPts + 1));
+
+            // For VFS Open (5-6 points): can only reach 6 if at 4 points + block
+            const isOpenClass = (eventType === '2way-vfs-open');
+
+            // For VFS Advanced (4-5 points): can only reach 5 if at 3 points + block
+            const isAdvancedClass = (eventType === '2way-vfs-advanced');
+
+            // For VFS Intermediate/Rookie (3-4 points): can only reach 4 if at 2 points + block
+            const isIntermediateClass = (eventType === '2way-vfs-intermediate' || eventType === '2way-vfs-rookie');
 
             const round = [];
             let currentPoints = 0;
@@ -763,13 +847,85 @@
             const availableRandoms = [...pool.randoms];
             const availableBlocks = [...pool.blocks];
 
-            while (currentPoints < targetPoints) {
-                const canAddRandom = availableRandoms.length > 0 && (currentPoints + 1 <= targetPoints);
-                const canAddBlock = availableBlocks.length > 0 && (currentPoints + 2 <= targetPoints);
+            while (currentPoints < maxPts) {
+                // Open class special rule: at 5 points, must stop (can't add 1 to make 6)
+                if (isOpenClass && currentPoints === 5) {
+                    break;
+                }
+
+                // Advanced class special rule: at 4 points, must stop (can't add 1 to make 5)
+                if (isAdvancedClass && currentPoints === 4) {
+                    break;
+                }
+
+                // Intermediate/Rookie class special rule: at 3 points, must stop (can't add 1 to make 4)
+                if (isIntermediateClass && currentPoints === 3) {
+                    break;
+                }
+
+                // Check if we've reached minimum and should maybe stop (Open class)
+                if (isOpenClass && currentPoints >= minPts) {
+                    if (currentPoints === 4 && availableBlocks.length > 0) {
+                        // Can add block to reach 6 - 50% chance to do so
+                        if (Math.random() < 0.5) {
+                            const idx = Math.floor(Math.random() * availableBlocks.length);
+                            const block = availableBlocks.splice(idx, 1)[0];
+                            const info = getVFSFormationInfo(block);
+                            round.push({ type: 'block', value: block, points: 2, name: info.name, color: info.color, inter: info.inter, category: info.category });
+                            currentPoints += 2;
+                        }
+                        break;
+                    } else {
+                        break; // Stop at 5 or if no blocks available at 4
+                    }
+                }
+
+                // Check if we've reached minimum and should maybe stop (Advanced class)
+                if (isAdvancedClass && currentPoints >= minPts) {
+                    if (currentPoints === 3 && availableBlocks.length > 0) {
+                        // Can add block to reach 5 - 50% chance to do so
+                        if (Math.random() < 0.5) {
+                            const idx = Math.floor(Math.random() * availableBlocks.length);
+                            const block = availableBlocks.splice(idx, 1)[0];
+                            const info = getVFSFormationInfo(block);
+                            round.push({ type: 'block', value: block, points: 2, name: info.name, color: info.color, inter: info.inter, category: info.category });
+                            currentPoints += 2;
+                        }
+                        break;
+                    } else {
+                        break; // Stop at 4 or if no blocks available at 3
+                    }
+                }
+
+                // Check if we've reached minimum and should maybe stop (Intermediate/Rookie class)
+                if (isIntermediateClass && currentPoints >= minPts) {
+                    if (currentPoints === 2 && availableBlocks.length > 0) {
+                        // Can add block to reach 4 - 50% chance to do so
+                        if (Math.random() < 0.5) {
+                            const idx = Math.floor(Math.random() * availableBlocks.length);
+                            const block = availableBlocks.splice(idx, 1)[0];
+                            const info = getVFSFormationInfo(block);
+                            round.push({ type: 'block', value: block, points: 2, name: info.name, color: info.color, inter: info.inter, category: info.category });
+                            currentPoints += 2;
+                        }
+                        break;
+                    } else {
+                        break; // Stop at 3 or if no blocks available at 2
+                    }
+                }
+
+                const canAddRandom = availableRandoms.length > 0 && (currentPoints + 1 <= maxPts);
+                const canAddBlock = availableBlocks.length > 0 && (currentPoints + 2 <= maxPts);
 
                 if (!canAddRandom && !canAddBlock) break;
 
-                const addBlock = canAddBlock && (!canAddRandom || (Math.random() < 0.4 && currentPoints + 2 <= targetPoints));
+                // For Open at 4 points: prefer block to reach 6
+                let addBlock = false;
+                if (isOpenClass && currentPoints === 4 && canAddBlock) {
+                    addBlock = true;
+                } else {
+                    addBlock = canAddBlock && (!canAddRandom || (Math.random() < 0.4));
+                }
 
                 if (addBlock) {
                     const idx = Math.floor(Math.random() * availableBlocks.length);
@@ -794,6 +950,11 @@
             };
         }
 
+        // Global state for editing
+        let currentDraw = null;
+        let currentRules = null;
+        let editMode = false;
+
         function generateDraw() {
             const eventType = document.getElementById('eventType').value;
             const numRounds = parseInt(document.getElementById('numRounds').value);
@@ -809,16 +970,188 @@
                 }
             }
 
+            // Store for editing
+            currentDraw = rounds;
+            currentRules = rules;
+            editMode = false;
+
             displayDraw(rounds, rules);
+        }
+
+        function toggleEditMode() {
+            editMode = !editMode;
+            if (currentDraw && currentRules) {
+                displayDraw(currentDraw, currentRules);
+            }
+        }
+
+        function replaceFormation(roundIdx, formIdx) {
+            if (!editMode || !currentDraw || !currentRules) return;
+
+            const rules = currentRules;
+            const isVFS = rules.isVFS;
+
+            // Show formation picker modal
+            showFormationPicker(roundIdx, formIdx, rules);
+        }
+
+        function showFormationPicker(roundIdx, formIdx, rules) {
+            const modal = document.getElementById('formationPickerModal');
+            const content = document.getElementById('formationPickerContent');
+
+            // Get available formations based on event type
+            let randoms = [];
+            let blocks = [];
+
+            if (rules.isVFS) {
+                const eventType = document.getElementById('eventType').value;
+                const pool = getVFSPool(eventType, roundIdx + 1);
+                randoms = pool.randoms;
+                blocks = pool.blocks;
+            } else {
+                randoms = rules.randoms;
+                blocks = rules.blocks;
+            }
+
+            let html = '<div class="grid grid-cols-2 gap-4">';
+
+            // Randoms section
+            html += '<div><h4 class="font-bold text-blue-400 mb-2">Randoms (1 pt)</h4><div class="flex flex-wrap gap-2">';
+            randoms.forEach(r => {
+                const name = rules.isVFS ? (allVFSFormations[r]?.name || r) : (fs4wayRandoms[r] || r);
+                const imgSrc = rules.isVFS ? `/static/formations/${r}.png` : `/static/formations/FS-${r}.png`;
+                html += `<div class="cursor-pointer hover:ring-2 hover:ring-blue-400 rounded p-1 bg-gray-700" onclick="selectFormation(${roundIdx}, ${formIdx}, 'random', '${r}', '${name}')">
+                    <img src="${imgSrc}" alt="${r}" class="w-12 h-12 object-contain bg-white rounded">
+                    <div class="text-center text-xs mt-1">${r}</div>
+                </div>`;
+            });
+            html += '</div></div>';
+
+            // Blocks section
+            if (blocks.length > 0) {
+                html += '<div><h4 class="font-bold text-purple-400 mb-2">Blocks (2 pts)</h4><div class="flex flex-wrap gap-2">';
+                blocks.forEach(b => {
+                    const name = rules.isVFS ? (allVFSFormations[b]?.name || b) : (fs4wayBlocks[b] || b);
+                    const imgSrc = rules.isVFS ? `/static/formations/${b}.png` : `/static/formations/FS-${b}.png`;
+                    html += `<div class="cursor-pointer hover:ring-2 hover:ring-purple-400 rounded p-1 bg-gray-700" onclick="selectFormation(${roundIdx}, ${formIdx}, 'block', '${b}', '${name}')">
+                        <img src="${imgSrc}" alt="${b}" class="w-12 h-16 object-contain bg-white rounded">
+                        <div class="text-center text-xs mt-1">${b}</div>
+                    </div>`;
+                });
+                html += '</div></div>';
+            }
+
+            html += '</div>';
+
+            // Add remove button if editing existing formation
+            if (formIdx !== null && formIdx < currentDraw[roundIdx].formations.length) {
+                html += `<div class="mt-4 pt-4 border-t border-gray-600">
+                    <button onclick="removeFormation(${roundIdx}, ${formIdx})" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded">
+                        Remove This Formation
+                    </button>
+                </div>`;
+            }
+
+            content.innerHTML = html;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function selectFormation(roundIdx, formIdx, type, value, name) {
+            if (!currentDraw) return;
+
+            const formation = {
+                type: type,
+                value: value,
+                points: type === 'block' ? 2 : 1,
+                name: name
+            };
+
+            // If formIdx is null, add to end of round
+            if (formIdx === null || formIdx >= currentDraw[roundIdx].formations.length) {
+                currentDraw[roundIdx].formations.push(formation);
+            } else {
+                currentDraw[roundIdx].formations[formIdx] = formation;
+            }
+
+            // Recalculate points
+            currentDraw[roundIdx].maxPoints = currentDraw[roundIdx].formations.reduce((sum, f) => sum + f.points, 0);
+
+            closeFormationPicker();
+            displayDraw(currentDraw, currentRules);
+        }
+
+        function removeFormation(roundIdx, formIdx) {
+            if (!currentDraw) return;
+
+            currentDraw[roundIdx].formations.splice(formIdx, 1);
+            currentDraw[roundIdx].maxPoints = currentDraw[roundIdx].formations.reduce((sum, f) => sum + f.points, 0);
+
+            closeFormationPicker();
+            displayDraw(currentDraw, currentRules);
+        }
+
+        function addFormationToRound(roundIdx) {
+            if (!editMode || !currentDraw || !currentRules) return;
+            showFormationPicker(roundIdx, null, currentRules);
+        }
+
+        function closeFormationPicker() {
+            const modal = document.getElementById('formationPickerModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function formatDateRange(startStr, endStr) {
+            const start = new Date(startStr + 'T00:00:00');
+            const end = new Date(endStr + 'T00:00:00');
+            const options = { month: 'long', day: 'numeric', year: 'numeric' };
+
+            if (startStr === endStr) {
+                return start.toLocaleDateString('en-US', options);
+            }
+
+            // If same month and year, format as "January 31 - February 1, 2026"
+            const startMonth = start.toLocaleDateString('en-US', { month: 'long' });
+            const endMonth = end.toLocaleDateString('en-US', { month: 'long' });
+            const startDay = start.getDate();
+            const endDay = end.getDate();
+            const year = end.getFullYear();
+
+            if (startMonth === endMonth) {
+                return `${startMonth} ${startDay} - ${endDay}, ${year}`;
+            }
+            return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
         }
 
         function displayDraw(rounds, rules) {
             const resultsEl = document.getElementById('drawResults');
             const contentEl = document.getElementById('drawContent');
+            const editModeBtn = document.getElementById('editModeBtn');
+            const editModeNotice = document.getElementById('editModeNotice');
 
             resultsEl.classList.remove('hidden');
 
-            // Find max formations in any round
+            // Update edit mode UI
+            if (editMode) {
+                editModeBtn.textContent = 'Done Editing';
+                editModeBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+                editModeBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                editModeNotice.classList.remove('hidden');
+            } else {
+                editModeBtn.textContent = 'Edit Draw';
+                editModeBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+                editModeBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                editModeNotice.classList.add('hidden');
+            }
+
+            // Get competition info from inputs
+            const competitionName = document.getElementById('competitionName').value || 'Competition';
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const dateRange = formatDateRange(startDate, endDate);
+
+            // Find max formations in any round (add 1 if in edit mode for the add button row)
             const maxFormations = Math.max(...rounds.map(r => r.formations.length));
 
             // Print header info
@@ -826,8 +1159,8 @@
                 <div id="printHeader" class="mb-4">
                     <div class="flex justify-between items-center border-b-2 border-gray-600 pb-2 print:border-black">
                         <div>
-                            <h1 class="text-xl font-bold print:text-black">SkyVenture NH 2026 - ${rules.name}</h1>
-                            <p class="text-sm text-gray-400 print:text-gray-600">January 31 - February 1, 2026</p>
+                            <h1 class="text-xl font-bold print:text-black">${competitionName} - ${rules.name}</h1>
+                            <p class="text-sm text-gray-400 print:text-gray-600">${dateRange}</p>
                         </div>
                         <div class="text-right text-sm text-gray-400 print:text-gray-600">
                             <div>${new Date().toLocaleDateString()}</div>
@@ -860,16 +1193,22 @@
             for (let formIdx = 0; formIdx < maxFormations; formIdx++) {
                 html += `<tr class="border-b border-gray-700 print:border-gray-300">`;
 
-                rounds.forEach((round) => {
+                rounds.forEach((round, roundIdx) => {
                     if (formIdx < round.formations.length) {
                         const f = round.formations[formIdx];
                         const imgSrc = getFormationImagePath(f.value, rules.isVFS);
+                        const isBlock = f.type === 'block';
+                        const sizeClass = isBlock ? 'w-14 h-36' : 'w-16 h-16';
+                        const editClass = editMode ? 'ring-2 ring-yellow-500 hover:ring-yellow-300' : '';
+                        const clickHandler = editMode
+                            ? `replaceFormation(${roundIdx}, ${formIdx})`
+                            : `openModal('${imgSrc}', '${f.value} - ${f.name || ''}')`;
                         html += `
                             <td class="text-center p-1 align-top">
                                 <div class="formation-cell inline-block">
-                                    <div class="formation-pic w-16 h-20 mx-auto rounded overflow-hidden border border-gray-600 print:border-gray-400 cursor-pointer"
+                                    <div class="formation-pic ${sizeClass} mx-auto rounded overflow-hidden border border-gray-600 print:border-gray-400 cursor-pointer ${editClass}"
                                          style="background-color: white"
-                                         onclick="openModal('${imgSrc}', '${f.value} - ${f.name || ''}')">
+                                         onclick="${clickHandler}">
                                         <span class="compact-code hidden font-bold text-black text-lg">${f.value}</span>
                                         <img src="${imgSrc}" alt="${f.value}" class="full-image w-full h-full object-contain"
                                              onerror="this.onerror=null; this.style.display='none'; this.parentElement.querySelector('.compact-code').classList.remove('hidden')"/>
@@ -884,6 +1223,21 @@
                 html += `</tr>`;
             }
 
+            // Add formation row (only in edit mode)
+            if (editMode) {
+                html += `<tr class="border-b border-gray-700 print:hidden">`;
+                rounds.forEach((round, roundIdx) => {
+                    html += `
+                        <td class="text-center p-2">
+                            <button onclick="addFormationToRound(${roundIdx})"
+                                    class="w-10 h-10 rounded-full bg-green-600 hover:bg-green-700 text-white font-bold text-xl">
+                                +
+                            </button>
+                        </td>`;
+                });
+                html += `</tr>`;
+            }
+
             // Max points row
             html += `<tr class="border-t-2 border-gray-600 print:border-black bg-gray-800 print:bg-gray-100">`;
             rounds.forEach((round) => {
@@ -892,42 +1246,6 @@
             html += `</tr>`;
 
             html += `</tbody></table></div>`;
-
-            // Detailed view (hidden on print)
-            html += `<div class="detailed-view mt-6 print:hidden">`;
-            rounds.forEach((round, idx) => {
-                const roundNum = idx + 1;
-                const drawString = round.formations.map(f => f.value).join(' ');
-
-                let poolNote = '';
-                if (rules.isVFS && round.poolType) {
-                    poolNote = `<span class="text-xs ${round.poolType === 'Back/Belly' ? 'text-green-400' : 'text-cyan-400'} ml-2">[${round.poolType}]</span>`;
-                }
-
-                html += `
-                    <div class="bg-gray-800 rounded-lg p-3 mb-2">
-                        <div class="flex justify-between items-center mb-2">
-                            <h3 class="font-bold">Round ${roundNum}${poolNote}</h3>
-                            <span class="text-gray-400 text-sm">${round.maxPoints} pts</span>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            ${round.formations.map((f, i) => {
-                                if (rules.isVFS) {
-                                    return renderVFSFormationCard(f, i);
-                                } else {
-                                    const bgColor = f.type === 'block' ? 'bg-purple-600' : 'bg-blue-600';
-                                    return `<div class="flex flex-col items-center">
-                                        <span class="text-xs text-gray-500 mb-1">${i + 1}</span>
-                                        <span class="px-3 py-2 ${bgColor} rounded font-mono text-lg">${f.value}</span>
-                                        <span class="text-xs text-gray-400 mt-1">${f.name || ''}</span>
-                                    </div>`;
-                                }
-                            }).join('')}
-                        </div>
-                    </div>
-                `;
-            });
-            html += `</div>`;
 
             // Formation legend for print
             if (rules.isVFS) {
@@ -1116,7 +1434,13 @@
             const contentEl = document.getElementById('drawContent');
             const rounds = contentEl.querySelectorAll('.bg-gray-800');
 
-            let text = `SkyVenture NH 2026 - ${rules.name}\n`;
+            const competitionName = document.getElementById('competitionName').value || 'Competition';
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const dateRange = formatDateRange(startDate, endDate);
+
+            let text = `${competitionName} - ${rules.name}\n`;
+            text += `${dateRange}\n`;
             text += '='.repeat(40) + '\n\n';
 
             rounds.forEach((round, idx) => {
@@ -1268,12 +1592,27 @@
             transform: scale(1.05);
         }
     </style>
+    <!-- Formation Picker Modal -->
+    <div id="formationPickerModal" class="fixed inset-0 bg-black/80 hidden z-50 overflow-y-auto" onclick="closeFormationPicker()">
+        <div class="min-h-full flex items-center justify-center p-8">
+            <div class="bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[80vh] overflow-y-auto" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold">Select Formation</h3>
+                    <button onclick="closeFormationPicker()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                </div>
+                <div id="formationPickerContent">
+                    <!-- Formations will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Image Modal -->
     <div id="imageModal" class="fixed inset-0 bg-black/80 hidden z-50 overflow-y-auto" onclick="closeModal()">
         <div class="min-h-full flex items-center justify-center p-8">
             <div class="relative" onclick="event.stopPropagation()">
                 <button onclick="closeModal()" class="absolute -top-8 -right-8 text-white text-3xl font-bold hover:text-gray-300">&times;</button>
-                <img id="modalImage" src="" alt="" class="bg-white rounded-lg shadow-2xl">
+                <img id="modalImage" src="" alt="" class="bg-white rounded-lg shadow-2xl max-w-[90vw] max-h-[85vh] object-contain">
                 <div id="modalCaption" class="text-center text-white mt-4 text-xl font-bold"></div>
             </div>
         </div>
