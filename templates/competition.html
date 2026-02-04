@@ -11,22 +11,42 @@
         <div class="container mx-auto flex justify-between items-center">
             <a href="/" class="text-2xl font-bold text-blue-600">Video Library</a>
             <div class="flex items-center gap-4">
+                {% if is_public_view %}
+                <span class="bg-green-100 text-green-800 px-3 py-1 rounded-lg text-sm font-medium">Results View</span>
+                {% else %}
                 <a href="/competitions" class="text-gray-600 hover:text-gray-900">Competitions</a>
                 <a href="/videographer" class="bg-yellow-500 hover:bg-gray-400 text-white px-4 py-2 rounded-lg">Videographer Upload</a>
                 {% if is_admin %}
                 <a href="/admin" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg">Admin</a>
+                {% endif %}
                 {% endif %}
             </div>
         </div>
     </nav>
 
     <div class="max-w-[1800px] mx-auto px-4 py-8">
+        <!-- Unofficial Scores Banner (shown in public view when not all rounds approved) -->
+        {% if is_public_view %}
+        <div id="unofficialBanner" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 px-4 py-3 mb-6 rounded">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                    <span class="font-bold">*UNOFFICIAL Scores</span>
+                    <span class="ml-2 text-sm">- Pending Chief Judge approval</span>
+                </div>
+                <button onclick="showChiefJudgeApprovalModal()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm">
+                    Chief Judge Approval
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Header -->
         <div class="flex justify-between items-start mb-8">
             <div>
                 <div class="flex items-center gap-3 mb-2">
                     <h1 class="text-3xl font-bold">{{ competition.name }}</h1>
-                    {% if is_admin %}
+                    {% if is_admin and not is_public_view %}
                     <button onclick="showAddEventModal()" class="bg-gray-300 hover:bg-gray-400 px-3 py-1 rounded text-sm" title="Add another event">
                         + Add Event
                     </button>
@@ -49,7 +69,7 @@
                 </div>
             </div>
             {% set is_individual_competition = (competition.event_type.startswith('cp') and competition.event_type != 'cp_team') or competition.event_type.startswith('al') or competition.event_type.startswith('sp') or competition.event_type.startswith('ws_performance') %}
-            {% if is_admin %}
+            {% if is_admin and not is_public_view %}
             <div class="flex gap-2 flex-wrap">
                 <button onclick="showAddTeamModal()" class="bg-green-600 hover:bg-gray-300 px-4 py-2 rounded-lg text-sm">
                     + Add Team
@@ -90,6 +110,9 @@
                 <span class="text-gray-600">|</span>
                 <button onclick="showChiefJudgeModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
                     Chief Judge
+                </button>
+                <button onclick="showChiefJudgeApprovalModal()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm">
+                    Approve Scores
                 </button>
                 <button onclick="showEventDetailsModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
                     Event Details
@@ -2330,6 +2353,39 @@
         </div>
     </div>
 
+    <!-- Chief Judge Score Approval Modal -->
+    <div id="chiefJudgeApprovalModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-lg mx-4">
+            <h3 class="text-xl font-bold mb-4">Chief Judge Score Approval</h3>
+
+            <div class="mb-4">
+                <p class="text-gray-600 mb-3">Enter your PIN to approve scores for each round. Once approved, scores become official.</p>
+
+                <label class="block text-sm font-medium text-gray-700 mb-1">Chief Judge PIN</label>
+                <input type="password" id="approvalPinInput" class="w-full border rounded px-3 py-2" placeholder="Enter PIN">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Event</label>
+                <select id="approvalEventSelect" class="w-full border rounded px-3 py-2" onchange="updateApprovalRounds()">
+                </select>
+            </div>
+
+            <div id="approvalRoundsContainer" class="mb-4 max-h-64 overflow-y-auto">
+                <!-- Rounds will be populated dynamically -->
+            </div>
+
+            <div class="flex justify-between gap-3">
+                <button onclick="approveAllRounds()" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white">
+                    Approve All Rounds
+                </button>
+                <button onclick="closeChiefJudgeApprovalModal()" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Leaflet CSS and JS for WS Reference Points Map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -2337,6 +2393,8 @@
     <script>
         const compId = '{{ competition.id }}';
         const isMultiEvent = {{ 'true' if is_multi_event else 'false' }};
+        const isPublicView = {{ 'true' if is_public_view else 'false' }};
+        const scoreApprovals = {{ score_approvals|default({})|tojson|safe }};
         const eventTypes = {{ event_types|tojson|safe }};
         const EVENT_DISPLAY_NAMES = {{ EVENT_DISPLAY_NAMES|tojson|safe }};
         let selectedVideoFile = null;
@@ -2930,6 +2988,199 @@
 
         function hideChiefJudgeModal() {
             document.getElementById('chiefJudgeModal').classList.add('hidden');
+        }
+
+        // Chief Judge Score Approval Functions
+        function showChiefJudgeApprovalModal() {
+            document.getElementById('chiefJudgeApprovalModal').classList.remove('hidden');
+            document.getElementById('approvalPinInput').value = '';
+
+            // Populate event select
+            const eventSelect = document.getElementById('approvalEventSelect');
+            eventSelect.innerHTML = '';
+
+            if (isMultiEvent && eventTypes.length > 1) {
+                eventTypes.forEach(et => {
+                    const option = document.createElement('option');
+                    option.value = et;
+                    option.textContent = EVENT_DISPLAY_NAMES[et] || et;
+                    eventSelect.appendChild(option);
+                });
+            } else {
+                const option = document.createElement('option');
+                option.value = 'default';
+                option.textContent = EVENT_DISPLAY_NAMES[eventTypes[0]] || eventTypes[0] || 'Default';
+                eventSelect.appendChild(option);
+            }
+
+            updateApprovalRounds();
+        }
+
+        function closeChiefJudgeApprovalModal() {
+            document.getElementById('chiefJudgeApprovalModal').classList.add('hidden');
+        }
+
+        function updateApprovalRounds() {
+            const eventType = document.getElementById('approvalEventSelect').value;
+            const container = document.getElementById('approvalRoundsContainer');
+            const eventRounds = {{ event_rounds|tojson|safe }};
+            const numRounds = eventRounds[eventType] || eventRounds[eventTypes[0]] || 10;
+
+            let html = '<div class="space-y-2">';
+            for (let i = 1; i <= numRounds; i++) {
+                const approvalKey = eventType || 'default';
+                const roundApproval = scoreApprovals[approvalKey] && scoreApprovals[approvalKey][i.toString()];
+                const isApproved = !!roundApproval;
+                const approvedAt = roundApproval ? new Date(roundApproval.approved_at).toLocaleString() : '';
+
+                html += `
+                    <div class="flex items-center justify-between p-2 border rounded ${isApproved ? 'bg-green-50 border-green-300' : 'bg-gray-50'}">
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium">Round ${i}</span>
+                            ${isApproved ? `<span class="text-xs text-green-700">Approved: ${approvedAt}</span>` : '<span class="text-xs text-gray-500">Pending approval</span>'}
+                        </div>
+                        ${isApproved ?
+                            '<span class="text-green-600 text-sm font-medium">✓ Official</span>' :
+                            `<button onclick="approveRound('${eventType}', ${i})" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">Approve</button>`
+                        }
+                    </div>
+                `;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+
+            // Update the unofficial banner based on all approvals
+            updateUnofficialBanner();
+        }
+
+        async function approveRound(eventType, roundNum) {
+            const pin = document.getElementById('approvalPinInput').value;
+            if (!pin) {
+                alert('Please enter the Chief Judge PIN');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/competition/${compId}/approve-scores`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pin: pin,
+                        round_num: roundNum,
+                        event_type: eventType || 'default'
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    // Update local scoreApprovals
+                    const key = eventType || 'default';
+                    if (!scoreApprovals[key]) scoreApprovals[key] = {};
+                    scoreApprovals[key][roundNum.toString()] = {
+                        approved_at: result.approved_at,
+                        approved_by: 'Chief Judge'
+                    };
+                    updateApprovalRounds();
+                    alert(`Round ${roundNum} scores approved and now OFFICIAL`);
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to approve'));
+                }
+            } catch (err) {
+                console.error('Error:', err);
+                alert('Error approving scores');
+            }
+        }
+
+        async function approveAllRounds() {
+            const pin = document.getElementById('approvalPinInput').value;
+            if (!pin) {
+                alert('Please enter the Chief Judge PIN');
+                return;
+            }
+
+            const eventType = document.getElementById('approvalEventSelect').value;
+            const eventRounds = {{ event_rounds|tojson|safe }};
+            const numRounds = eventRounds[eventType] || eventRounds[eventTypes[0]] || 10;
+
+            let approved = 0;
+            let errors = [];
+
+            for (let roundNum = 1; roundNum <= numRounds; roundNum++) {
+                const key = eventType || 'default';
+                // Skip already approved rounds
+                if (scoreApprovals[key] && scoreApprovals[key][roundNum.toString()]) {
+                    continue;
+                }
+
+                try {
+                    const response = await fetch(`/api/competition/${compId}/approve-scores`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            pin: pin,
+                            round_num: roundNum,
+                            event_type: eventType || 'default'
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        if (!scoreApprovals[key]) scoreApprovals[key] = {};
+                        scoreApprovals[key][roundNum.toString()] = {
+                            approved_at: result.approved_at,
+                            approved_by: 'Chief Judge'
+                        };
+                        approved++;
+                    } else {
+                        errors.push(`Round ${roundNum}: ${result.error}`);
+                    }
+                } catch (err) {
+                    errors.push(`Round ${roundNum}: Network error`);
+                }
+            }
+
+            updateApprovalRounds();
+
+            if (errors.length > 0) {
+                alert(`Approved ${approved} rounds.\n\nErrors:\n${errors.join('\n')}`);
+            } else if (approved > 0) {
+                alert(`All ${approved} rounds approved! Scores are now OFFICIAL.`);
+            } else {
+                alert('All rounds were already approved.');
+            }
+        }
+
+        function updateUnofficialBanner() {
+            const banner = document.getElementById('unofficialBanner');
+            if (!banner) return;
+
+            const eventRounds = {{ event_rounds|tojson|safe }};
+            let allApproved = true;
+
+            // Check if all rounds in all events are approved
+            const eventsToCheck = isMultiEvent ? eventTypes : ['default'];
+            for (const et of eventsToCheck) {
+                const numRounds = eventRounds[et] || eventRounds[eventTypes[0]] || 10;
+                const key = et === eventTypes[0] && !isMultiEvent ? 'default' : et;
+                for (let i = 1; i <= numRounds; i++) {
+                    if (!scoreApprovals[key] || !scoreApprovals[key][i.toString()]) {
+                        allApproved = false;
+                        break;
+                    }
+                }
+                if (!allApproved) break;
+            }
+
+            if (allApproved) {
+                banner.classList.add('hidden');
+            } else {
+                banner.classList.remove('hidden');
+            }
+        }
+
+        // Check banner status on page load
+        if (isPublicView) {
+            document.addEventListener('DOMContentLoaded', updateUnofficialBanner);
         }
 
         async function saveChiefJudge(e) {

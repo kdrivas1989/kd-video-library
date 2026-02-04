@@ -130,6 +130,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'uspa-video-library-secret-key')
 DROPBOX_APP_KEY = os.environ.get('DROPBOX_APP_KEY', '')
 ADMIN_PIN = os.environ.get('ADMIN_PIN', '1234')  # Default PIN for dangerous operations
+CHIEF_JUDGE_PIN = os.environ.get('CHIEF_JUDGE_PIN', '9999')  # PIN for Chief Judge to approve scores
 
 # Event type display names mapping
 EVENT_DISPLAY_NAMES = {
@@ -606,6 +607,12 @@ def init_db():
 
         try:
             cursor.execute('ALTER TABLE competitions ADD COLUMN ws_field_elevation REAL')
+        except:
+            pass
+
+        # Add score_approvals column if it doesn't exist (JSON: event_type -> round -> {approved_at, approved_by})
+        try:
+            cursor.execute('ALTER TABLE competitions ADD COLUMN score_approvals TEXT')
         except:
             pass
 
@@ -4100,6 +4107,14 @@ def competition_page(comp_id):
     competition['parsed_event_rounds'] = event_rounds
     is_multi_event = len(event_types) > 1
 
+    # Parse score approvals
+    score_approvals = {}
+    if competition.get('score_approvals'):
+        try:
+            score_approvals = json.loads(competition['score_approvals'])
+        except:
+            score_approvals = {}
+
     teams = get_competition_teams(comp_id)
 
     # Check if any scores have been entered (to disable delete)
@@ -4315,7 +4330,9 @@ def competition_page(comp_id):
                              categories=CATEGORIES,
                              is_admin=session.get('role') == 'admin',
                              has_scores=has_scores,
-                             EVENT_DISPLAY_NAMES=EVENT_DISPLAY_NAMES)
+                             EVENT_DISPLAY_NAMES=EVENT_DISPLAY_NAMES,
+                             is_public_view=False,
+                             score_approvals=score_approvals)
     else:
         # Single event - group by class only
         teams_by_class = {
@@ -4492,7 +4509,133 @@ def competition_page(comp_id):
                              categories=CATEGORIES,
                              is_admin=session.get('role') == 'admin',
                              has_scores=has_scores,
-                             EVENT_DISPLAY_NAMES=EVENT_DISPLAY_NAMES)
+                             EVENT_DISPLAY_NAMES=EVENT_DISPLAY_NAMES,
+                             is_public_view=False,
+                             score_approvals=score_approvals)
+
+
+@app.route('/results/<comp_id>')
+def public_results_page(comp_id):
+    """Public results page for competitors to view scores (read-only)."""
+    competition = get_competition(comp_id)
+    if not competition:
+        return "Competition not found", 404
+
+    # Parse event_types from JSON
+    event_types = []
+    if competition.get('event_types'):
+        try:
+            event_types = json.loads(competition['event_types'])
+        except:
+            event_types = [competition.get('event_type', 'fs')]
+    else:
+        event_types = [competition.get('event_type', 'fs')]
+
+    # Default rounds per event type
+    default_event_rounds = {
+        'fs_4way_fs': 10, 'fs_4way_vfs': 10, 'fs_2way_mfs': 10, 'fs_8way': 10,
+        'fs_16way': 6, 'fs_10way': 6,
+        'cf_4way_rot': 8, 'cf_4way_seq': 8, 'cf_2way_open': 8, 'cf_2way_proam': 8, 'cf_2way': 8,
+        'ae_freestyle': 7, 'ae_freefly': 7,
+        'cp_dsz': 9, 'cp_team': 9, 'cp_freestyle': 3,
+        'ws_performance': 9, 'ws_acrobatic': 7,
+        'sp_individual': 8, 'sp_mixed_team': 3,
+        'al_individual': 8, 'al_team': 8,
+    }
+
+    # Parse event_rounds from JSON
+    event_rounds = {}
+    if competition.get('event_rounds'):
+        try:
+            event_rounds = json.loads(competition['event_rounds'])
+        except:
+            pass
+    for et in event_types:
+        if et in default_event_rounds:
+            event_rounds[et] = default_event_rounds[et]
+        elif et not in event_rounds:
+            event_rounds[et] = competition.get('total_rounds', 10)
+
+    competition['parsed_event_types'] = event_types
+    competition['parsed_event_rounds'] = event_rounds
+    is_multi_event = len(event_types) > 1
+
+    # Parse score approvals
+    score_approvals = {}
+    if competition.get('score_approvals'):
+        try:
+            score_approvals = json.loads(competition['score_approvals'])
+        except:
+            score_approvals = {}
+
+    teams = get_competition_teams(comp_id)
+
+    if is_multi_event:
+        teams_by_event = {}
+        for event_type in event_types:
+            teams_by_event[event_type] = {
+                'beginner': [], 'intermediate': [], 'advanced': [], 'open': []
+            }
+
+        for team in teams:
+            team_class = team.get('class', 'open').lower()
+            team_event = team.get('event', event_types[0])
+            team['scores'] = get_team_scores(team['id'])
+            team['total_score'] = sum(s.get('score', 0) or 0 for s in team['scores'])
+
+            if team_event in teams_by_event:
+                if team_class in teams_by_event[team_event]:
+                    teams_by_event[team_event][team_class].append(team)
+                else:
+                    teams_by_event[team_event]['open'].append(team)
+
+        for event_type in teams_by_event:
+            for class_name in teams_by_event[event_type]:
+                teams_by_event[event_type][class_name].sort(key=lambda t: t['total_score'], reverse=True)
+
+        return render_template('competition.html',
+                             competition=competition,
+                             teams_by_event=teams_by_event,
+                             teams_by_class={'beginner': [], 'intermediate': [], 'advanced': [], 'open': []},
+                             is_multi_event=True,
+                             event_types=event_types,
+                             event_rounds=event_rounds,
+                             categories=CATEGORIES,
+                             is_admin=False,
+                             has_scores=True,
+                             EVENT_DISPLAY_NAMES=EVENT_DISPLAY_NAMES,
+                             is_public_view=True,
+                             score_approvals=score_approvals)
+    else:
+        teams_by_class = {
+            'beginner': [], 'intermediate': [], 'advanced': [], 'open': []
+        }
+        for team in teams:
+            team_class = team.get('class', 'open').lower()
+            team['scores'] = get_team_scores(team['id'])
+            team['total_score'] = sum(s.get('score', 0) or 0 for s in team['scores'])
+
+            if team_class in teams_by_class:
+                teams_by_class[team_class].append(team)
+            else:
+                teams_by_class['open'].append(team)
+
+        for class_name in teams_by_class:
+            teams_by_class[class_name].sort(key=lambda t: t['total_score'], reverse=True)
+
+        return render_template('competition.html',
+                             competition=competition,
+                             teams_by_class=teams_by_class,
+                             teams_by_event={},
+                             is_multi_event=False,
+                             event_types=event_types,
+                             event_rounds=event_rounds,
+                             categories=CATEGORIES,
+                             is_admin=False,
+                             has_scores=True,
+                             EVENT_DISPLAY_NAMES=EVENT_DISPLAY_NAMES,
+                             is_public_view=True,
+                             score_approvals=score_approvals)
 
 
 @app.route('/admin/competition/create', methods=['POST'])
@@ -6541,6 +6684,82 @@ def clear_rejump(team_id):
         })
 
     return jsonify({'success': True, 'message': f'Rejump cleared for Round {round_num}'})
+
+
+@app.route('/api/competition/<comp_id>/approve-scores', methods=['POST'])
+def approve_scores(comp_id):
+    """Approve scores for a round (requires Chief Judge PIN)."""
+    data = request.json
+    pin = data.get('pin', '')
+    round_num = int(data.get('round_num', 0))
+    event_type = data.get('event_type', 'default')
+
+    if not round_num:
+        return jsonify({'error': 'Round number is required'}), 400
+
+    # Verify PIN - check competition-specific PIN first, then global
+    competition = get_competition(comp_id)
+    if not competition:
+        return jsonify({'error': 'Competition not found'}), 404
+
+    comp_pin = competition.get('chief_judge_pin', '')
+    valid_pin = comp_pin if comp_pin else CHIEF_JUDGE_PIN
+
+    if pin != valid_pin:
+        return jsonify({'error': 'Invalid Chief Judge PIN'}), 403
+
+    # Load existing approvals
+    approvals = {}
+    if competition.get('score_approvals'):
+        try:
+            approvals = json.loads(competition['score_approvals'])
+        except:
+            approvals = {}
+
+    # Add this approval
+    if event_type not in approvals:
+        approvals[event_type] = {}
+
+    approvals[event_type][str(round_num)] = {
+        'approved_at': datetime.now().isoformat(),
+        'approved_by': session.get('username', 'Chief Judge')
+    }
+
+    # Save to competition
+    if USE_SUPABASE:
+        supabase.table('competitions').update({
+            'score_approvals': json.dumps(approvals)
+        }).eq('id', comp_id).execute()
+    else:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('UPDATE competitions SET score_approvals = ? WHERE id = ?',
+                      (json.dumps(approvals), comp_id))
+        conn.commit()
+        conn.close()
+
+    return jsonify({
+        'success': True,
+        'message': f'Round {round_num} scores approved',
+        'approved_at': approvals[event_type][str(round_num)]['approved_at']
+    })
+
+
+@app.route('/api/competition/<comp_id>/score-approvals')
+def get_score_approvals(comp_id):
+    """Get score approval status for a competition."""
+    competition = get_competition(comp_id)
+    if not competition:
+        return jsonify({'error': 'Competition not found'}), 404
+
+    approvals = {}
+    if competition.get('score_approvals'):
+        try:
+            approvals = json.loads(competition['score_approvals'])
+        except:
+            approvals = {}
+
+    return jsonify({'approvals': approvals})
 
 
 @app.route('/admin/get-video-info/<video_id>')
