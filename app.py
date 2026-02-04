@@ -2,6 +2,7 @@
 """Video Library - Video database for skydiving disciplines."""
 
 import os
+import re
 import uuid
 import json
 import subprocess
@@ -9,6 +10,8 @@ import shutil
 import smtplib
 import secrets
 import threading
+import urllib.parse
+import urllib.request
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
@@ -1207,10 +1210,6 @@ def is_direct_video_url(url):
 def fetch_vimeo_metadata(url):
     """Fetch title and thumbnail from Vimeo using oEmbed API."""
     try:
-        import urllib.request
-        import urllib.parse
-        import re
-
         # Clean URL - ensure it's the standard format
         clean_url = url.split('?')[0]  # Remove query params for oEmbed
 
@@ -1236,8 +1235,6 @@ def fetch_vimeo_metadata(url):
 def fetch_youtube_metadata(url):
     """Fetch title and thumbnail from YouTube using oEmbed API."""
     try:
-        import urllib.request
-        import urllib.parse
         oembed_url = f"https://www.youtube.com/oembed?url={urllib.parse.quote(url, safe='')}&format=json"
         req = urllib.request.Request(oembed_url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=5) as response:
@@ -1285,7 +1282,6 @@ def get_video_embed_url(url):
         # https://vimeo.com/123456789
         # https://vimeo.com/123456789/abcdef (unlisted with hash)
         # https://vimeo.com/channels/xxx/123456789
-        import re
         # Extract video ID (just the numbers)
         match = re.search(r'vimeo\.com/(?:channels/[^/]+/|video/)?(\d+)', url)
         if match:
