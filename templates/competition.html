@@ -1520,12 +1520,20 @@
                                 </div>
                             </div>
 
+                            <!-- Stand Up Landing -->
+                            <div class="mb-4">
+                                <label class="flex items-center gap-3 bg-gray-300 px-4 py-2 rounded cursor-pointer hover:bg-gray-400">
+                                    <input type="checkbox" id="cpStandUp" class="w-5 h-5" checked onchange="calculateCpScore()">
+                                    <span>Stand Up Landing</span>
+                                    <span class="text-gray-500 text-sm ml-auto">(-10 pts if not checked)</span>
+                                </label>
+                            </div>
+
                             <!-- Landing Zone -->
                             <div class="mb-4">
                                 <label class="block text-gray-600 text-sm mb-2">Landing Zone (click to select)</label>
-                                <input type="hidden" id="cpLandingZone" value="0">
+                                <input type="hidden" id="cpLandingZone" value="3">
                                 <div class="flex flex-col gap-1">
-                                    <button type="button" onclick="selectCpZone(0)" class="cp-zone-btn px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm text-left" data-zone="0">Outside (0 pts)</button>
                                     <button type="button" onclick="selectCpZone(3)" class="cp-zone-btn px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm text-left" data-zone="3">Z1 (3 pts)</button>
                                     <button type="button" onclick="selectCpZone(11)" class="cp-zone-btn px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm text-left" data-zone="11">Z2 (11 pts)</button>
                                     <button type="button" onclick="selectCpZone(19)" class="cp-zone-btn px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm text-left" data-zone="19">Z3 (19 pts)</button>
@@ -3944,8 +3952,12 @@
             });
 
             // Reset input fields
+            // Reset stand up checkbox
+            const standUp = document.getElementById('cpStandUp');
+            if (standUp) standUp.checked = true;
+
             const landingZone = document.getElementById('cpLandingZone');
-            if (landingZone) landingZone.value = '0';
+            if (landingZone) landingZone.value = '3';
             // Reset zone button styles
             document.querySelectorAll('.cp-zone-btn').forEach(btn => {
                 const btnZone = parseInt(btn.dataset.zone);
@@ -4033,11 +4045,20 @@
                 // Landing zone points
                 const zonePoints = parseInt(document.getElementById('cpLandingZone').value) || 0;
 
+                // Stand up penalty (-10 if not checked)
+                const standUp = document.getElementById('cpStandUp').checked;
+                const standUpPenalty = standUp ? 0 : 10;
+
                 const rawScore = gatePoints + zonePoints;
+                const finalScore = Math.max(0, rawScore - standUpPenalty);
 
                 // Update zone total display
-                document.getElementById('cpZoneTotal').textContent = rawScore;
-                document.getElementById('cpScoreValue').value = rawScore;
+                if (!standUp) {
+                    document.getElementById('cpZoneTotal').textContent = `${finalScore} (${rawScore} - 10 stand up)`;
+                } else {
+                    document.getElementById('cpZoneTotal').textContent = finalScore;
+                }
+                document.getElementById('cpScoreValue').value = finalScore;
             } else if (currentCpEvent === 'distance') {
                 // Distance scoring - just record the distance if gates are passed
                 const entryGate = document.getElementById('cpDistEntry').checked;
