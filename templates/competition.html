@@ -1257,11 +1257,8 @@
                 </div>
                 <div>
                     <label class="block text-gray-600 text-sm mb-1">Rounds</label>
-                    <select id="drawNumRounds" class="w-full px-3 py-2 rounded bg-white text-gray-900 border border-gray-300">
-                        <option value="6">6 Rounds</option>
-                        <option value="8">8 Rounds</option>
-                        <option value="10" selected>10 Rounds</option>
-                    </select>
+                    <div id="drawNumRoundsDisplay" class="w-full px-3 py-2 rounded bg-gray-100 text-gray-900 border border-gray-300 font-medium">10 Rounds</div>
+                    <input type="hidden" id="drawNumRounds" value="10">
                 </div>
                 <div class="flex items-end gap-2">
                     <button onclick="generateCompetitionDraw()" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold">
@@ -3812,16 +3809,9 @@
             };
             const rounds = defaultRounds[eventType] || 10;
 
-            // Update the rounds dropdown
-            const roundsSelect = document.getElementById('drawNumRounds');
-            roundsSelect.innerHTML = '';
-            for (let i = 1; i <= rounds; i++) {
-                const option = document.createElement('option');
-                option.value = i;
-                option.textContent = i + (i === 1 ? ' Round' : ' Rounds');
-                if (i === rounds) option.selected = true;
-                roundsSelect.appendChild(option);
-            }
+            // Update the rounds display and hidden input
+            document.getElementById('drawNumRounds').value = rounds;
+            document.getElementById('drawNumRoundsDisplay').textContent = rounds + ' Rounds';
         }
 
         function generateCompetitionDraw() {
