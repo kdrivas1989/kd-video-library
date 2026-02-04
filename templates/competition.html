@@ -3862,8 +3862,6 @@
             document.getElementById('wsScoreValue').value = '';
             document.getElementById('wsDlPenaltyValue').value = 'none';
         }
-            document.getElementById('cfScoreValue').value = '0';
-        }
 
         function openRoundModal(teamId, teamName, roundNum, score, videoId, category, scoreId, trainingFlag) {
             document.getElementById('roundTeamId').value = teamId;
@@ -4235,23 +4233,33 @@
                 activeBtn.classList.add('bg-blue-100', 'border-blue-500', 'text-blue-700');
             }
 
-            // Update card highlights
-            document.getElementById('wsTimeCard').classList.remove('border-2', 'border-blue-500');
-            document.getElementById('wsTimeCard').classList.add('border');
-            document.getElementById('wsDistanceCard').classList.remove('border-2', 'border-green-500');
-            document.getElementById('wsDistanceCard').classList.add('border');
-            document.getElementById('wsSpeedCard').classList.remove('border-2', 'border-orange-500');
-            document.getElementById('wsSpeedCard').classList.add('border');
+            // Update card highlights (only if cards exist - they appear after CSV upload)
+            const wsTimeCard = document.getElementById('wsTimeCard');
+            const wsDistanceCard = document.getElementById('wsDistanceCard');
+            const wsSpeedCard = document.getElementById('wsSpeedCard');
 
-            if (task === 'time') {
-                document.getElementById('wsTimeCard').classList.remove('border');
-                document.getElementById('wsTimeCard').classList.add('border-2', 'border-blue-500');
-            } else if (task === 'distance') {
-                document.getElementById('wsDistanceCard').classList.remove('border');
-                document.getElementById('wsDistanceCard').classList.add('border-2', 'border-green-500');
-            } else if (task === 'speed') {
-                document.getElementById('wsSpeedCard').classList.remove('border');
-                document.getElementById('wsSpeedCard').classList.add('border-2', 'border-orange-500');
+            if (wsTimeCard) {
+                wsTimeCard.classList.remove('border-2', 'border-blue-500');
+                wsTimeCard.classList.add('border');
+            }
+            if (wsDistanceCard) {
+                wsDistanceCard.classList.remove('border-2', 'border-green-500');
+                wsDistanceCard.classList.add('border');
+            }
+            if (wsSpeedCard) {
+                wsSpeedCard.classList.remove('border-2', 'border-orange-500');
+                wsSpeedCard.classList.add('border');
+            }
+
+            if (task === 'time' && wsTimeCard) {
+                wsTimeCard.classList.remove('border');
+                wsTimeCard.classList.add('border-2', 'border-blue-500');
+            } else if (task === 'distance' && wsDistanceCard) {
+                wsDistanceCard.classList.remove('border');
+                wsDistanceCard.classList.add('border-2', 'border-green-500');
+            } else if (task === 'speed' && wsSpeedCard) {
+                wsSpeedCard.classList.remove('border');
+                wsSpeedCard.classList.add('border-2', 'border-orange-500');
             }
 
             updateWsSelectedDisplay();
@@ -4279,12 +4287,16 @@
             const taskLabels = { time: 'Time', distance: 'Distance', speed: 'Speed' };
             const taskUnits = { time: 's', distance: 'm', speed: 'km/h' };
 
-            document.getElementById('wsSelectedTaskLabel').textContent = taskLabels[selectedWsTask];
-            document.getElementById('wsSelectedRoundLabel').textContent = 'Round ' + selectedWsRound;
+            const taskLabelEl = document.getElementById('wsSelectedTaskLabel');
+            const roundLabelEl = document.getElementById('wsSelectedRoundLabel');
+            const valueEl = document.getElementById('wsSelectedValue');
 
-            if (wsFlysightParsedData) {
+            if (taskLabelEl) taskLabelEl.textContent = taskLabels[selectedWsTask];
+            if (roundLabelEl) roundLabelEl.textContent = 'Round ' + selectedWsRound;
+
+            if (wsFlysightParsedData && valueEl) {
                 const value = wsFlysightParsedData[selectedWsTask];
-                document.getElementById('wsSelectedValue').textContent = value + ' ' + taskUnits[selectedWsTask];
+                valueEl.textContent = value + ' ' + taskUnits[selectedWsTask];
             }
         }
 
