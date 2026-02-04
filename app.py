@@ -593,6 +593,11 @@ def init_db():
         except:
             pass
 
+        try:
+            cursor.execute('ALTER TABLE competitions ADD COLUMN ws_field_elevation REAL')
+        except:
+            pass
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS competition_teams (
                 id TEXT PRIMARY KEY,
@@ -1047,8 +1052,8 @@ def save_competition(comp_data):
     else:
         db = get_sqlite_db()
         db.execute('''
-            INSERT OR REPLACE INTO competitions (id, name, event_type, event_types, event_rounds, total_rounds, created_at, status, chief_judge, chief_judge_pin, event_locations, event_dates, draws, ws_reference_points, ws_validation_window, ws_competitor_ref_points)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO competitions (id, name, event_type, event_types, event_rounds, total_rounds, created_at, status, chief_judge, chief_judge_pin, event_locations, event_dates, draws, ws_reference_points, ws_validation_window, ws_competitor_ref_points, ws_field_elevation)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (comp_data['id'], comp_data['name'], comp_data['event_type'],
               comp_data.get('event_types', ''), comp_data.get('event_rounds', '{}'),
               comp_data.get('total_rounds', 10), comp_data['created_at'], comp_data.get('status', 'active'),
@@ -1057,7 +1062,8 @@ def save_competition(comp_data):
               comp_data.get('draws', '{}'),
               comp_data.get('ws_reference_points'),
               comp_data.get('ws_validation_window'),
-              comp_data.get('ws_competitor_ref_points')))
+              comp_data.get('ws_competitor_ref_points'),
+              comp_data.get('ws_field_elevation', 0)))
         db.commit()
 
 
@@ -6968,19 +6974,23 @@ def ws_performance_reference_points(competition_id):
             except:
                 competitor_assignments = {}
 
+        field_elevation = competition.get('ws_field_elevation', 0)
+
         return jsonify({
             'success': True,
             'points': ref_points,
             'validation_window': validation_window,
-            'competitor_assignments': competitor_assignments
+            'competitor_assignments': competitor_assignments,
+            'field_elevation': field_elevation
         })
 
     elif request.method == 'POST':
-        # Save reference points, validation window, and competitor assignments
+        # Save reference points, validation window, competitor assignments, and field elevation
         data = request.json
         points = data.get('points', [])
         validation_window = data.get('validation_window')
         competitor_assignments = data.get('competitor_assignments', {})
+        field_elevation = data.get('field_elevation', 0)
 
         if len(points) == 0:
             return jsonify({'error': 'At least one reference point is required'}), 400
@@ -7019,10 +7029,17 @@ def ws_performance_reference_points(competition_id):
                     return jsonify({'error': 'Invalid validation window coordinates'}), 400
                 validated_vw = {'lat': float(vw_lat), 'lng': float(vw_lng)}
 
+        # Validate field elevation
+        try:
+            field_elevation = float(field_elevation) if field_elevation else 0
+        except:
+            field_elevation = 0
+
         # Save to competition
         competition['ws_reference_points'] = json.dumps(validated_points)
         competition['ws_validation_window'] = json.dumps(validated_vw) if validated_vw else None
         competition['ws_competitor_ref_points'] = json.dumps(competitor_assignments)
+        competition['ws_field_elevation'] = field_elevation
         save_competition(competition)
 
         return jsonify({
@@ -7030,7 +7047,8 @@ def ws_performance_reference_points(competition_id):
             'message': 'Flight path configuration saved',
             'points': validated_points,
             'validation_window': validated_vw,
-            'competitor_assignments': competitor_assignments
+            'competitor_assignments': competitor_assignments,
+            'field_elevation': field_elevation
         })
 
 
