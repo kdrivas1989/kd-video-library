@@ -45,7 +45,7 @@
 
         <!-- Subcategory Filter (for FS) -->
         {% if category.subcategories %}
-        <div class="mb-8">
+        <div class="mb-6">
             <div class="flex flex-wrap gap-3">
                 <a href="/category/{{ cat_id }}"
                    class="px-4 py-2 rounded-lg transition {% if not current_sub %}bg-blue-600 text-white{% else %}bg-gray-700 text-gray-300 hover:bg-gray-600{% endif %}">
@@ -55,6 +55,25 @@
                 <a href="/category/{{ cat_id }}?sub={{ sub.id }}"
                    class="px-4 py-2 rounded-lg transition {% if current_sub == sub.id %}bg-blue-600 text-white{% else %}bg-gray-700 text-gray-300 hover:bg-gray-600{% endif %}">
                     {{ sub.name }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Event Filter -->
+        {% if event_list %}
+        <div class="mb-8">
+            <h3 class="text-sm font-medium text-gray-400 mb-3">Filter by Event</h3>
+            <div class="flex flex-wrap gap-2">
+                <a href="/category/{{ cat_id }}{% if current_sub %}?sub={{ current_sub }}{% endif %}"
+                   class="px-3 py-1.5 rounded-lg text-sm transition {% if not current_event %}bg-green-600 text-white{% else %}bg-gray-700 text-gray-300 hover:bg-gray-600{% endif %}">
+                    All Events
+                </a>
+                {% for event_name in event_list %}
+                <a href="/category/{{ cat_id }}?{% if current_sub %}sub={{ current_sub }}&{% endif %}event={{ event_name | urlencode }}"
+                   class="px-3 py-1.5 rounded-lg text-sm transition {% if current_event == event_name %}bg-green-600 text-white{% else %}bg-gray-700 text-gray-300 hover:bg-gray-600{% endif %}">
+                    {{ event_name }}
                 </a>
                 {% endfor %}
             </div>
@@ -107,13 +126,19 @@
         </div>
         {% endif %}
 
-        <!-- Videos Grid -->
+        <!-- Videos Display -->
         {% if videos %}
+
+        {% if current_event %}
+        <!-- Filtered by specific event - show flat grid -->
+        <div class="mb-4">
+            <h2 class="text-xl font-semibold text-green-400">{{ current_event }}</h2>
+            <p class="text-gray-400 text-sm">{{ videos_by_event.get(current_event, [])|length }} videos</p>
+        </div>
         <div class="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="videosGrid">
-            {% for video in videos %}
+            {% for video in videos_by_event.get(current_event, []) %}
             <div class="video-card bg-gray-800 rounded-lg overflow-hidden hover:bg-gray-700 transition relative" data-id="{{ video.id }}">
                 {% if is_admin %}
-                <!-- Checkbox overlay -->
                 <div class="absolute top-2 left-2 z-10">
                     <input type="checkbox" class="video-checkbox w-5 h-5 rounded bg-gray-700 border-gray-500 text-blue-600 focus:ring-blue-500 cursor-pointer"
                         value="{{ video.id }}" onchange="updateSelectedCount()">
@@ -157,6 +182,195 @@
             </div>
             {% endfor %}
         </div>
+
+        {% elif event_list %}
+        <!-- Show event folders -->
+        <div id="videosGrid">
+            {% for event_name in event_list %}
+            <div class="event-folder mb-6">
+                <div class="flex items-center gap-3 mb-4 cursor-pointer group" onclick="toggleEventFolder('{{ loop.index }}')">
+                    <svg id="folder-icon-{{ loop.index }}" class="w-8 h-8 text-yellow-500 transition-transform" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    </svg>
+                    <div class="flex-1">
+                        <h2 class="text-lg font-semibold text-white group-hover:text-green-400 transition">{{ event_name }}</h2>
+                        <p class="text-gray-400 text-sm">{{ videos_by_event[event_name]|length }} videos</p>
+                    </div>
+                    <svg id="chevron-{{ loop.index }}" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+                <div id="folder-content-{{ loop.index }}" class="hidden pl-4 border-l-2 border-gray-700">
+                    <div class="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {% for video in videos_by_event[event_name] %}
+                        <div class="video-card bg-gray-800 rounded-lg overflow-hidden hover:bg-gray-700 transition relative" data-id="{{ video.id }}">
+                            {% if is_admin %}
+                            <div class="absolute top-2 left-2 z-10">
+                                <input type="checkbox" class="video-checkbox w-5 h-5 rounded bg-gray-700 border-gray-500 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                    value="{{ video.id }}" onchange="updateSelectedCount()">
+                            </div>
+                            {% endif %}
+                            <a href="/video/{{ video.id }}" class="block">
+                                <div class="aspect-video bg-gray-700 relative">
+                                    {% if video.thumbnail %}
+                                    <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="w-full h-full object-cover">
+                                    {% else %}
+                                    <div class="w-full h-full flex items-center justify-center text-gray-500">
+                                        <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                    </div>
+                                    {% endif %}
+                                    {% if video.duration %}
+                                    <span class="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">{{ video.duration }}</span>
+                                    {% endif %}
+                                </div>
+                            </a>
+                            <div class="p-3">
+                                <a href="/video/{{ video.id }}">
+                                    <h3 class="font-medium text-white text-sm line-clamp-2 hover:text-blue-400">{{ video.title }}</h3>
+                                </a>
+                                <div class="flex justify-between items-center mt-2 text-xs text-gray-400">
+                                    {% if is_admin %}
+                                    <select onchange="moveToCategory('{{ video.id }}', this.value)"
+                                        class="bg-gray-700 text-white text-xs px-1 py-0.5 rounded cursor-pointer hover:bg-gray-600">
+                                        {% for c_id, c in all_categories.items() %}
+                                        <option value="{{ c_id }}" {% if c_id == video.category %}selected{% endif %}>{{ c.abbrev }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {% else %}
+                                    <span>{{ category.abbrev }}</span>
+                                    {% endif %}
+                                    <span>{{ video.views }} views</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Videos without event -->
+            {% if videos_no_event %}
+            <div class="event-folder mb-6">
+                <div class="flex items-center gap-3 mb-4 cursor-pointer group" onclick="toggleEventFolder('uncategorized')">
+                    <svg class="w-8 h-8 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    </svg>
+                    <div class="flex-1">
+                        <h2 class="text-lg font-semibold text-gray-400 group-hover:text-white transition">No Event Assigned</h2>
+                        <p class="text-gray-500 text-sm">{{ videos_no_event|length }} videos</p>
+                    </div>
+                    <svg id="chevron-uncategorized" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+                <div id="folder-content-uncategorized" class="hidden pl-4 border-l-2 border-gray-700">
+                    <div class="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {% for video in videos_no_event %}
+                        <div class="video-card bg-gray-800 rounded-lg overflow-hidden hover:bg-gray-700 transition relative" data-id="{{ video.id }}">
+                            {% if is_admin %}
+                            <div class="absolute top-2 left-2 z-10">
+                                <input type="checkbox" class="video-checkbox w-5 h-5 rounded bg-gray-700 border-gray-500 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                    value="{{ video.id }}" onchange="updateSelectedCount()">
+                            </div>
+                            {% endif %}
+                            <a href="/video/{{ video.id }}" class="block">
+                                <div class="aspect-video bg-gray-700 relative">
+                                    {% if video.thumbnail %}
+                                    <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="w-full h-full object-cover">
+                                    {% else %}
+                                    <div class="w-full h-full flex items-center justify-center text-gray-500">
+                                        <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                    </div>
+                                    {% endif %}
+                                    {% if video.duration %}
+                                    <span class="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">{{ video.duration }}</span>
+                                    {% endif %}
+                                </div>
+                            </a>
+                            <div class="p-3">
+                                <a href="/video/{{ video.id }}">
+                                    <h3 class="font-medium text-white text-sm line-clamp-2 hover:text-blue-400">{{ video.title }}</h3>
+                                </a>
+                                <div class="flex justify-between items-center mt-2 text-xs text-gray-400">
+                                    {% if is_admin %}
+                                    <select onchange="moveToCategory('{{ video.id }}', this.value)"
+                                        class="bg-gray-700 text-white text-xs px-1 py-0.5 rounded cursor-pointer hover:bg-gray-600">
+                                        {% for c_id, c in all_categories.items() %}
+                                        <option value="{{ c_id }}" {% if c_id == video.category %}selected{% endif %}>{{ c.abbrev }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {% else %}
+                                    <span>{{ category.abbrev }}</span>
+                                    {% endif %}
+                                    <span>{{ video.views }} views</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% else %}
+        <!-- No events - show flat grid -->
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="videosGrid">
+            {% for video in videos %}
+            <div class="video-card bg-gray-800 rounded-lg overflow-hidden hover:bg-gray-700 transition relative" data-id="{{ video.id }}">
+                {% if is_admin %}
+                <div class="absolute top-2 left-2 z-10">
+                    <input type="checkbox" class="video-checkbox w-5 h-5 rounded bg-gray-700 border-gray-500 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        value="{{ video.id }}" onchange="updateSelectedCount()">
+                </div>
+                {% endif %}
+                <a href="/video/{{ video.id }}" class="block">
+                    <div class="aspect-video bg-gray-700 relative">
+                        {% if video.thumbnail %}
+                        <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="w-full h-full object-cover">
+                        {% else %}
+                        <div class="w-full h-full flex items-center justify-center text-gray-500">
+                            <svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        {% endif %}
+                        {% if video.duration %}
+                        <span class="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">{{ video.duration }}</span>
+                        {% endif %}
+                    </div>
+                </a>
+                <div class="p-4">
+                    <a href="/video/{{ video.id }}">
+                        <h3 class="font-semibold text-white line-clamp-2 hover:text-blue-400">{{ video.title }}</h3>
+                    </a>
+                    <div class="flex justify-between items-center mt-2 text-sm text-gray-400">
+                        {% if is_admin %}
+                        <select onchange="moveToCategory('{{ video.id }}', this.value)"
+                            class="bg-gray-700 text-white text-xs px-2 py-1 rounded cursor-pointer hover:bg-gray-600">
+                            {% for c_id, c in all_categories.items() %}
+                            <option value="{{ c_id }}" {% if c_id == video.category %}selected{% endif %}>{{ c.abbrev }}</option>
+                            {% endfor %}
+                        </select>
+                        {% else %}
+                        <span>{{ category.abbrev }}</span>
+                        {% endif %}
+                        <span>{{ video.views }} views</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         {% else %}
         <div class="text-center py-16 text-gray-500">
             <svg class="w-24 h-24 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
@@ -174,6 +388,21 @@
             <p>Video Library - Competition footage for judges and competitors</p>
         </div>
     </footer>
+
+    <script>
+        function toggleEventFolder(folderId) {
+            const content = document.getElementById('folder-content-' + folderId);
+            const chevron = document.getElementById('chevron-' + folderId);
+
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                if (chevron) chevron.style.transform = 'rotate(180deg)';
+            } else {
+                content.classList.add('hidden');
+                if (chevron) chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+    </script>
 
     {% if is_admin %}
     <script>

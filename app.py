@@ -340,9 +340,7 @@ CATEGORIES = {
             {'id': '4way_vfs', 'name': '4-Way VFS'},
             {'id': '2way_fs', 'name': '2-Way FS'},
             {'id': '2way_vfs', 'name': '2-Way VFS'},
-            {'id': '8way', 'name': '8-Way'},
-            {'id': 'freestyle', 'name': 'Freestyle'},
-            {'id': 'freefly', 'name': 'Freefly'}
+            {'id': '8way', 'name': '8-Way'}
         ]
     }
 }
@@ -1738,8 +1736,27 @@ def category(cat_id):
 
     cat = CATEGORIES[cat_id]
     subcategory = request.args.get('sub')
+    current_event = request.args.get('event')
 
     videos = get_videos_by_category(cat_id, subcategory)
+
+    # Group videos by event
+    videos_by_event = {}
+    videos_no_event = []
+    event_list = []
+
+    for video in videos:
+        event_name = video.get('event', '').strip() if video.get('event') else ''
+        if event_name:
+            if event_name not in videos_by_event:
+                videos_by_event[event_name] = []
+                event_list.append(event_name)
+            videos_by_event[event_name].append(video)
+        else:
+            videos_no_event.append(video)
+
+    # Sort events alphabetically
+    event_list.sort()
 
     # Get all events for autocomplete (admin only)
     events = get_all_events() if session.get('role') == 'admin' else []
@@ -1748,6 +1765,10 @@ def category(cat_id):
                          category=cat,
                          cat_id=cat_id,
                          videos=videos,
+                         videos_by_event=videos_by_event,
+                         videos_no_event=videos_no_event,
+                         event_list=event_list,
+                         current_event=current_event,
                          current_sub=subcategory,
                          is_admin=session.get('role') == 'admin',
                          all_categories=CATEGORIES,
