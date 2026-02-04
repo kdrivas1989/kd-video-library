@@ -4922,12 +4922,40 @@
 
         document.getElementById('setDrawInput').addEventListener('input', updateSetDrawPreview);
 
+        function getMaxDrawLength() {
+            // Get max allowed draw length from event type and class
+            const eventType = document.getElementById('eventType')?.value || '4way-fs';
+            const eventClass = document.getElementById('eventClass')?.value || 'open';
+
+            // Map event types to dive pool keys
+            const eventMap = {
+                '4way-fs': '4way-fs', '4way': '4way-fs', '4way-inter': '4way-fs',
+                '8way': '8way', '8way-inter': '8way',
+                '4way-vfs': '4way-vfs', 'vfs': '4way-vfs',
+                '2way-mfs': '2way-mfs',
+                '16way': '16way',
+                '10way': '10way'
+            };
+
+            const poolKey = eventMap[eventType] || '4way-fs';
+
+            if (typeof divePoolRules !== 'undefined' && divePoolRules[poolKey] && divePoolRules[poolKey][eventClass]) {
+                const drawLength = divePoolRules[poolKey][eventClass].drawLength;
+                // Return max from drawLength array (last element is typically max)
+                return Math.max(...drawLength);
+            }
+
+            // Default max
+            return 6;
+        }
+
         function updateSetDrawPreview() {
             const input = document.getElementById('setDrawInput').value.toUpperCase();
             const preview = document.getElementById('setDrawPreview');
+            const maxLength = getMaxDrawLength();
 
             if (!input) {
-                preview.innerHTML = '<div class="text-gray-500 text-sm">Preview will appear here...</div>';
+                preview.innerHTML = `<div class="text-gray-500 text-sm">Preview will appear here... (Max: ${maxLength} formations)</div>`;
                 return;
             }
 
@@ -4939,17 +4967,23 @@
                 return;
             }
 
+            // Check if exceeds max length
+            const exceedsMax = parsed.length > maxLength;
+
             // Show preview
             preview.innerHTML = `
                 <div class="flex flex-wrap gap-2">
                     ${parsed.map((f, i) => `
                         <div class="flex flex-col items-center">
                             <span class="text-xs text-gray-500">${i + 1}</span>
-                            <span class="px-2 py-1 rounded ${f.match(/^\d+$/) ? 'bg-purple-600' : 'bg-blue-600'} text-white font-mono text-sm">${f}</span>
+                            <span class="px-2 py-1 rounded ${i >= maxLength ? 'bg-red-600' : (f.match(/^\d+$/) ? 'bg-purple-600' : 'bg-blue-600')} text-white font-mono text-sm">${f}</span>
                         </div>
                     `).join('')}
                 </div>
-                <div class="text-gray-400 text-xs mt-2">${parsed.length} formations</div>
+                <div class="${exceedsMax ? 'text-red-400' : 'text-gray-400'} text-xs mt-2">
+                    ${parsed.length} formations ${exceedsMax ? `(Max allowed: ${maxLength})` : `(Max: ${maxLength})`}
+                </div>
+                ${exceedsMax ? '<div class="text-red-400 text-sm mt-1 font-medium">⚠️ Too many formations!</div>' : ''}
             `;
         }
 
@@ -4989,9 +5023,15 @@
         async function saveVideoDraw() {
             const input = document.getElementById('setDrawInput').value.toUpperCase();
             const parsed = parseDrawInput(input);
+            const maxLength = getMaxDrawLength();
 
             if (parsed.length === 0) {
                 alert('Please enter a valid draw');
+                return;
+            }
+
+            if (parsed.length > maxLength) {
+                alert(`Draw has too many formations!\n\nYou entered: ${parsed.length} formations\nMaximum allowed: ${maxLength} formations\n\nPlease reduce the number of formations.`);
                 return;
             }
 
