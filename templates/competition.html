@@ -272,13 +272,13 @@
                                     </div>
                                     {% endif %}
                                 </td>
-                                <td class="px-4 py-3">{{ team.team_number }}</td>
                                 {% if is_individual %}
-                                <td class="px-4 py-3 font-medium">
-                                    {{ team.team_name }}
-                                    {% if team.members %}<span class="country-flag text-gray-600 text-sm ml-2" data-country="{{ team.members }}"></span>{% endif %}
+                                <td class="px-4 py-3">
+                                    {% if team.members %}<span class="country-flag" data-country="{{ team.members }}"></span> {% endif %}{{ team.team_number }}
                                 </td>
+                                <td class="px-4 py-3 font-medium">{{ team.team_name }}</td>
                                 {% else %}
+                                <td class="px-4 py-3">{{ team.team_number }}</td>
                                 <td class="px-4 py-3 font-medium">{{ team.team_name }}</td>
                                 {% endif %}
                                 {% if event_type == 'ws_performance' %}
@@ -557,13 +557,13 @@
                                 </div>
                                 {% endif %}
                             </td>
-                            <td class="px-4 py-3">{{ team.team_number }}</td>
                             {% if is_individual %}
-                            <td class="px-4 py-3 font-medium">
-                                {{ team.team_name }}
-                                {% if team.members %}<span class="country-flag text-gray-600 text-sm ml-2" data-country="{{ team.members }}"></span>{% endif %}
+                            <td class="px-4 py-3">
+                                {% if team.members %}<span class="country-flag" data-country="{{ team.members }}"></span> {% endif %}{{ team.team_number }}
                             </td>
+                            <td class="px-4 py-3 font-medium">{{ team.team_name }}</td>
                             {% else %}
+                            <td class="px-4 py-3">{{ team.team_number }}</td>
                             <td class="px-4 py-3 font-medium">{{ team.team_name }}</td>
                             {% endif %}
                             {% if competition.event_type == 'ws_performance' %}
@@ -2696,12 +2696,12 @@
                     resultsEl.innerHTML = allCompetitors.slice(0, 10).map(c => {
                         const safeName = (c.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
                         const safeMembers = (c.members || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                        const flagDisplay = countryWithFlag(c.members);
+                        const flag = countryToFlag(c.members);
                         return `
                         <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0"
                              onclick="selectCompetitor('${safeName}', '${c.team_number || ''}', '${safeMembers}')">
-                            <div class="font-medium text-gray-800">${c.name || 'Unknown'}${flagDisplay ? ' <span class="text-sm">' + flagDisplay + '</span>' : ''}</div>
-                            <div class="text-xs text-gray-500">#${c.team_number || '?'}</div>
+                            <div class="font-medium text-gray-800">${c.name || 'Unknown'}</div>
+                            <div class="text-xs text-gray-500">${flag ? flag + ' ' : ''}#${c.team_number || '?'}${c.members ? ' ' + c.members : ''}</div>
                         </div>`;
                     }).join('');
                     if (allCompetitors.length > 0) {
@@ -2724,12 +2724,12 @@
                 resultsEl.innerHTML = matches.map(c => {
                     const safeName = (c.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
                     const safeMembers = (c.members || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    const flagDisplay = countryWithFlag(c.members);
+                    const flag = countryToFlag(c.members);
                     return `
                     <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0"
                          onclick="selectCompetitor('${safeName}', '${c.team_number || ''}', '${safeMembers}')">
-                        <div class="font-medium text-gray-800">${c.name || 'Unknown'}${flagDisplay ? ' <span class="text-sm">' + flagDisplay + '</span>' : ''}</div>
-                        <div class="text-xs text-gray-500">#${c.team_number || '?'}</div>
+                        <div class="font-medium text-gray-800">${c.name || 'Unknown'}</div>
+                        <div class="text-xs text-gray-500">${flag ? flag + ' ' : ''}#${c.team_number || '?'}${c.members ? ' ' + c.members : ''}</div>
                     </div>`;
                 }).join('');
                 resultsEl.classList.remove('hidden');
