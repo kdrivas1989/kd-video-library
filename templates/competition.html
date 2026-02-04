@@ -4935,26 +4935,17 @@
                     }
                 }
 
-                const headers = lines[headerIdx].split(',').map(h => h.trim().toLowerCase());
+                const headers = lines[headerIdx].split(',').map(h => h.trim());
 
-                // Loose header matching - find columns by various possible names
-                function findHeader(possibleNames) {
-                    for (const name of possibleNames) {
-                        const idx = headers.findIndex(h => h === name || h.includes(name) || name.includes(h));
-                        if (idx !== -1) return idx;
-                    }
-                    return -1;
-                }
-
-                const hMSLIdx = findHeader(['hmsl', 'h_msl', 'altmsl', 'alt_msl', 'altitude', 'alt', 'elev', 'height']);
-                const velNIdx = findHeader(['veln', 'vel_n', 'velocityn', 'velocity_n', 'vnorth', 'v_north']);
-                const velEIdx = findHeader(['vele', 'vel_e', 'velocitye', 'velocity_e', 'veast', 'v_east']);
-                const timeIdx = findHeader(['time', 'timestamp', 't', 'utc', 'gps_time']);
-                const latIdx = findHeader(['lat', 'latitude', 'gpslat', 'gps_lat']);
-                const lonIdx = findHeader(['lon', 'lng', 'long', 'longitude', 'gpslon', 'gps_lon', 'gps_long']);
+                const hMSLIdx = headers.indexOf('hMSL');
+                const velNIdx = headers.indexOf('velN');
+                const velEIdx = headers.indexOf('velE');
+                const timeIdx = headers.indexOf('time');
+                const latIdx = headers.indexOf('lat');
+                const lonIdx = headers.indexOf('lon');
 
                 if (hMSLIdx === -1) {
-                    document.getElementById('wsFlysightStatus').textContent = 'Error: Could not find altitude column. Expected: hMSL, altitude, alt, etc.';
+                    document.getElementById('wsFlysightStatus').textContent = 'Error: hMSL column not found in CSV';
                     return;
                 }
 
