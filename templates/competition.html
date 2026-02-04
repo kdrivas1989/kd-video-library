@@ -3800,12 +3800,28 @@
             const eventType = document.getElementById('drawEventType').value;
             // Update available rounds based on event type
             const defaultRounds = {
+                // Formation Skydiving
                 'fs_4way_fs': 10, 'fs_4way_vfs': 10, 'fs_2way_mfs': 10, 'fs_8way': 10,
                 'fs_16way': 6, 'fs_10way': 6,
-                'cf_4way_rot': 8, 'cf_4way_seq': 8, 'cf_2way_open': 8
+                // Canopy Formation
+                'cf_4way_rot': 8, 'cf_4way_seq': 8, 'cf_2way_open': 8, 'cf_2way_proam': 8, 'cf_2way': 8,
+                // Artistic Events
+                'ae_freestyle': 7, 'ae_freefly': 7,
+                // Wingsuit
+                'ws_acrobatic': 7, 'ws_performance': 9
             };
             const rounds = defaultRounds[eventType] || 10;
-            document.getElementById('drawNumRounds').value = Math.min(parseInt(document.getElementById('drawNumRounds').value) || rounds, rounds);
+
+            // Update the rounds dropdown
+            const roundsSelect = document.getElementById('drawNumRounds');
+            roundsSelect.innerHTML = '';
+            for (let i = 1; i <= rounds; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i + (i === 1 ? ' Round' : ' Rounds');
+                if (i === rounds) option.selected = true;
+                roundsSelect.appendChild(option);
+            }
         }
 
         function generateCompetitionDraw() {
