@@ -2338,7 +2338,7 @@
             document.getElementById('freezeOverlay').classList.add('hidden');
             document.getElementById('bustReasonsModal').classList.remove('hidden');
 
-            // Generate bust reason form
+            // Generate bust reason form with clickable buttons instead of dropdowns
             const content = document.getElementById('bustReasonsContent');
             let html = '<div class="space-y-4">';
 
@@ -2350,17 +2350,21 @@
                     const currentReason = bustReasons[idx] || '';
 
                     html += `
-                        <div class="bg-gray-800 rounded p-3 relative">
-                            <div class="flex items-center justify-between mb-2">
+                        <div class="bg-gray-800 rounded p-3">
+                            <div class="flex items-center justify-between mb-3">
                                 <span class="text-white font-medium">Position ${position}</span>
                                 <span class="text-gray-400 text-sm">${time}s</span>
                             </div>
-                            <select id="bustReason_${idx}" class="w-full px-3 py-2 rounded bg-gray-700 text-white cursor-pointer" style="appearance: menulist;">
-                                <option value="">-- Select Reason --</option>
+                            <div class="grid grid-cols-2 gap-2" id="bustReasonBtns_${idx}">
                                 ${BUST_REASON_OPTIONS.map(opt =>
-                                    `<option value="${opt.value}" ${currentReason === opt.value ? 'selected' : ''}>${opt.label}</option>`
+                                    `<button type="button" onclick="selectBustReason(${idx}, '${opt.value}')"
+                                        class="bust-reason-btn px-3 py-2 rounded text-sm text-left ${currentReason === opt.value ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}"
+                                        data-idx="${idx}" data-value="${opt.value}">
+                                        ${opt.label}
+                                    </button>`
                                 ).join('')}
-                            </select>
+                            </div>
+                            <input type="hidden" id="bustReason_${idx}" value="${currentReason}">
                         </div>
                     `;
                 }
@@ -2368,12 +2372,23 @@
 
             html += '</div>';
             content.innerHTML = html;
+        }
 
-            // Focus the first select element
-            setTimeout(() => {
-                const firstSelect = content.querySelector('select');
-                if (firstSelect) firstSelect.focus();
-            }, 100);
+        function selectBustReason(idx, value) {
+            // Update hidden input
+            document.getElementById('bustReason_' + idx).value = value;
+
+            // Update button styles
+            const btnContainer = document.getElementById('bustReasonBtns_' + idx);
+            btnContainer.querySelectorAll('button').forEach(btn => {
+                if (btn.dataset.value === value) {
+                    btn.classList.remove('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+                    btn.classList.add('bg-red-600', 'text-white');
+                } else {
+                    btn.classList.remove('bg-red-600', 'text-white');
+                    btn.classList.add('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+                }
+            });
         }
 
         function saveBustReasonsAndClose() {
