@@ -4851,7 +4851,8 @@
                         inWindow = true;
                     }
 
-                    if (inWindow && alt >= 2000) {
+                    // Only include points within the competition window (3000m to 2000m)
+                    if (inWindow && alt >= 2000 && alt <= 3000) {
                         windowPoints.push({
                             time: timeIdx >= 0 ? cols[timeIdx] : '',
                             lat: latIdx >= 0 ? parseFloat(cols[latIdx]) : 0,
@@ -4862,6 +4863,7 @@
                         });
                     }
 
+                    // Stop when below validation window (2000m)
                     if (inWindow && alt < 2000) {
                         break;
                     }
@@ -4909,8 +4911,8 @@
                     validationAlt: validationPoint.alt
                 };
 
-                // Store track points for map visualization
-                wsFlysightTrackPoints = windowPoints.filter(p => p.lat && p.lon);
+                // Store track points for map visualization (only points within validation window)
+                wsFlysightTrackPoints = windowPoints.filter(p => p.lat && p.lon && p.alt >= 2000 && p.alt <= 3000);
 
                 // Update display
                 document.getElementById('wsFlysightTime').textContent = wsFlysightParsedData.time;
