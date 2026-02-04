@@ -2548,14 +2548,32 @@
             // Clear previous timeout
             if (competitorSearchTimeout) clearTimeout(competitorSearchTimeout);
 
-            // Debounce search
+            // Debounce search - start immediately on first character
             competitorSearchTimeout = setTimeout(() => {
-                if (!query || query.length < 1) {
+                if (!query) {
                     resultsEl.classList.add('hidden');
                     return;
                 }
 
-                const searchLower = query.toLowerCase();
+                const searchLower = query.toLowerCase().trim();
+                if (searchLower.length === 0) {
+                    // Show all competitors if field is focused but empty
+                    resultsEl.innerHTML = allCompetitors.slice(0, 10).map(c => {
+                        const safeName = (c.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                        const safeMembers = (c.members || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                        return `
+                        <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0"
+                             onclick="selectCompetitor('${safeName}', '${c.team_number || ''}', '${safeMembers}')">
+                            <div class="font-medium text-gray-800">${c.name || 'Unknown'}</div>
+                            <div class="text-xs text-gray-500">#${c.team_number || '?'}${c.members ? ' - ' + c.members : ''}</div>
+                        </div>`;
+                    }).join('');
+                    if (allCompetitors.length > 0) {
+                        resultsEl.classList.remove('hidden');
+                    }
+                    return;
+                }
+
                 const matches = allCompetitors.filter(c =>
                     (c.name && c.name.toLowerCase().includes(searchLower)) ||
                     (c.team_number && c.team_number.toString().includes(searchLower))
@@ -2567,13 +2585,16 @@
                     return;
                 }
 
-                resultsEl.innerHTML = matches.map(c => `
+                resultsEl.innerHTML = matches.map(c => {
+                    const safeName = (c.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const safeMembers = (c.members || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    return `
                     <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0"
-                         onclick="selectCompetitor('${c.name || ''}', '${c.team_number || ''}', '${(c.members || '').replace(/'/g, "\\'")}')">
+                         onclick="selectCompetitor('${safeName}', '${c.team_number || ''}', '${safeMembers}')">
                         <div class="font-medium text-gray-800">${c.name || 'Unknown'}</div>
                         <div class="text-xs text-gray-500">#${c.team_number || '?'}${c.members ? ' - ' + c.members : ''}</div>
-                    </div>
-                `).join('');
+                    </div>`;
+                }).join('');
                 resultsEl.classList.remove('hidden');
             }, 150);
         }
@@ -4915,15 +4936,25 @@
                 }
 
                 const headers = lines[headerIdx].split(',').map(h => h.trim().toLowerCase());
-                const hMSLIdx = headers.indexOf('hmsl');
-                const velNIdx = headers.indexOf('veln');
-                const velEIdx = headers.indexOf('vele');
-                const timeIdx = headers.indexOf('time');
-                const latIdx = headers.indexOf('lat');
-                const lonIdx = headers.indexOf('lon');
+
+                // Loose header matching - find columns by various possible names
+                function findHeader(possibleNames) {
+                    for (const name of possibleNames) {
+                        const idx = headers.findIndex(h => h === name || h.includes(name) || name.includes(h));
+                        if (idx !== -1) return idx;
+                    }
+                    return -1;
+                }
+
+                const hMSLIdx = findHeader(['hmsl', 'h_msl', 'altmsl', 'alt_msl', 'altitude', 'alt', 'elev', 'height']);
+                const velNIdx = findHeader(['veln', 'vel_n', 'velocityn', 'velocity_n', 'vnorth', 'v_north']);
+                const velEIdx = findHeader(['vele', 'vel_e', 'velocitye', 'velocity_e', 'veast', 'v_east']);
+                const timeIdx = findHeader(['time', 'timestamp', 't', 'utc', 'gps_time']);
+                const latIdx = findHeader(['lat', 'latitude', 'gpslat', 'gps_lat']);
+                const lonIdx = findHeader(['lon', 'lng', 'long', 'longitude', 'gpslon', 'gps_lon', 'gps_long']);
 
                 if (hMSLIdx === -1) {
-                    document.getElementById('wsFlysightStatus').textContent = 'Error: Could not find altitude data (hMSL column)';
+                    document.getElementById('wsFlysightStatus').textContent = 'Error: Could not find altitude column. Expected: hMSL, altitude, alt, etc.';
                     return;
                 }
 
