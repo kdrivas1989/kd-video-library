@@ -752,8 +752,8 @@
             let backgroundJobs = 0;
             const results = [];
 
-            // Batch size for concurrent uploads
-            const BATCH_SIZE = 10;
+            // Batch size for concurrent uploads (higher = faster but more server load)
+            const BATCH_SIZE = 20;
             const totalBatches = Math.ceil(files.length / BATCH_SIZE);
 
             for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
@@ -814,11 +814,6 @@
 
                 // Wait for all uploads in this batch to complete
                 await Promise.all(batchPromises);
-
-                // Small delay between batches to avoid overwhelming the server
-                if (batchNum < totalBatches - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                }
             }
 
             progressDiv.classList.add('hidden');
