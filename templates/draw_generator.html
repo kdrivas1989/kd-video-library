@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Draw Generator</title>
+    <title>Draw Generator - Video Library</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
@@ -18,10 +18,25 @@
 
     <div class="container mx-auto px-4 py-8">
         <h1 class="text-3xl font-bold mb-6 print:hidden">Draw Generator</h1>
-        <p class="text-gray-400 mb-8">Generate competition draws based on USPA rules (SCM Chapter 9)</p>
+        <p class="text-gray-400 mb-8">Generate competition draws based on USPA or SVNH rules</p>
 
         <!-- Generator Controls -->
         <div class="bg-gray-800 rounded-lg p-6 mb-8">
+            <!-- Rule Set Selection -->
+            <div class="mb-6 pb-4 border-b border-gray-700">
+                <label class="block text-gray-400 text-sm mb-2">Rule Set</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="ruleSet" value="uspa" checked onchange="updateRuleSet()" class="w-4 h-4 text-blue-600">
+                        <span class="font-medium">USPA (SCM Chapter 9)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="ruleSet" value="svnh" onchange="updateRuleSet()" class="w-4 h-4 text-blue-600">
+                        <span class="font-medium">SkyVenture NH</span>
+                    </label>
+                </div>
+            </div>
+
             <!-- Competition Info -->
             <div class="grid md:grid-cols-3 gap-4 mb-4">
                 <div>
@@ -43,29 +58,20 @@
                 <div>
                     <label class="block text-gray-400 text-sm mb-2">Event</label>
                     <select id="eventType" onchange="updateClassOptions()" class="w-full px-3 py-2 rounded bg-gray-700 text-white">
-                        <optgroup label="Formation Skydiving">
-                            <option value="4way-fs" selected>4-Way FS</option>
-                            <option value="8way">8-Way FS</option>
-                            <option value="4way-vfs">4-Way VFS</option>
-                            <option value="2way-mfs">2-Way MFS</option>
-                            <option value="16way">16-Way FS</option>
-                            <option value="10way">10-Way Speed</option>
-                        </optgroup>
+                        <!-- Options populated by updateRuleSet() -->
                     </select>
                 </div>
-                <div>
+                <div id="classSelectDiv">
                     <label class="block text-gray-400 text-sm mb-2">Class</label>
                     <select id="eventClass" class="w-full px-3 py-2 rounded bg-gray-700 text-white">
                         <option value="open">Open</option>
-                        <option value="advanced">Advanced</option>
-                        <option value="intermediate">Intermediate</option>
-                        <option value="beginner">Beginner</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-gray-400 text-sm mb-2">Number of Rounds</label>
-                    <div id="numRoundsDisplay" class="w-full px-3 py-2 rounded bg-gray-600 text-white font-medium">10 Rounds</div>
-                    <input type="hidden" id="numRounds" value="10">
+                    <select id="numRounds" class="w-full px-3 py-2 rounded bg-gray-700 text-white">
+                        <!-- Options populated dynamically -->
+                    </select>
                 </div>
                 <div class="flex items-end">
                     <button onclick="generateDraw()" class="w-full px-6 py-2 bg-green-600 hover:bg-green-700 rounded font-bold">
@@ -76,7 +82,7 @@
 
             <!-- Event Info -->
             <div id="eventInfo" class="text-sm text-gray-400 p-3 bg-gray-700 rounded">
-                <strong>4-Way FS Open:</strong> 5-6 formations per round | All blocks (1-22) | All randoms (A-Q) | Working time: 35s
+                Select an event to see rules
             </div>
         </div>
 
@@ -85,10 +91,16 @@
             <div class="flex justify-between items-center mb-4 print:hidden">
                 <h2 class="text-2xl font-bold">Draw Sheet</h2>
                 <div class="flex gap-2">
+                    <button id="editModeBtn" onclick="toggleEditMode()" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded">
+                        Edit Draw
+                    </button>
                     <button onclick="copyDraw()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Copy All</button>
-                    <button onclick="printCompact()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded">Print Compact (1 page)</button>
+                    <button onclick="printCompact()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded">Print Compact</button>
                     <button onclick="printFull()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded">Print Full</button>
                 </div>
+            </div>
+            <div id="editModeNotice" class="hidden mb-4 p-3 bg-yellow-600/20 border border-yellow-600 rounded text-yellow-400 print:hidden">
+                <strong>Edit Mode Active:</strong> Click on any formation to change it, or click the + button to add formations to a round.
             </div>
 
             <div id="drawContent" class="space-y-4">
@@ -99,17 +111,66 @@
         <!-- Dive Pool Reference -->
         <div class="mt-12">
             <h2 class="text-2xl font-bold mb-4">Dive Pool Reference</h2>
-            <div class="grid md:grid-cols-2 gap-6">
-                <div class="bg-gray-800 rounded-lg p-4">
-                    <h3 class="font-bold text-blue-400 mb-3">Random Formations (1 point each)</h3>
-                    <div class="flex flex-wrap gap-2" id="randomsReference">
-                        <!-- Generated by JS -->
+
+            <!-- 4-Way FS Pool (USPA) -->
+            <div id="fsPool" class="mb-8">
+                <h3 class="text-xl font-bold text-blue-400 mb-3">Formation Skydiving Dive Pool</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <h4 class="font-bold text-blue-400 mb-3">Random Formations (1 pt each)</h4>
+                        <div class="flex flex-wrap gap-2" id="randomsReference">
+                            <!-- Generated by JS -->
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <h4 class="font-bold text-purple-400 mb-3">Block Sequences (2 pts each)</h4>
+                        <div class="flex flex-wrap gap-2" id="blocksReference">
+                            <!-- Generated by JS -->
+                        </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- 2-Way VFS Pool (SVNH) -->
+            <div id="vfsPool" class="hidden">
+                <h3 class="text-xl font-bold text-green-400 mb-3">2-Way VFS Dive Pool</h3>
+
+                <!-- Back/Belly Pool -->
+                <div class="bg-gray-800 rounded-lg p-4 mb-4">
+                    <h4 class="font-bold text-green-400 mb-3">Back/Belly Pool</h4>
+                    <div class="mb-4">
+                        <h5 class="text-sm text-gray-400 mb-2">Randoms (1 pt each):</h5>
+                        <div id="bbRandomsPool" class="flex flex-wrap gap-2"></div>
+                    </div>
+                    <div>
+                        <h5 class="text-sm text-gray-400 mb-2">Blocks (2 pts each):</h5>
+                        <div id="bbBlocksPool" class="flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+
+                <!-- Head-Up Pool -->
+                <div class="bg-gray-800 rounded-lg p-4 mb-4">
+                    <h4 class="font-bold text-cyan-400 mb-3">Head-Up Pool</h4>
+                    <div class="mb-4">
+                        <h5 class="text-sm text-gray-400 mb-2">Randoms (1 pt each):</h5>
+                        <div id="huRandomsPool" class="flex flex-wrap gap-2"></div>
+                    </div>
+                    <div>
+                        <h5 class="text-sm text-gray-400 mb-2">Blocks (2 pts each):</h5>
+                        <div id="huBlocksPool" class="flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+
+                <!-- Head-Down Pool -->
                 <div class="bg-gray-800 rounded-lg p-4">
-                    <h3 class="font-bold text-purple-400 mb-3">Block Sequences (2 points each)</h3>
-                    <div class="flex flex-wrap gap-2" id="blocksReference">
-                        <!-- Generated by JS -->
+                    <h4 class="font-bold text-purple-400 mb-3">Head-Down Pool</h4>
+                    <div class="mb-4">
+                        <h5 class="text-sm text-gray-400 mb-2">Randoms (1 pt each):</h5>
+                        <div id="hdRandomsPool" class="flex flex-wrap gap-2"></div>
+                    </div>
+                    <div>
+                        <h5 class="text-sm text-gray-400 mb-2">Blocks (2 pts each):</h5>
+                        <div id="hdBlocksPool" class="flex flex-wrap gap-2"></div>
                     </div>
                 </div>
             </div>
@@ -117,9 +178,30 @@
     </div>
 
     <script>
-        // USPA Dive Pool Rules per Event/Class (from SCM Chapter 9)
-        // drawPoints = target points per round (randoms=1pt, blocks=2pts)
-        const divePoolRules = {
+        // ==========================================
+        // USPA DIVE POOL RULES (SCM Chapter 9)
+        // ==========================================
+
+        const allRandoms = ['A','B','C','D','E','F','G','H','J','K','L','M','N','O','P','Q'];
+        const allBlocks = Array.from({length: 22}, (_, i) => i + 1);
+
+        const fs4wayRandoms = {
+            'A': 'Unipod', 'B': 'Stairstep', 'C': 'Murphy', 'D': 'Yuan',
+            'E': 'Meeker', 'F': 'Open Accord', 'G': 'Cataccord', 'H': 'Bow',
+            'J': 'Donut', 'K': 'Hook', 'L': 'Adder', 'M': 'Star',
+            'N': 'Crank', 'O': 'Satellite', 'P': 'Sidebody', 'Q': 'Phalanx'
+        };
+
+        const fs4wayBlocks = {
+            1: 'Bipole-Opal', 2: 'Sidebody-Opal', 3: 'Caterpillar-Opal', 4: 'Monopod',
+            5: 'Sidebuddies', 6: 'Stardian', 7: 'Zig-Zag', 8: 'Marquis',
+            9: 'Lepton', 10: 'Dancer', 11: 'Bunyip', 12: 'Photon',
+            13: 'Ritz', 14: 'Piver', 15: 'Compressed', 16: 'Packer',
+            17: 'Meson', 18: 'Tango', 19: 'Icepick', 20: 'Zircon',
+            21: 'Firefly', 22: 'Turbo'
+        };
+
+        const uspaRules = {
             '4way-fs': {
                 open: { blocks: 'all', randoms: 'all', drawPoints: [5, 6], workingTime: 35, name: '4-Way FS Open' },
                 advanced: { blocks: 'all', randoms: 'all', drawPoints: [5, 6], workingTime: 35, name: '4-Way FS Advanced' },
@@ -145,26 +227,373 @@
                 open: { blocks: 'all', randoms: 'all', drawPoints: [3, 4], workingTime: 50, name: '16-Way FS' }
             },
             '10way': {
-                open: { blocks: [], randoms: [1,2,3,4,5,6,7,9,10,11,12], drawPoints: [1], workingTime: 35, name: '10-Way Speed', isSpeed: true, excludeRound6: 8 }
+                open: { blocks: [], randoms: [1,2,3,4,5,6,7,9,10,11,12], drawPoints: [1], workingTime: 35, name: '10-Way Speed', isSpeed: true }
             }
         };
 
-        // All randoms and blocks
-        const allRandoms = ['A','B','C','D','E','F','G','H','J','K','L','M','N','O','P','Q'];
-        const allBlocks = Array.from({length: 22}, (_, i) => i + 1);
+        const uspaDefaultRounds = {
+            '4way-fs': 10, '4way-vfs': 10, '2way-mfs': 10, '8way': 10, '16way': 6, '10way': 6
+        };
 
-        // Get available formations for current event/class
-        function getAvailablePool() {
+        // ==========================================
+        // SVNH DIVE POOL RULES
+        // ==========================================
+
+        const vfs2wayBBRandoms = {
+            'BB-A': { name: 'Belly Star', color: '#22c55e', classes: [1,2,3,4] },
+            'BB-B': { name: 'Back Star', color: '#22c55e', classes: [1,2,3,4] },
+            'BB-C': { name: 'Belly Closed Accordion', color: '#22c55e', classes: [1,2,3,4] },
+            'BB-D': { name: 'Mixed Closed Accordion', color: '#22c55e', classes: [1,2,3,4] },
+            'BB-E': { name: 'Back Open Accordion', color: '#22c55e', classes: [1,2,3,4] },
+            'BB-F': { name: 'Mixed Open Accordion', color: '#22c55e', classes: [1,2,3,4] },
+            'BB-G': { name: 'Back Side Body', color: '#22c55e', classes: [1,2,3,4] },
+            'BB-H': { name: 'Mixed Side Body', color: '#22c55e', classes: [1,2,3,4] },
+            'BB-J': { name: 'Back Cat', color: '#22c55e', classes: [1,2,3,4] },
+            'BB-K': { name: 'Mixed Cat', color: '#22c55e', classes: [1,2,3,4] },
+            'BB-L': { name: 'Back Stair Step', color: '#22c55e', classes: [1,2,3,4] }
+        };
+
+        const vfs2wayBBBlocks = {
+            'BB-01': { name: 'Back Grip Turn', color: '#16a34a', classes: [1,2,3,4] },
+            'BB-02': { name: 'Back Grip Over/Under', color: '#16a34a', classes: [1,2,3,4] }
+        };
+
+        const vfs2wayHURandoms = {
+            'HU-A': { name: 'Single Grip', color: '#06b6d4', classes: [1,2,3] },
+            'HU-B': { name: 'In-Facing Double Grip', color: '#06b6d4', classes: [1,2,3] },
+            'HU-C': { name: 'Out-Facing Double', color: '#06b6d4', classes: [1,2,3] },
+            'HU-D': { name: 'Hand to Foot', color: '#06b6d4', classes: [1,2,3] },
+            'HU-E': { name: 'Hands to Feet', color: '#06b6d4', classes: [1,2,3] },
+            'HU-F': { name: 'Feet to Knees', color: '#06b6d4', classes: [1,2,3] },
+            'HU-G': { name: 'Totem', color: '#06b6d4', classes: [1,2,3] },
+            'HU-H': { name: 'Foot to Foot', color: '#06b6d4', classes: [1,2,3] },
+            'HU-J': { name: 'Double Spock', color: '#06b6d4', classes: [1,2,3] }
+        };
+
+        const vfs2wayHUBlocks = {
+            'HU-01': { name: 'Grip Turn', color: '#0891b2', classes: [1,2,3] },
+            'HU-02': { name: 'Grip Carve', color: '#0891b2', classes: [1,2,3] },
+            'HU-03': { name: 'Grip Flip', color: '#0891b2', classes: [1,2] },
+            'HU-04': { name: 'Grip Over/Under', color: '#0891b2', classes: [1,2,3] }
+        };
+
+        const vfs2wayHDRandoms = {
+            'HD-A': { name: 'Joker', color: '#a855f7', classes: [1,2] },
+            'HD-B': { name: 'In-Facing Double Grip', color: '#a855f7', classes: [1,2] },
+            'HD-C': { name: 'Vice Versa', color: '#a855f7', classes: [1,2] },
+            'HD-E': { name: 'Mind Warp', color: '#a855f7', classes: [1,2] },
+            'HD-F': { name: 'Double Spock', color: '#a855f7', classes: [1] },
+            'HD-G': { name: 'Sole to Sole', color: '#a855f7', classes: [1,2] },
+            'HD-H': { name: 'Stair Step', color: '#a855f7', classes: [1,2] },
+            'HD-J': { name: 'Vertical Closed Accordion', color: '#a855f7', classes: [1,2] },
+            'HD-K': { name: 'Sixty Nine', color: '#a855f7', classes: [1] }
+        };
+
+        const vfs2wayHDBlocks = {
+            'HD-01': { name: 'Sixty Nine Transition', color: '#7c3aed', classes: [1] },
+            'HD-02': { name: 'Grip Turn', color: '#7c3aed', classes: [1] },
+            'HD-03': { name: 'Grip Carve', color: '#7c3aed', classes: [1] },
+            'HD-04': { name: 'Grip Flip', color: '#7c3aed', classes: [1,2] },
+            'HD-05': { name: 'Grip Half-Eagle', color: '#7c3aed', classes: [1] }
+        };
+
+        const allVFSFormations = {
+            ...vfs2wayBBRandoms, ...vfs2wayHURandoms, ...vfs2wayHDRandoms,
+            ...vfs2wayBBBlocks, ...vfs2wayHUBlocks, ...vfs2wayHDBlocks
+        };
+
+        const svnhRules = {
+            '4way-rookie': {
+                name: '4-Way Rookie',
+                rounds: 10,
+                pointsPerRound: [3, 3],
+                randoms: Object.keys(fs4wayRandoms).filter(r => r !== 'G'),
+                blocks: [],
+                starStart: true,
+                rotateStarToEnd: true
+            },
+            '4way-intermediate': {
+                name: '4-Way Intermediate',
+                rounds: 10,
+                pointsPerRound: [3, 4],
+                randoms: Object.keys(fs4wayRandoms),
+                blocks: [7, 9, 14],
+                starStart: true,
+                rotateStarToEnd: true
+            },
+            '4way-advanced': {
+                name: '4-Way Advanced',
+                rounds: 10,
+                pointsPerRound: [4, 5],
+                randoms: Object.keys(fs4wayRandoms),
+                blocks: [1, 6, 7, 9, 14, 15, 21],
+                starStart: true,
+                rotateStarToEnd: true
+            },
+            '4way-open': {
+                name: '4-Way Open',
+                rounds: 10,
+                pointsPerRound: [5, 6],
+                randoms: Object.keys(fs4wayRandoms),
+                blocks: Object.keys(fs4wayBlocks).map(Number).filter(b => ![2, 4, 8, 12, 19].includes(b)),
+                starStart: false
+            },
+            '2way-vfs-rookie': {
+                name: '2-Way VFS Rookie',
+                rounds: 10,
+                pointsPerRound: [3, 4],
+                isVFS: true,
+                usisClass: 4,
+                poolType: 'backbelly-all'
+            },
+            '2way-vfs-intermediate': {
+                name: '2-Way VFS Intermediate',
+                rounds: 10,
+                pointsPerRound: [3, 4],
+                isVFS: true,
+                usisClass: 3,
+                poolType: 'mixed-headup'
+            },
+            '2way-vfs-advanced': {
+                name: '2-Way VFS Advanced',
+                rounds: 10,
+                pointsPerRound: [4, 5],
+                isVFS: true,
+                usisClass: 2,
+                poolType: 'mixed-advanced'
+            },
+            '2way-vfs-open': {
+                name: '2-Way VFS Open',
+                rounds: 10,
+                pointsPerRound: [5, 6],
+                isVFS: true,
+                usisClass: 1,
+                poolType: 'mixed-open'
+            }
+        };
+
+        // ==========================================
+        // STATE
+        // ==========================================
+
+        let currentDraw = null;
+        let currentRules = null;
+        let editMode = false;
+
+        // ==========================================
+        // UI FUNCTIONS
+        // ==========================================
+
+        function getRuleSet() {
+            return document.querySelector('input[name="ruleSet"]:checked').value;
+        }
+
+        function updateRuleSet() {
+            const ruleSet = getRuleSet();
+            const eventSelect = document.getElementById('eventType');
+            const classSelectDiv = document.getElementById('classSelectDiv');
+
+            // Update event options based on rule set
+            if (ruleSet === 'uspa') {
+                eventSelect.innerHTML = `
+                    <optgroup label="Formation Skydiving">
+                        <option value="4way-fs" selected>4-Way FS</option>
+                        <option value="8way">8-Way FS</option>
+                        <option value="4way-vfs">4-Way VFS</option>
+                        <option value="2way-mfs">2-Way MFS</option>
+                        <option value="16way">16-Way FS</option>
+                        <option value="10way">10-Way Speed</option>
+                    </optgroup>
+                `;
+                classSelectDiv.classList.remove('hidden');
+                document.getElementById('fsPool').classList.remove('hidden');
+                document.getElementById('vfsPool').classList.add('hidden');
+            } else {
+                eventSelect.innerHTML = `
+                    <optgroup label="4-Way FS">
+                        <option value="4way-rookie">4-Way Rookie</option>
+                        <option value="4way-intermediate">4-Way Intermediate</option>
+                        <option value="4way-advanced">4-Way Advanced</option>
+                        <option value="4way-open">4-Way Open</option>
+                    </optgroup>
+                    <optgroup label="2-Way VFS">
+                        <option value="2way-vfs-rookie">2-Way VFS Rookie</option>
+                        <option value="2way-vfs-intermediate">2-Way VFS Intermediate</option>
+                        <option value="2way-vfs-advanced">2-Way VFS Advanced</option>
+                        <option value="2way-vfs-open">2-Way VFS Open</option>
+                    </optgroup>
+                `;
+                classSelectDiv.classList.add('hidden');
+            }
+
+            updateClassOptions();
+            updatePoolReference();
+        }
+
+        function updateClassOptions() {
+            const ruleSet = getRuleSet();
             const eventType = document.getElementById('eventType').value;
-            const eventClass = document.getElementById('eventClass').value;
 
-            const rules = divePoolRules[eventType];
+            if (ruleSet === 'uspa') {
+                updateUSPAClassOptions(eventType);
+            } else {
+                updateSVNHOptions(eventType);
+            }
+        }
+
+        function updateUSPAClassOptions(eventType) {
+            const classSelect = document.getElementById('eventClass');
+            const rules = uspaRules[eventType];
+
+            classSelect.innerHTML = '';
+            const classes = ['open', 'advanced', 'intermediate', 'beginner'];
+            classes.forEach(cls => {
+                if (rules && rules[cls]) {
+                    const option = document.createElement('option');
+                    option.value = cls;
+                    option.textContent = cls.charAt(0).toUpperCase() + cls.slice(1);
+                    classSelect.appendChild(option);
+                }
+            });
+
+            // Update rounds
+            const rounds = uspaDefaultRounds[eventType] || 10;
+            updateRoundsDropdown(rounds);
+
+            updateEventInfo();
+            updatePoolReference();
+        }
+
+        function updateSVNHOptions(eventType) {
+            const rules = svnhRules[eventType];
+            if (!rules) return;
+
+            // Update rounds
+            updateRoundsDropdown(rules.rounds);
+
+            // Show/hide appropriate pool reference
+            const isVFS = eventType.startsWith('2way-vfs');
+            document.getElementById('fsPool').classList.toggle('hidden', isVFS);
+            document.getElementById('vfsPool').classList.toggle('hidden', !isVFS);
+
+            updateEventInfo();
+            if (isVFS) {
+                updateVFSPoolReference();
+            } else {
+                updatePoolReference();
+            }
+        }
+
+        function updateRoundsDropdown(maxRounds) {
+            const numRoundsEl = document.getElementById('numRounds');
+            let html = '';
+            for (let r = 1; r <= maxRounds; r++) {
+                const label = r === 1 ? '1 Round' : `${r} Rounds${r === maxRounds ? ' (Full)' : ''}`;
+                const selected = r === maxRounds ? ' selected' : '';
+                html += `<option value="${r}"${selected}>${label}</option>`;
+            }
+            numRoundsEl.innerHTML = html;
+        }
+
+        function updateEventInfo() {
+            const ruleSet = getRuleSet();
+            const eventType = document.getElementById('eventType').value;
+            const infoEl = document.getElementById('eventInfo');
+
+            if (ruleSet === 'uspa') {
+                const eventClass = document.getElementById('eventClass').value;
+                const rules = uspaRules[eventType];
+                const classRules = rules ? (rules[eventClass] || rules.open) : null;
+
+                if (classRules) {
+                    const drawPts = classRules.drawPoints;
+                    infoEl.innerHTML = `<strong>${classRules.name}:</strong> ${drawPts[0]}${drawPts.length > 1 ? '-' + drawPts[1] : ''} points per round | Working time: ${classRules.workingTime}s`;
+                }
+            } else {
+                const rules = svnhRules[eventType];
+                if (rules) {
+                    let info = `<div class="font-bold text-yellow-400 mb-2">${rules.name}:</div><ul class="list-disc list-inside text-gray-300 space-y-1">`;
+                    info += `<li>${rules.rounds} rounds, ${rules.pointsPerRound[0]}${rules.pointsPerRound[1] !== rules.pointsPerRound[0] ? '-' + rules.pointsPerRound[1] : ''} points per round</li>`;
+
+                    if (rules.isVFS) {
+                        switch(rules.poolType) {
+                            case 'backbelly-all':
+                                info += `<li>All rounds: Back/Belly pool only</li>`;
+                                break;
+                            case 'mixed-headup':
+                                info += `<li>Rounds 1-2 & 9-10: Back/Belly | Rounds 3-8: Head-Up</li>`;
+                                break;
+                            case 'mixed-advanced':
+                                info += `<li>Rounds 1-2 & 9-10: Back/Belly | Rounds 3-8: Head-Up + Head-Down</li>`;
+                                break;
+                            case 'mixed-open':
+                                info += `<li>Rounds 1-2 & 9-10: Back/Belly | Rounds 3-8: All vertical</li>`;
+                                break;
+                        }
+                    } else {
+                        if (rules.blocks.length === 0) {
+                            info += `<li>Randoms only (no blocks)${eventType === '4way-rookie' ? ', excludes G' : ''}</li>`;
+                        } else {
+                            info += `<li>All randoms + blocks: ${rules.blocks.join(', ')}</li>`;
+                        }
+                        if (rules.starStart) {
+                            info += `<li>Start with Star (M) - not scored</li>`;
+                        }
+                    }
+                    info += `</ul>`;
+                    infoEl.innerHTML = info;
+                }
+            }
+        }
+
+        function updatePoolReference() {
+            const randomsEl = document.getElementById('randomsReference');
+            const blocksEl = document.getElementById('blocksReference');
+
+            if (randomsEl) {
+                randomsEl.innerHTML = Object.entries(fs4wayRandoms).map(([code, name]) =>
+                    `<span class="px-2 py-1 bg-blue-600 rounded text-sm font-mono cursor-pointer hover:bg-blue-500" onclick="openModal('/static/formations/FS-${code}.png', '${code} - ${name}')">${code}</span>`
+                ).join('');
+            }
+
+            if (blocksEl) {
+                blocksEl.innerHTML = Object.entries(fs4wayBlocks).map(([num, name]) =>
+                    `<span class="px-2 py-1 bg-purple-600 rounded text-sm font-mono cursor-pointer hover:bg-purple-500" onclick="openModal('/static/formations/FS-${num}.png', '${num} - ${name}')">${num}</span>`
+                ).join('');
+            }
+        }
+
+        function updateVFSPoolReference() {
+            const pools = [
+                { el: 'bbRandomsPool', data: vfs2wayBBRandoms },
+                { el: 'bbBlocksPool', data: vfs2wayBBBlocks },
+                { el: 'huRandomsPool', data: vfs2wayHURandoms },
+                { el: 'huBlocksPool', data: vfs2wayHUBlocks },
+                { el: 'hdRandomsPool', data: vfs2wayHDRandoms },
+                { el: 'hdBlocksPool', data: vfs2wayHDBlocks }
+            ];
+
+            pools.forEach(({ el, data }) => {
+                const element = document.getElementById(el);
+                if (element) {
+                    element.innerHTML = Object.entries(data).map(([code, info]) =>
+                        `<span class="px-2 py-1 rounded text-sm font-mono cursor-pointer hover:opacity-80" style="background-color: ${info.color}" onclick="openModal('/static/formations/${code}.png', '${code} - ${info.name}')">${code}</span>`
+                    ).join('');
+                }
+            });
+        }
+
+        // ==========================================
+        // DRAW GENERATION
+        // ==========================================
+
+        function getUSPAPool(eventType, eventClass) {
+            const rules = uspaRules[eventType];
             const classRules = rules[eventClass] || rules.open;
 
             let randoms = [];
             let blocks = [];
 
-            // Get randoms
             if (classRules.randoms === 'all') {
                 randoms = [...allRandoms];
             } else if (classRules.randoms === 'allExcept') {
@@ -173,7 +602,6 @@
                 randoms = [...classRules.randoms];
             }
 
-            // Get blocks
             if (classRules.blocks === 'all') {
                 blocks = [...allBlocks];
             } else if (classRules.blocks === 'allExcept') {
@@ -185,88 +613,10 @@
             return { randoms, blocks, classRules };
         }
 
-        // Default rounds per event type based on USPA competition rules
-        const defaultRoundsPerEvent = {
-            // Formation Skydiving
-            '4way-fs': 10,
-            '4way-vfs': 10,
-            '2way-mfs': 10,
-            '8way': 10,
-            '16way': 6,
-            '10way': 6,
-            // Canopy Formation
-            'cf_4way_rot': 8,
-            'cf_4way_seq': 8,
-            'cf_2way_open': 8,
-            'cf_2way_proam': 8,
-            // Artistic Events
-            'ae_freestyle': 7,
-            'ae_freefly': 7,
-            // Wingsuit
-            'ws_acrobatic': 7,
-            'ws_performance': 3,
-            // Default
-            'default': 10
-        };
-
-        // Update class options and rounds based on event
-        function updateClassOptions() {
-            const eventType = document.getElementById('eventType').value;
-            const classSelect = document.getElementById('eventClass');
-            const rules = divePoolRules[eventType];
-
-            // Clear and rebuild options
-            classSelect.innerHTML = '';
-
-            const classes = ['open', 'advanced', 'intermediate', 'beginner'];
-            classes.forEach(cls => {
-                if (rules[cls]) {
-                    const option = document.createElement('option');
-                    option.value = cls;
-                    option.textContent = cls.charAt(0).toUpperCase() + cls.slice(1);
-                    classSelect.appendChild(option);
-                }
-            });
-
-            // Update rounds based on event type
-            const rounds = defaultRoundsPerEvent[eventType] || defaultRoundsPerEvent['default'];
-            document.getElementById('numRounds').value = rounds;
-            document.getElementById('numRoundsDisplay').textContent = rounds + ' Rounds';
-
-            updateEventInfo();
-            updatePoolReference();
-        }
-
-        // Update event info display
-        function updateEventInfo() {
-            const { classRules } = getAvailablePool();
-            const infoEl = document.getElementById('eventInfo');
-
-            const drawPts = classRules.drawPoints;
-            infoEl.innerHTML = `<strong>${classRules.name}:</strong> ${drawPts[0]}${drawPts.length > 1 ? '-' + drawPts[1] : ''} points per round (randoms=1pt, blocks=2pts) | Working time: ${classRules.workingTime}s`;
-        }
-
-        // Update pool reference display
-        function updatePoolReference() {
-            const { randoms, blocks } = getAvailablePool();
-
-            const randomsEl = document.getElementById('randomsReference');
-            randomsEl.innerHTML = randoms.map(r =>
-                `<span class="px-2 py-1 bg-blue-600 rounded text-sm font-mono">${r}</span>`
-            ).join('');
-
-            const blocksEl = document.getElementById('blocksReference');
-            blocksEl.innerHTML = blocks.map(b =>
-                `<span class="px-2 py-1 bg-purple-600 rounded text-sm font-mono">${b}</span>`
-            ).join('');
-        }
-
-        // Generate a single round based on target POINTS (not formation count)
-        function generateRound(pool, usedInRound = new Set()) {
+        function generateUSPARound(pool) {
             const { randoms, blocks, classRules } = pool;
             const drawPoints = classRules.drawPoints;
 
-            // Determine target points (random between min and max)
             const targetPoints = drawPoints.length > 1
                 ? drawPoints[0] + Math.floor(Math.random() * (drawPoints[1] - drawPoints[0] + 1))
                 : drawPoints[0];
@@ -276,23 +626,19 @@
             const availableRandoms = [...randoms];
             const availableBlocks = [...blocks];
 
-            // Build the round until we reach target points
             while (currentPoints < targetPoints) {
                 const canAddRandom = availableRandoms.length > 0 && (currentPoints + 1 <= targetPoints);
                 const canAddBlock = availableBlocks.length > 0 && (currentPoints + 2 <= targetPoints);
 
                 if (!canAddRandom && !canAddBlock) break;
 
-                // Prefer blocks slightly to get variety, but ensure we can hit exact point target
                 const pointsRemaining = targetPoints - currentPoints;
                 let addBlock = false;
 
                 if (canAddBlock && canAddRandom) {
-                    // If we need exactly 1 more point, must use random
                     if (pointsRemaining === 1) {
                         addBlock = false;
                     } else {
-                        // Otherwise, randomly choose (slight preference for blocks)
                         addBlock = Math.random() < 0.4;
                     }
                 } else {
@@ -302,12 +648,12 @@
                 if (addBlock) {
                     const idx = Math.floor(Math.random() * availableBlocks.length);
                     const block = availableBlocks.splice(idx, 1)[0];
-                    round.push({ type: 'block', value: block, points: 2 });
+                    round.push({ type: 'block', value: block, points: 2, name: fs4wayBlocks[block] });
                     currentPoints += 2;
                 } else if (canAddRandom) {
                     const idx = Math.floor(Math.random() * availableRandoms.length);
                     const random = availableRandoms.splice(idx, 1)[0];
-                    round.push({ type: 'random', value: random, points: 1 });
+                    round.push({ type: 'random', value: random, points: 1, name: fs4wayRandoms[random] });
                     currentPoints += 1;
                 }
             }
@@ -315,26 +661,425 @@
             return { formations: round, maxPoints: currentPoints };
         }
 
-        // Generate full draw
-        function generateDraw() {
-            const numRounds = parseInt(document.getElementById('numRounds').value);
-            const pool = getAvailablePool();
+        function getFormationsForClass(pool, classNum) {
+            return Object.entries(pool)
+                .filter(([code, info]) => info.classes.includes(classNum))
+                .map(([code]) => code);
+        }
 
-            const rounds = [];
-            const masterPool = new Set(); // Track used formations across rounds
+        function getVFSPool(eventType, roundNum) {
+            const rules = svnhRules[eventType];
+            const isBackBellyRound = (roundNum <= 2 || roundNum >= 9);
+            const classNum = rules.usisClass || 1;
 
-            for (let i = 0; i < numRounds; i++) {
-                // If pool is exhausted, reset it
-                if (masterPool.size >= pool.randoms.length + pool.blocks.length) {
-                    masterPool.clear();
+            let randoms = [];
+            let blocks = [];
+
+            if (rules.poolType === 'backbelly-all' || isBackBellyRound) {
+                randoms = getFormationsForClass(vfs2wayBBRandoms, classNum);
+                blocks = getFormationsForClass(vfs2wayBBBlocks, classNum);
+            } else {
+                switch(rules.poolType) {
+                    case 'mixed-headup':
+                        randoms = getFormationsForClass(vfs2wayHURandoms, classNum);
+                        blocks = getFormationsForClass(vfs2wayHUBlocks, classNum).filter(b => b !== 'HU-03');
+                        break;
+                    case 'mixed-advanced':
+                        randoms = [
+                            ...getFormationsForClass(vfs2wayHURandoms, classNum),
+                            ...getFormationsForClass(vfs2wayHDRandoms, classNum)
+                        ];
+                        blocks = [
+                            ...getFormationsForClass(vfs2wayHUBlocks, classNum),
+                            ...getFormationsForClass(vfs2wayHDBlocks, classNum).filter(b => b === 'HD-04')
+                        ];
+                        break;
+                    case 'mixed-open':
+                        randoms = [
+                            ...getFormationsForClass(vfs2wayHURandoms, classNum),
+                            ...getFormationsForClass(vfs2wayHDRandoms, classNum)
+                        ];
+                        blocks = [
+                            ...getFormationsForClass(vfs2wayHUBlocks, classNum),
+                            ...getFormationsForClass(vfs2wayHDBlocks, classNum)
+                        ];
+                        break;
                 }
-
-                const round = generateRound(pool, new Set()); // Each round allows repeats from other rounds
-                rounds.push(round);
             }
 
+            return { randoms, blocks };
+        }
+
+        function generateSVNHRound(rules, roundNum) {
+            if (rules.isVFS) {
+                return generateVFSRound(rules, roundNum);
+            }
+            return generateSVNH4WayRound(rules);
+        }
+
+        function generateSVNH4WayRound(rules) {
+            const [minPts, maxPts] = rules.pointsPerRound;
+            const round = [];
+            let currentPoints = 0;
+
+            const availableRandoms = [...rules.randoms];
+            const availableBlocks = [...rules.blocks];
+
+            while (currentPoints < maxPts) {
+                if (currentPoints >= minPts && (maxPts - currentPoints === 1 || Math.random() < 0.3)) {
+                    break;
+                }
+
+                const canAddRandom = availableRandoms.length > 0 && (currentPoints + 1 <= maxPts);
+                const canAddBlock = availableBlocks.length > 0 && (currentPoints + 2 <= maxPts);
+
+                if (!canAddRandom && !canAddBlock) break;
+
+                let addBlock = canAddBlock && (!canAddRandom || Math.random() < 0.4);
+
+                if (addBlock) {
+                    const idx = Math.floor(Math.random() * availableBlocks.length);
+                    const block = availableBlocks.splice(idx, 1)[0];
+                    round.push({ type: 'block', value: block, points: 2, name: fs4wayBlocks[block] });
+                    currentPoints += 2;
+                } else if (canAddRandom) {
+                    const idx = Math.floor(Math.random() * availableRandoms.length);
+                    const random = availableRandoms.splice(idx, 1)[0];
+                    round.push({ type: 'random', value: random, points: 1, name: fs4wayRandoms[random] });
+                    currentPoints += 1;
+                }
+            }
+
+            if (rules.rotateStarToEnd && round.length > 0 && round[0].value === 'M') {
+                const star = round.shift();
+                round.push(star);
+            }
+
+            return { formations: round, maxPoints: currentPoints };
+        }
+
+        function generateVFSRound(rules, roundNum) {
+            const pool = getVFSPool(document.getElementById('eventType').value, roundNum);
+            const [minPts, maxPts] = rules.pointsPerRound;
+
+            const round = [];
+            let currentPoints = 0;
+            const availableRandoms = [...pool.randoms];
+            const availableBlocks = [...pool.blocks];
+
+            while (currentPoints < maxPts) {
+                if (currentPoints >= minPts && (maxPts - currentPoints === 1 || Math.random() < 0.3)) {
+                    break;
+                }
+
+                const canAddRandom = availableRandoms.length > 0 && (currentPoints + 1 <= maxPts);
+                const canAddBlock = availableBlocks.length > 0 && (currentPoints + 2 <= maxPts);
+
+                if (!canAddRandom && !canAddBlock) break;
+
+                let addBlock = canAddBlock && (!canAddRandom || Math.random() < 0.4);
+
+                if (addBlock) {
+                    const idx = Math.floor(Math.random() * availableBlocks.length);
+                    const block = availableBlocks.splice(idx, 1)[0];
+                    const info = allVFSFormations[block] || { name: block, color: '#666' };
+                    round.push({ type: 'block', value: block, points: 2, name: info.name, color: info.color });
+                    currentPoints += 2;
+                } else if (canAddRandom) {
+                    const idx = Math.floor(Math.random() * availableRandoms.length);
+                    const random = availableRandoms.splice(idx, 1)[0];
+                    const info = allVFSFormations[random] || { name: random, color: '#666' };
+                    round.push({ type: 'random', value: random, points: 1, name: info.name, color: info.color });
+                    currentPoints += 1;
+                }
+            }
+
+            const isBackBellyRound = (roundNum <= 2 || roundNum >= 9);
+            return {
+                formations: round,
+                maxPoints: currentPoints,
+                poolType: isBackBellyRound ? 'Back/Belly' : 'Vertical'
+            };
+        }
+
+        function generateDraw() {
+            const ruleSet = getRuleSet();
+            const eventType = document.getElementById('eventType').value;
+            const numRounds = parseInt(document.getElementById('numRounds').value);
+
+            const rounds = [];
+
+            if (ruleSet === 'uspa') {
+                const eventClass = document.getElementById('eventClass').value;
+                const pool = getUSPAPool(eventType, eventClass);
+                currentRules = pool.classRules;
+
+                for (let i = 0; i < numRounds; i++) {
+                    rounds.push(generateUSPARound(pool));
+                }
+            } else {
+                const rules = svnhRules[eventType];
+                currentRules = rules;
+
+                for (let i = 1; i <= numRounds; i++) {
+                    rounds.push(generateSVNHRound(rules, i));
+                }
+            }
+
+            currentDraw = rounds;
+            editMode = false;
             displayDraw(rounds);
         }
+
+        // ==========================================
+        // DISPLAY & EDITING
+        // ==========================================
+
+        function toggleEditMode() {
+            editMode = !editMode;
+            if (currentDraw) {
+                displayDraw(currentDraw);
+            }
+        }
+
+        function displayDraw(rounds) {
+            const resultsEl = document.getElementById('drawResults');
+            const contentEl = document.getElementById('drawContent');
+            const editModeBtn = document.getElementById('editModeBtn');
+            const editModeNotice = document.getElementById('editModeNotice');
+
+            resultsEl.classList.remove('hidden');
+
+            if (editMode) {
+                editModeBtn.textContent = 'Done Editing';
+                editModeBtn.classList.remove('bg-yellow-600', 'hover:bg-yellow-700');
+                editModeBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                editModeNotice.classList.remove('hidden');
+            } else {
+                editModeBtn.textContent = 'Edit Draw';
+                editModeBtn.classList.add('bg-yellow-600', 'hover:bg-yellow-700');
+                editModeBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                editModeNotice.classList.add('hidden');
+            }
+
+            const competitionName = document.getElementById('competitionName').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const dateRange = formatDateRange(startDate, endDate);
+            const ruleName = currentRules?.name || document.getElementById('eventType').value;
+
+            const title = competitionName ? `${competitionName} - ${ruleName}` : ruleName;
+            const subtitle = dateRange ? `${dateRange} | ${rounds.length} Rounds` : `${rounds.length} Rounds`;
+
+            const maxFormations = Math.max(...rounds.map(r => r.formations.length));
+            const ruleSet = getRuleSet();
+            const isVFS = ruleSet === 'svnh' && document.getElementById('eventType').value.startsWith('2way-vfs');
+
+            let html = `
+                <div id="printHeader" class="mb-4">
+                    <div class="flex justify-between items-center border-b-2 border-gray-600 pb-2 print:border-black">
+                        <div>
+                            <h1 class="text-xl font-bold print:text-black">${title}</h1>
+                            <p class="text-sm text-gray-400 print:text-gray-600">${subtitle}</p>
+                        </div>
+                        <div class="text-right text-sm text-gray-400 print:text-gray-600">
+                            <div>${new Date().toLocaleDateString()}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            html += `<div class="draw-columns overflow-x-auto">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="border-b-2 border-gray-600 print:border-black">`;
+
+            rounds.forEach((round, idx) => {
+                let poolLabel = '';
+                if (isVFS && round.poolType) {
+                    poolLabel = `<div class="text-xs ${round.poolType === 'Back/Belly' ? 'text-green-400' : 'text-cyan-400'}">${round.poolType === 'Back/Belly' ? 'BB' : 'Vert'}</div>`;
+                }
+                html += `<th class="text-center px-1 py-2 text-sm font-bold print:text-black">
+                    <div>Round ${idx + 1}</div>
+                    ${poolLabel}
+                </th>`;
+            });
+            html += `</tr></thead><tbody>`;
+
+            for (let formIdx = 0; formIdx < maxFormations; formIdx++) {
+                html += `<tr class="border-b border-gray-700 print:border-gray-300">`;
+
+                rounds.forEach((round, roundIdx) => {
+                    if (formIdx < round.formations.length) {
+                        const f = round.formations[formIdx];
+                        const imgPath = isVFS ? `/static/formations/${f.value}.png` : `/static/formations/FS-${f.value}.png`;
+                        const isBlock = f.type === 'block';
+                        const sizeClass = isBlock ? 'w-14 h-36' : 'w-16 h-16';
+                        const editClass = editMode ? 'ring-2 ring-yellow-500 hover:ring-yellow-300' : '';
+                        const clickHandler = editMode
+                            ? `replaceFormation(${roundIdx}, ${formIdx})`
+                            : `openModal('${imgPath}', '${f.value} - ${f.name || ''}')`;
+
+                        html += `
+                            <td class="text-center p-1 align-top">
+                                <div class="formation-cell inline-block">
+                                    <div class="formation-pic ${sizeClass} mx-auto rounded overflow-hidden border border-gray-600 print:border-gray-400 cursor-pointer ${editClass}"
+                                         style="background-color: white"
+                                         onclick="${clickHandler}">
+                                        <span class="compact-code hidden font-bold text-black text-lg">${f.value}</span>
+                                        <img src="${imgPath}" alt="${f.value}" class="full-image w-full h-full object-contain"
+                                             onerror="this.onerror=null; this.style.display='none'; this.parentElement.querySelector('.compact-code').classList.remove('hidden')"/>
+                                    </div>
+                                </div>
+                            </td>`;
+                    } else {
+                        html += `<td></td>`;
+                    }
+                });
+
+                html += `</tr>`;
+            }
+
+            if (editMode) {
+                html += `<tr class="border-b border-gray-700 print:hidden">`;
+                rounds.forEach((round, roundIdx) => {
+                    html += `
+                        <td class="text-center p-2">
+                            <button onclick="addFormationToRound(${roundIdx})"
+                                    class="w-10 h-10 rounded-full bg-green-600 hover:bg-green-700 text-white font-bold text-xl">
+                                +
+                            </button>
+                        </td>`;
+                });
+                html += `</tr>`;
+            }
+
+            html += `<tr class="border-t-2 border-gray-600 print:border-black bg-gray-800 print:bg-gray-100">`;
+            rounds.forEach((round) => {
+                html += `<td class="text-center py-2 text-sm font-bold print:text-black">${round.maxPoints} pts</td>`;
+            });
+            html += `</tr></tbody></table></div>`;
+
+            contentEl.innerHTML = html;
+        }
+
+        function replaceFormation(roundIdx, formIdx) {
+            if (!editMode || !currentDraw) return;
+            showFormationPicker(roundIdx, formIdx);
+        }
+
+        function addFormationToRound(roundIdx) {
+            if (!editMode || !currentDraw) return;
+            showFormationPicker(roundIdx, null);
+        }
+
+        function showFormationPicker(roundIdx, formIdx) {
+            const modal = document.getElementById('formationPickerModal');
+            const content = document.getElementById('formationPickerContent');
+            const ruleSet = getRuleSet();
+            const eventType = document.getElementById('eventType').value;
+            const isVFS = ruleSet === 'svnh' && eventType.startsWith('2way-vfs');
+
+            let randoms = [];
+            let blocks = [];
+
+            if (ruleSet === 'uspa') {
+                const eventClass = document.getElementById('eventClass').value;
+                const pool = getUSPAPool(eventType, eventClass);
+                randoms = pool.randoms;
+                blocks = pool.blocks;
+            } else if (isVFS) {
+                const pool = getVFSPool(eventType, roundIdx + 1);
+                randoms = pool.randoms;
+                blocks = pool.blocks;
+            } else {
+                const rules = svnhRules[eventType];
+                randoms = rules.randoms;
+                blocks = rules.blocks;
+            }
+
+            let html = '<div class="grid grid-cols-2 gap-4">';
+
+            html += '<div><h4 class="font-bold text-blue-400 mb-2">Randoms (1 pt)</h4><div class="flex flex-wrap gap-2">';
+            randoms.forEach(r => {
+                const name = isVFS ? (allVFSFormations[r]?.name || r) : (fs4wayRandoms[r] || r);
+                const imgSrc = isVFS ? `/static/formations/${r}.png` : `/static/formations/FS-${r}.png`;
+                html += `<div class="cursor-pointer hover:ring-2 hover:ring-blue-400 rounded p-1 bg-gray-700" onclick="selectFormation(${roundIdx}, ${formIdx}, 'random', '${r}', '${name.replace(/'/g, "\\'")}')">
+                    <img src="${imgSrc}" alt="${r}" class="w-12 h-12 object-contain bg-white rounded">
+                    <div class="text-center text-xs mt-1">${r}</div>
+                </div>`;
+            });
+            html += '</div></div>';
+
+            if (blocks.length > 0) {
+                html += '<div><h4 class="font-bold text-purple-400 mb-2">Blocks (2 pts)</h4><div class="flex flex-wrap gap-2">';
+                blocks.forEach(b => {
+                    const name = isVFS ? (allVFSFormations[b]?.name || b) : (fs4wayBlocks[b] || b);
+                    const imgSrc = isVFS ? `/static/formations/${b}.png` : `/static/formations/FS-${b}.png`;
+                    html += `<div class="cursor-pointer hover:ring-2 hover:ring-purple-400 rounded p-1 bg-gray-700" onclick="selectFormation(${roundIdx}, ${formIdx}, 'block', '${b}', '${name.replace(/'/g, "\\'")}')">
+                        <img src="${imgSrc}" alt="${b}" class="w-12 h-16 object-contain bg-white rounded">
+                        <div class="text-center text-xs mt-1">${b}</div>
+                    </div>`;
+                });
+                html += '</div></div>';
+            }
+
+            html += '</div>';
+
+            if (formIdx !== null && formIdx < currentDraw[roundIdx].formations.length) {
+                html += `<div class="mt-4 pt-4 border-t border-gray-600">
+                    <button onclick="removeFormation(${roundIdx}, ${formIdx})" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded">
+                        Remove This Formation
+                    </button>
+                </div>`;
+            }
+
+            content.innerHTML = html;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function selectFormation(roundIdx, formIdx, type, value, name) {
+            if (!currentDraw) return;
+
+            const formation = {
+                type: type,
+                value: value,
+                points: type === 'block' ? 2 : 1,
+                name: name
+            };
+
+            if (formIdx === null || formIdx >= currentDraw[roundIdx].formations.length) {
+                currentDraw[roundIdx].formations.push(formation);
+            } else {
+                currentDraw[roundIdx].formations[formIdx] = formation;
+            }
+
+            currentDraw[roundIdx].maxPoints = currentDraw[roundIdx].formations.reduce((sum, f) => sum + f.points, 0);
+
+            closeFormationPicker();
+            displayDraw(currentDraw);
+        }
+
+        function removeFormation(roundIdx, formIdx) {
+            if (!currentDraw) return;
+
+            currentDraw[roundIdx].formations.splice(formIdx, 1);
+            currentDraw[roundIdx].maxPoints = currentDraw[roundIdx].formations.reduce((sum, f) => sum + f.points, 0);
+
+            closeFormationPicker();
+            displayDraw(currentDraw);
+        }
+
+        function closeFormationPicker() {
+            const modal = document.getElementById('formationPickerModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // ==========================================
+        // UTILITY FUNCTIONS
+        // ==========================================
 
         function formatDateRange(startStr, endStr) {
             if (!startStr && !endStr) return '';
@@ -361,127 +1106,18 @@
             return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
         }
 
-        // Display generated draw - columnar layout like reference PDF
-        function displayDraw(rounds) {
-            const resultsEl = document.getElementById('drawResults');
-            const contentEl = document.getElementById('drawContent');
-
-            resultsEl.classList.remove('hidden');
-
-            const eventType = document.getElementById('eventType').value;
-            const eventClass = document.getElementById('eventClass').value;
-            const rules = divePoolRules[eventType][eventClass] || divePoolRules[eventType].open;
-
-            // Get competition info from inputs
-            const competitionName = document.getElementById('competitionName').value;
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            const dateRange = formatDateRange(startDate, endDate);
-
-            // Build title
-            const title = competitionName ? `${competitionName} - ${rules.name}` : rules.name;
-            const subtitle = dateRange ? `${dateRange} | Working Time: ${rules.workingTime}s` : `Working Time: ${rules.workingTime}s`;
-
-            // Find max formations in any round for row count
-            const maxFormations = Math.max(...rounds.map(r => r.formations.length));
-
-            // Print header
-            let html = `
-                <div id="printHeader" class="mb-4">
-                    <div class="flex justify-between items-center border-b-2 border-gray-600 pb-2 print:border-black">
-                        <div>
-                            <h1 class="text-xl font-bold print:text-black">${title}</h1>
-                            <p class="text-sm text-gray-400 print:text-gray-600">${subtitle}</p>
-                        </div>
-                        <div class="text-right text-sm text-gray-400 print:text-gray-600">
-                            <div>${new Date().toLocaleDateString()}</div>
-                            <div>${rounds.length} Rounds</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // Columnar layout - rounds as columns
-            html += `<div class="draw-columns overflow-x-auto">
-                <table class="w-full border-collapse">
-                    <thead>
-                        <tr class="border-b-2 border-gray-600 print:border-black">`;
-
-            // Round headers
-            rounds.forEach((_, idx) => {
-                html += `<th class="text-center px-1 py-2 text-sm font-bold print:text-black">Round ${idx + 1}</th>`;
-            });
-            html += `</tr></thead><tbody>`;
-
-            // Formation rows
-            for (let formIdx = 0; formIdx < maxFormations; formIdx++) {
-                html += `<tr class="border-b border-gray-700 print:border-gray-300">`;
-
-                rounds.forEach((round) => {
-                    if (formIdx < round.formations.length) {
-                        const f = round.formations[formIdx];
-                        const imgPath = `/static/formations/FS-${f.value}.png`;
-                        html += `
-                            <td class="text-center p-1 align-top">
-                                <div class="formation-cell inline-block">
-                                    <div class="formation-pic w-16 h-20 mx-auto rounded overflow-hidden border border-gray-600 print:border-gray-400 cursor-pointer"
-                                         style="background-color: white"
-                                         onclick="openModal('${imgPath}', '${f.value}')">
-                                        <span class="compact-code hidden font-bold text-black text-lg">${f.value}</span>
-                                        <img src="${imgPath}" alt="${f.value}" class="full-image w-full h-full object-contain"
-                                             onerror="this.onerror=null; this.style.display='none'; this.parentElement.querySelector('.compact-code').classList.remove('hidden')"/>
-                                    </div>
-                                </div>
-                            </td>`;
-                    } else {
-                        html += `<td></td>`;
-                    }
-                });
-
-                html += `</tr>`;
-            }
-
-            // Max points row
-            html += `<tr class="border-t-2 border-gray-600 print:border-black bg-gray-800 print:bg-gray-100">`;
-            rounds.forEach((round) => {
-                html += `<td class="text-center py-2 text-sm font-bold print:text-black">${round.maxPoints} pts</td>`;
-            });
-            html += `</tr>`;
-
-            html += `</tbody></table></div>`;
-
-            // Detailed view (hidden on print) - text version
-            html += `<div class="detailed-view mt-6 print:hidden">
-                <h3 class="text-lg font-bold mb-3">Text Format</h3>`;
-            rounds.forEach((round, idx) => {
-                const drawString = round.formations.map(f => f.value).join(' ');
-                html += `
-                    <div class="bg-gray-800 rounded-lg p-3 mb-2">
-                        <div class="flex justify-between items-center">
-                            <span class="font-bold">Round ${idx + 1}:</span>
-                            <span class="text-gray-400 text-sm">${round.maxPoints} pts</span>
-                        </div>
-                        <div class="font-mono text-lg mt-1">${drawString}</div>
-                    </div>
-                `;
-            });
-            html += `</div>`;
-
-            contentEl.innerHTML = html;
-        }
-
-        // Copy draw to clipboard
         function copyDraw() {
-            const contentEl = document.getElementById('drawContent');
-            const rounds = contentEl.querySelectorAll('.bg-gray-800');
+            if (!currentDraw) return;
 
-            let text = `Draw - ${document.getElementById('eventType').value.toUpperCase()} ${document.getElementById('eventClass').value.toUpperCase()}\n`;
+            const competitionName = document.getElementById('competitionName').value || 'Draw';
+            const ruleName = currentRules?.name || document.getElementById('eventType').value;
+
+            let text = `${competitionName} - ${ruleName}\n`;
             text += '='.repeat(40) + '\n\n';
 
-            rounds.forEach((round, idx) => {
-                const drawStr = round.querySelector('.font-mono.bg-gray-700').textContent.trim();
-                const maxPts = round.querySelector('.text-gray-400.text-sm').textContent.trim();
-                text += `Round ${idx + 1}: ${drawStr} (${maxPts})\n`;
+            currentDraw.forEach((round, idx) => {
+                const drawStr = round.formations.map(f => f.value).join(' ');
+                text += `Round ${idx + 1}: ${drawStr} (${round.maxPoints} pts)\n`;
             });
 
             navigator.clipboard.writeText(text).then(() => {
@@ -489,130 +1125,18 @@
             });
         }
 
-        // Print compact (1 page)
         function printCompact() {
             document.body.classList.add('print-compact');
             document.body.classList.remove('print-full');
             window.print();
         }
 
-        // Print full
         function printFull() {
             document.body.classList.remove('print-compact');
             document.body.classList.add('print-full');
             window.print();
         }
 
-        // Initialize
-        updateClassOptions();
-    </script>
-
-    <style>
-        @media print {
-            @page {
-                size: letter landscape;
-                margin: 0.3in;
-            }
-            body {
-                background: white !important;
-                color: black !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            nav, button, #eventInfo, .mt-12, .detailed-view, .bg-gray-800.rounded-lg.p-6 {
-                display: none !important;
-            }
-            #printHeader { display: block !important; }
-            #drawResults { display: block !important; }
-            .container { max-width: 100% !important; padding: 0 !important; }
-            .draw-columns {
-                overflow: visible !important;
-            }
-            .draw-columns table {
-                width: 100% !important;
-                table-layout: fixed !important;
-            }
-            .formation-pic {
-                border: 1px solid #333 !important;
-                background: white !important;
-            }
-        }
-
-        /* Compact print mode - 1 page, no images, landscape */
-        @media print {
-            body.print-compact .formation-pic {
-                width: 40px !important;
-                height: 28px !important;
-            }
-            body.print-compact .formation-pic .full-image,
-            body.print-compact .formation-pic img {
-                display: none !important;
-            }
-            body.print-compact .formation-pic .compact-code {
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                height: 100% !important;
-                font-size: 10pt !important;
-            }
-            body.print-compact td {
-                padding: 2px !important;
-            }
-            body.print-compact th {
-                font-size: 9pt !important;
-                padding: 4px 2px !important;
-            }
-        }
-
-        /* Full print mode - with images */
-        @media print {
-            body.print-full .formation-pic {
-                width: 65px !important;
-                height: 80px !important;
-            }
-            body.print-full .formation-pic .compact-code {
-                display: none !important;
-            }
-            body.print-full .formation-pic .full-image,
-            body.print-full .formation-pic img {
-                display: block !important;
-                width: 100% !important;
-                height: 100% !important;
-                object-fit: contain !important;
-            }
-            body.print-full td {
-                padding: 3px !important;
-            }
-            body.print-full th {
-                font-size: 10pt !important;
-                padding: 4px 2px !important;
-            }
-        }
-
-        /* Screen styles */
-        .draw-columns table th,
-        .draw-columns table td {
-            vertical-align: top;
-        }
-        .formation-pic {
-            transition: transform 0.2s;
-        }
-        .formation-pic:hover {
-            transform: scale(1.05);
-        }
-    </style>
-    <!-- Image Modal -->
-    <div id="imageModal" class="fixed inset-0 bg-black/80 hidden z-50 overflow-y-auto" onclick="closeModal()">
-        <div class="min-h-full flex items-center justify-center p-8">
-            <div class="relative" onclick="event.stopPropagation()">
-                <button onclick="closeModal()" class="absolute -top-8 -right-8 text-white text-3xl font-bold hover:text-gray-300">&times;</button>
-                <img id="modalImage" src="" alt="" class="bg-white rounded-lg shadow-2xl">
-                <div id="modalCaption" class="text-center text-white mt-4 text-xl font-bold"></div>
-            </div>
-        </div>
-    </div>
-
-    <script>
         function openModal(imgSrc, caption) {
             const modal = document.getElementById('imageModal');
             const modalImg = document.getElementById('modalImage');
@@ -631,8 +1155,72 @@
         }
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeModal();
+            if (e.key === 'Escape') {
+                closeModal();
+                closeFormationPicker();
+            }
         });
+
+        // Initialize
+        updateRuleSet();
     </script>
+
+    <style>
+        @media print {
+            @page { size: letter landscape; margin: 0.3in; }
+            body { background: white !important; color: black !important; }
+            nav, button, #eventInfo, .mt-12, .bg-gray-800.rounded-lg.p-6.mb-8 { display: none !important; }
+            #printHeader { display: block !important; }
+            #drawResults { display: block !important; }
+            .container { max-width: 100% !important; padding: 0 !important; }
+            .draw-columns { overflow: visible !important; }
+            .draw-columns table { width: 100% !important; table-layout: fixed !important; }
+            .formation-pic { border: 1px solid #333 !important; background: white !important; }
+        }
+
+        @media print {
+            body.print-compact .formation-pic { width: 40px !important; height: 28px !important; }
+            body.print-compact .formation-pic .full-image, body.print-compact .formation-pic img { display: none !important; }
+            body.print-compact .formation-pic .compact-code { display: flex !important; align-items: center !important; justify-content: center !important; height: 100% !important; font-size: 10pt !important; }
+            body.print-compact td { padding: 2px !important; }
+            body.print-compact th { font-size: 9pt !important; padding: 4px 2px !important; }
+        }
+
+        @media print {
+            body.print-full .formation-pic { width: 65px !important; height: 80px !important; }
+            body.print-full .formation-pic .compact-code { display: none !important; }
+            body.print-full .formation-pic .full-image, body.print-full .formation-pic img { display: block !important; width: 100% !important; height: 100% !important; object-fit: contain !important; }
+            body.print-full td { padding: 3px !important; }
+            body.print-full th { font-size: 10pt !important; padding: 4px 2px !important; }
+        }
+
+        .draw-columns table th, .draw-columns table td { vertical-align: top; }
+        .formation-pic { transition: transform 0.2s; }
+        .formation-pic:hover { transform: scale(1.05); }
+    </style>
+
+    <!-- Formation Picker Modal -->
+    <div id="formationPickerModal" class="fixed inset-0 bg-black/80 hidden z-50 overflow-y-auto" onclick="closeFormationPicker()">
+        <div class="min-h-full flex items-center justify-center p-8">
+            <div class="bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[80vh] overflow-y-auto" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold">Select Formation</h3>
+                    <button onclick="closeFormationPicker()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                </div>
+                <div id="formationPickerContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="fixed inset-0 bg-black/80 hidden z-50 overflow-y-auto" onclick="closeModal()">
+        <div class="min-h-full flex items-center justify-center p-8">
+            <div class="relative" onclick="event.stopPropagation()">
+                <button onclick="closeModal()" class="absolute -top-8 -right-8 text-white text-3xl font-bold hover:text-gray-300">&times;</button>
+                <img id="modalImage" src="" alt="" class="bg-white rounded-lg shadow-2xl">
+                <div id="modalCaption" class="text-center text-white mt-4 text-xl font-bold"></div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

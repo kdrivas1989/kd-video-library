@@ -4679,12 +4679,6 @@ def draw_generator():
     return render_template('draw_generator.html')
 
 
-@app.route('/draw-generator/svnh')
-def draw_generator_svnh():
-    """SkyVenture NH draw generator with meet-specific rules."""
-    return render_template('draw_generator_svnh.html')
-
-
 # Competition routes
 @app.route('/competitions')
 @chief_judge_required
