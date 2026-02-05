@@ -3213,7 +3213,7 @@ def fetch_vimeo_account():
             req.add_header('Accept', 'application/vnd.vimeo.*+json;version=3.4')
 
             try:
-                with urllib.request.urlopen(req, timeout=30) as response:
+                with urllib.request.urlopen(req, timeout=15) as response:
                     result = json.loads(response.read().decode('utf-8'))
             except urllib.error.HTTPError as e:
                 if e.code == 401:
@@ -3222,6 +3222,12 @@ def fetch_vimeo_account():
                     return jsonify({'success': False, 'error': f'Folder "{folder}" not found'}), 404
                 else:
                     return jsonify({'success': False, 'error': f'Vimeo API error: {e.code}'}), e.code
+            except urllib.error.URLError as e:
+                return jsonify({'success': False, 'error': f'Network error: {str(e.reason)}'}), 500
+            except TimeoutError:
+                return jsonify({'success': False, 'error': 'Vimeo API request timed out. Please try again.'}), 504
+            except Exception as e:
+                return jsonify({'success': False, 'error': f'Failed to fetch from Vimeo: {str(e)}'}), 500
 
             # Extract video data
             for video in result.get('data', []):
@@ -3262,8 +3268,8 @@ def fetch_vimeo_account():
             else:
                 break
 
-            # Safety limit
-            if page > 50:
+            # Safety limit - max 10 pages (1000 videos) to prevent timeout
+            if page > 10:
                 break
 
         return jsonify({
@@ -3303,13 +3309,19 @@ def fetch_vimeo_folders():
             req.add_header('Accept', 'application/vnd.vimeo.*+json;version=3.4')
 
             try:
-                with urllib.request.urlopen(req, timeout=30) as response:
+                with urllib.request.urlopen(req, timeout=15) as response:
                     result = json.loads(response.read().decode('utf-8'))
             except urllib.error.HTTPError as e:
                 if e.code == 401:
                     return jsonify({'success': False, 'error': 'Invalid access token'}), 401
                 else:
                     return jsonify({'success': False, 'error': f'Vimeo API error: {e.code}'}), e.code
+            except urllib.error.URLError as e:
+                return jsonify({'success': False, 'error': f'Network error: {str(e.reason)}'}), 500
+            except TimeoutError:
+                return jsonify({'success': False, 'error': 'Vimeo API request timed out. Please try again.'}), 504
+            except Exception as e:
+                return jsonify({'success': False, 'error': f'Failed to fetch from Vimeo: {str(e)}'}), 500
 
             for folder in result.get('data', []):
                 folder_uri = folder.get('uri', '')
