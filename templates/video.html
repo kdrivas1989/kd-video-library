@@ -2841,6 +2841,7 @@
         let speedCompleted = false;
         let freezeTimeout = null;
         let currentPlaybackSpeed = 1.0; // Track playback speed for timer sync
+        let timerVideoStartTime = 0; // Video time when timer started (for sync with playback)
 
         // Auto-select event type based on video category and subcategory
         function autoSelectEventType() {
@@ -3152,6 +3153,13 @@
             timerRunning = true;
             timerStartTime = Date.now(); // Record start time for scoring timestamps
 
+            // Record video time when timer starts (for syncing with playback)
+            if (video) {
+                timerVideoStartTime = video.currentTime;
+            } else if (vimeoPlayer) {
+                vimeoPlayer.getCurrentTime().then(t => { timerVideoStartTime = t; });
+            }
+
             document.getElementById('timerBtn').textContent = 'Running...';
             document.getElementById('timerBtn').classList.remove('bg-green-600', 'hover:bg-green-700');
             document.getElementById('timerBtn').classList.add('bg-yellow-600', 'cursor-not-allowed');
@@ -3163,7 +3171,12 @@
             if (video) video.play();
 
             timerInterval = setInterval(() => {
-                elapsedTime += 10 * currentPlaybackSpeed; // Scale by playback speed
+                // Calculate elapsed time from video playback (syncs with pause/speed changes)
+                if (video) {
+                    elapsedTime = (video.currentTime - timerVideoStartTime) * 1000;
+                } else {
+                    elapsedTime += 10 * currentPlaybackSpeed; // Fallback for Vimeo
+                }
                 updateCountUpDisplay();
 
                 // Auto-stop when working time is reached (if FlySight data loaded)
@@ -3234,6 +3247,13 @@
             timerRunning = true;
             timerStartTime = Date.now(); // Record start time for scoring timestamps
 
+            // Record video time when timer starts (for syncing with playback)
+            if (video) {
+                timerVideoStartTime = video.currentTime;
+            } else if (vimeoPlayer) {
+                vimeoPlayer.getCurrentTime().then(t => { timerVideoStartTime = t; });
+            }
+
             document.getElementById('timerBtn').textContent = 'Stop (X)';
             document.getElementById('timerBtn').classList.remove('bg-green-600', 'hover:bg-green-700');
             document.getElementById('timerBtn').classList.add('bg-red-600', 'hover:bg-red-700');
@@ -3253,7 +3273,12 @@
             document.getElementById('timerDisplay').style.color = '#ffffff';
 
             timerInterval = setInterval(() => {
-                elapsedTime += 100 * currentPlaybackSpeed; // Scale by playback speed
+                // Calculate elapsed time from video playback (syncs with pause/speed changes)
+                if (video) {
+                    elapsedTime = (video.currentTime - timerVideoStartTime) * 1000;
+                } else {
+                    elapsedTime += 100 * currentPlaybackSpeed; // Fallback for Vimeo
+                }
                 timeRemaining = Math.max(0, duration - Math.floor(elapsedTime / 1000));
                 updateRunningTimeDisplay();
 
@@ -3302,6 +3327,13 @@
                 elapsedTime = 0;
                 timerRunning = true;
 
+                // Record video time when timer starts (for syncing with playback)
+                if (video) {
+                    timerVideoStartTime = video.currentTime;
+                } else if (vimeoPlayer) {
+                    vimeoPlayer.getCurrentTime().then(t => { timerVideoStartTime = t; });
+                }
+
                 document.getElementById('timerBtn').textContent = 'Stop (X)';
                 document.getElementById('timerBtn').classList.remove('bg-green-600', 'hover:bg-green-700');
                 document.getElementById('timerBtn').classList.add('bg-red-600', 'hover:bg-red-700');
@@ -3313,7 +3345,12 @@
                 if (video) video.play();
 
                 timerInterval = setInterval(() => {
-                    elapsedTime += 10 * currentPlaybackSpeed; // Scale by playback speed
+                    // Calculate elapsed time from video playback (syncs with pause/speed changes)
+                    if (video) {
+                        elapsedTime = (video.currentTime - timerVideoStartTime) * 1000;
+                    } else {
+                        elapsedTime += 10 * currentPlaybackSpeed; // Fallback for Vimeo
+                    }
                     updateSpeedDisplay();
                 }, 10);
             } else {
@@ -3515,6 +3552,7 @@
             speedCompleted = false;
             timerRunning = false;
             timerStartTime = 0;
+            timerVideoStartTime = 0;
             document.getElementById('timerDisplay').textContent = '--:--';
             document.getElementById('timerDisplay').classList.remove('text-yellow-400', 'text-white');
             document.getElementById('timerDisplay').classList.add('text-gray-400');
