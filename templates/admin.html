@@ -768,7 +768,8 @@
                     </div>
                 `;
 
-                // Upload batch concurrently
+                // Upload batch concurrently with timeout
+                let completedInBatch = 0;
                 const batchPromises = batch.map(async (file) => {
                     const formData = new FormData();
                     formData.append('file', file);
@@ -787,11 +788,26 @@
                     const uploadUrl = (s3Enabled && s3Compatible) ? '/admin/upload-to-s3' : '/admin/upload-video';
 
                     try {
+                        // 5 minute timeout per file
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 300000);
+
                         const response = await fetch(uploadUrl, {
                             method: 'POST',
-                            body: formData
+                            body: formData,
+                            signal: controller.signal
                         });
+                        clearTimeout(timeoutId);
+
                         const result = await response.json();
+
+                        completedInBatch++;
+                        progressDiv.innerHTML = `
+                            <div class="flex items-center gap-3">
+                                <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500"></div>
+                                <span>Batch ${batchNum + 1}/${totalBatches}: ${completedInBatch}/${batch.length} done (${file.name})</span>
+                            </div>
+                        `;
 
                         if (result.success) {
                             if (result.background) {
@@ -807,8 +823,10 @@
                             results.push({ name: file.name, success: false, error: result.error });
                         }
                     } catch (error) {
+                        completedInBatch++;
                         failed++;
-                        results.push({ name: file.name, success: false, error: error.message });
+                        const errorMsg = error.name === 'AbortError' ? 'Upload timeout (5 min)' : error.message;
+                        results.push({ name: file.name, success: false, error: errorMsg });
                     }
                 });
 
