@@ -4477,6 +4477,62 @@ def bulk_set_event():
     })
 
 
+@app.route('/admin/refresh-thumbnails', methods=['POST'])
+@admin_required
+def refresh_thumbnails():
+    """Re-fetch thumbnails for videos that are missing them."""
+    if not USE_SUPABASE:
+        return jsonify({'error': 'This feature requires Supabase'}), 400
+
+    try:
+        # Get all videos with missing thumbnails
+        result = supabase.table('videos').select('id, url, thumbnail').execute()
+        videos = result.data or []
+
+        missing_thumbs = [v for v in videos if not v.get('thumbnail')]
+
+        if not missing_thumbs:
+            return jsonify({'success': True, 'message': 'All videos already have thumbnails', 'updated': 0})
+
+        updated = 0
+        errors = []
+
+        for video in missing_thumbs:
+            url = video.get('url', '')
+            video_id = video.get('id')
+
+            if not url:
+                continue
+
+            thumbnail = None
+
+            # Vimeo
+            if 'vimeo.com' in url:
+                meta = fetch_vimeo_metadata(url)
+                thumbnail = meta.get('thumbnail', '')
+            # YouTube
+            elif 'youtube.com' in url or 'youtu.be' in url:
+                meta = fetch_youtube_metadata(url)
+                thumbnail = meta.get('thumbnail', '')
+
+            if thumbnail:
+                try:
+                    supabase.table('videos').update({'thumbnail': thumbnail}).eq('id', video_id).execute()
+                    updated += 1
+                except Exception as e:
+                    errors.append(f"{video_id}: {str(e)}")
+
+        return jsonify({
+            'success': True,
+            'message': f'Updated {updated} of {len(missing_thumbs)} videos missing thumbnails',
+            'updated': updated,
+            'total_missing': len(missing_thumbs),
+            'errors': errors[:10] if errors else []
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/admin/rename-event-folder', methods=['POST'])
 @admin_required
 def rename_event_folder():

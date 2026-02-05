@@ -62,6 +62,13 @@
                 </button>
                 <p id="fixDuplicatesMessage" class="text-sm mt-2 hidden"></p>
             </div>
+            <div class="bg-gray-800 rounded-lg p-6">
+                <p class="text-gray-400 text-sm mb-3">Re-fetch thumbnails for videos missing them</p>
+                <button onclick="refreshThumbnails()" id="refreshThumbsBtn" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm">
+                    Refresh Thumbnails
+                </button>
+                <p id="refreshThumbsMessage" class="text-sm mt-2 hidden"></p>
+            </div>
         </div>
 
         <!-- Background Conversion Status -->
@@ -908,6 +915,39 @@
             } catch (error) {
                 msgDiv.textContent = 'Error: ' + error.message;
                 msgDiv.className = 'text-sm mt-2 text-red-400';
+            }
+        }
+
+        async function refreshThumbnails() {
+            const btn = document.getElementById('refreshThumbsBtn');
+            const msgDiv = document.getElementById('refreshThumbsMessage');
+
+            btn.disabled = true;
+            btn.textContent = 'Refreshing...';
+            msgDiv.textContent = 'Fetching thumbnails from Vimeo/YouTube...';
+            msgDiv.className = 'text-sm mt-2 text-yellow-400';
+            msgDiv.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/admin/refresh-thumbnails', { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    msgDiv.textContent = result.message;
+                    msgDiv.className = 'text-sm mt-2 text-green-400';
+                    if (result.updated > 0) {
+                        setTimeout(() => location.reload(), 2000);
+                    }
+                } else {
+                    msgDiv.textContent = result.error || 'Error refreshing thumbnails';
+                    msgDiv.className = 'text-sm mt-2 text-red-400';
+                }
+            } catch (error) {
+                msgDiv.textContent = 'Error: ' + error.message;
+                msgDiv.className = 'text-sm mt-2 text-red-400';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Refresh Thumbnails';
             }
         }
 
