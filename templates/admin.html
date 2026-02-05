@@ -29,7 +29,17 @@
         <div class="grid md:grid-cols-3 gap-6 mb-8">
             <div class="bg-gray-800 rounded-lg p-6">
                 <p class="text-4xl font-bold text-blue-400">{{ total_videos }}</p>
-                <p class="text-gray-400">Total Videos</p>
+                <p class="text-gray-400 mb-3">Total Videos</p>
+                <div class="text-xs space-y-1">
+                    {% for cat_id, cat in categories.items() %}
+                    {% if category_counts.get(cat_id, 0) > 0 %}
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">{{ cat.abbrev }}</span>
+                        <span class="text-gray-400">{{ category_counts.get(cat_id, 0) }}</span>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
             </div>
             <div class="bg-gray-800 rounded-lg p-6">
                 <p class="text-gray-400 text-sm mb-2">Auto-categorize from filenames</p>
@@ -103,14 +113,28 @@
                     <span id="uploadDestinationLabel" class="text-blue-400">Local/Supabase</span>
                 </div>
             </div>
-            <p class="text-gray-400 text-sm mb-4">Drag & drop video files or click to select. MP4, WebM, MOV supported. MTS/AVI/MKV will be converted.</p>
-            <div class="flex flex-wrap gap-4 items-end mb-4">
+            <p class="text-gray-400 text-sm mb-4">Upload video files or a folder. Folder name will be used to auto-detect category.</p>
+
+            <!-- Upload Mode Toggle -->
+            <div class="flex gap-4 mb-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="uploadMode" value="files" checked onchange="toggleUploadMode()" class="text-purple-500">
+                    <span class="text-gray-300">Select Files</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="uploadMode" value="folder" onchange="toggleUploadMode()" class="text-purple-500">
+                    <span class="text-gray-300">Select Folder</span>
+                    <span class="text-gray-500 text-xs">(uses folder name for category)</span>
+                </label>
+            </div>
+
+            <div id="manualCategorySection" class="flex flex-wrap gap-4 items-end mb-4">
                 <div class="w-48">
-                    <label class="block text-gray-300 mb-2">Category *</label>
-                    <select id="uploadCategory" required
+                    <label class="block text-gray-300 mb-2">Category</label>
+                    <select id="uploadCategory"
                         class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                         onchange="updateUploadSubcategories()">
-                        <option value="">Select</option>
+                        <option value="">Auto-detect from filename</option>
                         {% for cat_id, cat in categories.items() %}
                         <option value="{{ cat_id }}">{{ cat.abbrev }} - {{ cat.name }}</option>
                         {% endfor %}
@@ -138,12 +162,13 @@
             <div id="dropZone"
                 class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-purple-500 transition"
                 ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
-                onclick="document.getElementById('fileInput').click()">
+                onclick="triggerFileInput()">
                 <input type="file" id="fileInput" multiple accept="video/*" class="hidden" onchange="handleFileSelect(event)">
+                <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden" onchange="handleFolderSelect(event)">
                 <svg class="w-12 h-12 mx-auto text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                 </svg>
-                <p class="text-gray-400">Drag & drop videos here or click to browse</p>
+                <p id="dropZoneText" class="text-gray-400">Drag & drop videos here or click to browse</p>
                 <p class="text-gray-500 text-sm mt-2">MP4, WebM, MOV, MTS, AVI, MKV</p>
             </div>
             <div id="uploadProgress" class="mt-4 hidden"></div>
@@ -557,6 +582,57 @@
             });
         }
 
+        let uploadFolderName = '';
+
+        function toggleUploadMode() {
+            const mode = document.querySelector('input[name="uploadMode"]:checked').value;
+            const dropZoneText = document.getElementById('dropZoneText');
+            const manualSection = document.getElementById('manualCategorySection');
+
+            if (mode === 'folder') {
+                dropZoneText.textContent = 'Click to select a folder';
+                // When folder mode, category will be auto-detected from folder name
+            } else {
+                dropZoneText.textContent = 'Drag & drop videos here or click to browse';
+            }
+        }
+
+        function triggerFileInput() {
+            const mode = document.querySelector('input[name="uploadMode"]:checked').value;
+            if (mode === 'folder') {
+                document.getElementById('folderInput').click();
+            } else {
+                document.getElementById('fileInput').click();
+            }
+        }
+
+        function handleFolderSelect(e) {
+            const files = Array.from(e.target.files).filter(f =>
+                f.type.startsWith('video/') ||
+                f.name.toLowerCase().match(/\.(mp4|webm|mov|m4v|ogg|ogv|mts|m2ts|avi|mkv)$/));
+
+            if (files.length === 0) {
+                alert('No video files found in the selected folder');
+                return;
+            }
+
+            // Extract folder name from the first file's path
+            const firstFile = files[0];
+            const pathParts = firstFile.webkitRelativePath.split('/');
+            uploadFolderName = pathParts.length > 1 ? pathParts[0] : '';
+
+            if (uploadFolderName) {
+                console.log('Folder name:', uploadFolderName);
+                // Use folder name as event name if event field is empty
+                const eventInput = document.getElementById('uploadEvent');
+                if (!eventInput.value) {
+                    eventInput.value = uploadFolderName;
+                }
+            }
+
+            uploadFiles(files, uploadFolderName);
+        }
+
         function handleDragOver(e) {
             e.preventDefault();
             e.currentTarget.classList.add('border-purple-500', 'bg-gray-700');
@@ -584,12 +660,12 @@
             }
         }
 
-        async function uploadFiles(files) {
+        async function uploadFiles(files, folderName = '') {
             const category = document.getElementById('uploadCategory').value;
             const subcategory = document.getElementById('uploadSubcategory').value;
             const event = document.getElementById('uploadEvent').value;
 
-            // Category is optional - will default to 'uncategorized'
+            // Category is optional - will default to 'uncategorized' or auto-detect from folder name
 
             const progressDiv = document.getElementById('uploadProgress');
             const resultsDiv = document.getElementById('uploadResults');
@@ -617,6 +693,9 @@
                 formData.append('event', event);
                 formData.append('title', file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '));
                 formData.append('background', 'true');
+                if (folderName) {
+                    formData.append('folder_name', folderName);
+                }
 
                 // Choose upload endpoint based on S3 status
                 const ext = file.name.split('.').pop().toLowerCase();

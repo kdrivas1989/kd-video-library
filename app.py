@@ -2527,18 +2527,31 @@ def admin_dashboard():
         total_videos = len(videos)
         total_views = sum(v.get('views', 0) for v in videos)
         events = get_all_events()
+
+        # Count videos per category
+        category_counts = {}
+        for cat_id in CATEGORIES:
+            category_counts[cat_id] = 0
+        for video in videos:
+            cat = video.get('category', 'uncategorized')
+            if cat in category_counts:
+                category_counts[cat] += 1
+            else:
+                category_counts['uncategorized'] = category_counts.get('uncategorized', 0) + 1
     except Exception as e:
         print(f"Admin dashboard error: {e}")
         videos = []
         total_videos = 0
         total_views = 0
         events = []
+        category_counts = {}
 
     return render_template('admin.html',
                          videos=videos,
                          categories=CATEGORIES,
                          total_videos=total_videos,
                          total_views=total_views,
+                         category_counts=category_counts,
                          events=events,
                          dropbox_app_key=DROPBOX_APP_KEY)
 
@@ -3554,6 +3567,7 @@ def upload_to_s3_endpoint():
     category = request.form.get('category', '') or 'uncategorized'
     subcategory = request.form.get('subcategory', '')
     event = request.form.get('event', '').strip()
+    folder_name = request.form.get('folder_name', '').strip()
 
     if category not in CATEGORIES:
         category = 'uncategorized'
@@ -3572,17 +3586,30 @@ def upload_to_s3_endpoint():
     if not title:
         title = os.path.splitext(filename)[0].replace('_', ' ').replace('-', ' ')
 
-    # Auto-detect category from filename if uncategorized
+    # Auto-detect category from folder name first, then filename
     category_auto = False
     if category == 'uncategorized' or not category:
-        detected_cat, detected_sub, detected_event = detect_category_from_filename(file.filename)
-        if detected_cat and detected_cat in CATEGORIES:
-            category = detected_cat
-            category_auto = True
-            if detected_sub and not subcategory:
-                subcategory = detected_sub
-        if detected_event and not event:
-            event = detected_event
+        # Try folder name first if provided
+        if folder_name:
+            detected_cat, detected_sub, detected_event = detect_category_from_filename(folder_name)
+            if detected_cat and detected_cat in CATEGORIES:
+                category = detected_cat
+                category_auto = True
+                if detected_sub and not subcategory:
+                    subcategory = detected_sub
+                if detected_event and not event:
+                    event = detected_event
+
+        # If no category from folder, try filename
+        if category == 'uncategorized' or not category:
+            detected_cat, detected_sub, detected_event = detect_category_from_filename(file.filename)
+            if detected_cat and detected_cat in CATEGORIES:
+                category = detected_cat
+                category_auto = True
+                if detected_sub and not subcategory:
+                    subcategory = detected_sub
+            if detected_event and not event:
+                event = detected_event
 
     try:
         # Read file data
