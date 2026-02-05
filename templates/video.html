@@ -1030,6 +1030,17 @@
             }
         }
 
+        // Scroll video container to top (below sticky nav) on page load
+        window.addEventListener('load', () => {
+            const videoContainer = document.getElementById('videoContainer');
+            const nav = document.getElementById('mainNav');
+            if (videoContainer && nav) {
+                const navHeight = nav.offsetHeight;
+                const containerTop = videoContainer.getBoundingClientRect().top + window.scrollY;
+                window.scrollTo({ top: containerTop - navHeight - 8, behavior: 'instant' });
+            }
+        });
+
         // Toggle navbar visibility
         let navHidden = false;
         function toggleNav() {
