@@ -3550,8 +3550,7 @@ def upload_to_s3_endpoint():
             'video_type': 's3',
             'local_file': '',
             'event': event,
-            'category_auto': category_auto,
-            's3_key': f"{s3_folder}/{s3_filename}"
+            'category_auto': category_auto
         })
 
         return jsonify({
@@ -3679,7 +3678,6 @@ def migrate_to_s3():
                 # Update database
                 video['url'] = new_url
                 video['video_type'] = 's3'
-                video['s3_key'] = f"{s3_folder}/{s3_filename}"
                 save_video(video)
 
                 print(f"[S3 MIGRATE] Success: {title}")
