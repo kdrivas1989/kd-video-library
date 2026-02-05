@@ -4577,6 +4577,16 @@ def refresh_thumbnails():
     if not USE_S3:
         return jsonify({'error': 'This feature requires S3 to be configured'}), 400
 
+    # Check if ffmpeg is available
+    try:
+        result = subprocess.run(['ffmpeg', '-version'], capture_output=True, timeout=5)
+        if result.returncode != 0:
+            return jsonify({'error': 'ffmpeg not available on server'}), 500
+    except FileNotFoundError:
+        return jsonify({'error': 'ffmpeg is not installed on this server'}), 500
+    except Exception as e:
+        return jsonify({'error': f'ffmpeg check failed: {str(e)}'}), 500
+
     try:
         # Get all videos with missing thumbnails
         result = supabase.table('videos').select('id, url, thumbnail').execute()
@@ -4597,15 +4607,16 @@ def refresh_thumbnails():
             video_id = video.get('id')
 
             if not url:
+                errors.append(f"{video_id}: No URL")
                 continue
 
             thumbnail = None
 
             # S3/CloudFront videos - generate thumbnail
-            if 's3.' in url or 'cloudfront' in url or AWS_S3_BUCKET in url:
+            if 's3.' in url or 'cloudfront' in url or (AWS_S3_BUCKET and AWS_S3_BUCKET in url):
                 thumbnail = generate_thumbnail_from_s3_video(url, video_id)
                 if not thumbnail:
-                    errors.append(f"{video_id}: Failed to generate thumbnail")
+                    errors.append(f"{video_id}: Failed to generate")
             # Vimeo
             elif 'vimeo.com' in url:
                 meta = fetch_vimeo_metadata(url)
@@ -4615,7 +4626,7 @@ def refresh_thumbnails():
                 meta = fetch_youtube_metadata(url)
                 thumbnail = meta.get('thumbnail', '')
             else:
-                errors.append(f"{video_id}: Unknown video source")
+                errors.append(f"{video_id}: Unknown source - {url[:50]}")
                 continue
 
             if thumbnail:
