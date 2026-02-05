@@ -1372,13 +1372,18 @@ def is_direct_video_url(url):
 
 def fetch_vimeo_metadata(url):
     """Fetch title and thumbnail from Vimeo using oEmbed API."""
+    import socket
+    old_timeout = socket.getdefaulttimeout()
     try:
+        # Set aggressive socket timeout to prevent worker hangs
+        socket.setdefaulttimeout(5)
+
         # Clean URL - ensure it's the standard format
         clean_url = url.split('?')[0]  # Remove query params for oEmbed
 
         oembed_url = f"https://vimeo.com/api/oembed.json?url={urllib.parse.quote(clean_url, safe='')}"
         req = urllib.request.Request(oembed_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=5) as response:
             data = json.loads(response.read().decode())
             return {
                 'title': data.get('title', ''),
@@ -1393,11 +1398,16 @@ def fetch_vimeo_metadata(url):
             'thumbnail': '',
             'duration': 0
         }
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
 
 def fetch_youtube_metadata(url):
     """Fetch title and thumbnail from YouTube using oEmbed API."""
+    import socket
+    old_timeout = socket.getdefaulttimeout()
     try:
+        socket.setdefaulttimeout(5)
         oembed_url = f"https://www.youtube.com/oembed?url={urllib.parse.quote(url, safe='')}&format=json"
         req = urllib.request.Request(oembed_url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=5) as response:
@@ -1419,6 +1429,8 @@ def fetch_youtube_metadata(url):
     except Exception as e:
         print(f"YouTube metadata fetch error: {e}")
         return None
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
 
 # Formats that browsers can play natively
