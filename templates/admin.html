@@ -752,86 +752,68 @@
             let backgroundJobs = 0;
             const results = [];
 
-            // Batch size for concurrent uploads (higher = faster but more server load)
-            const BATCH_SIZE = 20;
-            const totalBatches = Math.ceil(files.length / BATCH_SIZE);
-
-            for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
-                const batchStart = batchNum * BATCH_SIZE;
-                const batchEnd = Math.min(batchStart + BATCH_SIZE, files.length);
-                const batch = files.slice(batchStart, batchEnd);
+            // Upload files one at a time for reliable progress tracking
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
 
                 progressDiv.innerHTML = `
                     <div class="flex items-center gap-3">
                         <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500"></div>
-                        <span>Uploading batch ${batchNum + 1}/${totalBatches} (files ${batchStart + 1}-${batchEnd} of ${files.length})</span>
+                        <span>Uploading ${i + 1}/${files.length}: ${file.name}</span>
+                    </div>
+                    <div class="mt-2 text-sm text-gray-400">
+                        ${uploaded} uploaded, ${failed} failed
                     </div>
                 `;
 
-                // Upload batch concurrently with timeout
-                let completedInBatch = 0;
-                const batchPromises = batch.map(async (file) => {
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    formData.append('category', category);
-                    formData.append('subcategory', subcategory);
-                    formData.append('event', event);
-                    formData.append('title', file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '));
-                    formData.append('background', 'true');
-                    if (folderName) {
-                        formData.append('folder_name', folderName);
-                    }
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('category', category);
+                formData.append('subcategory', subcategory);
+                formData.append('event', event);
+                formData.append('title', file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '));
+                formData.append('background', 'true');
+                if (folderName) {
+                    formData.append('folder_name', folderName);
+                }
 
-                    // Choose upload endpoint based on S3 status
-                    const ext = file.name.split('.').pop().toLowerCase();
-                    const s3Compatible = ['mp4', 'webm', 'mov', 'm4v', 'ogg', 'ogv'].includes(ext);
-                    const uploadUrl = (s3Enabled && s3Compatible) ? '/admin/upload-to-s3' : '/admin/upload-video';
+                // Choose upload endpoint based on S3 status
+                const ext = file.name.split('.').pop().toLowerCase();
+                const s3Compatible = ['mp4', 'webm', 'mov', 'm4v', 'ogg', 'ogv'].includes(ext);
+                const uploadUrl = (s3Enabled && s3Compatible) ? '/admin/upload-to-s3' : '/admin/upload-video';
 
-                    try {
-                        // 5 minute timeout per file
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 300000);
+                try {
+                    // 2 minute timeout per file
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 120000);
 
-                        const response = await fetch(uploadUrl, {
-                            method: 'POST',
-                            body: formData,
-                            signal: controller.signal
-                        });
-                        clearTimeout(timeoutId);
+                    const response = await fetch(uploadUrl, {
+                        method: 'POST',
+                        body: formData,
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
 
-                        const result = await response.json();
+                    const result = await response.json();
 
-                        completedInBatch++;
-                        progressDiv.innerHTML = `
-                            <div class="flex items-center gap-3">
-                                <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500"></div>
-                                <span>Batch ${batchNum + 1}/${totalBatches}: ${completedInBatch}/${batch.length} done (${file.name})</span>
-                            </div>
-                        `;
-
-                        if (result.success) {
-                            if (result.background) {
-                                backgroundJobs++;
-                                results.push({ name: file.name, success: true, background: true, jobId: result.job_id });
-                                startConversionPolling();
-                            } else {
-                                uploaded++;
-                                results.push({ name: file.name, success: true, converted: result.converted, s3: s3Enabled && s3Compatible });
-                            }
+                    if (result.success) {
+                        if (result.background) {
+                            backgroundJobs++;
+                            results.push({ name: file.name, success: true, background: true, jobId: result.job_id });
+                            startConversionPolling();
                         } else {
-                            failed++;
-                            results.push({ name: file.name, success: false, error: result.error });
+                            uploaded++;
+                            results.push({ name: file.name, success: true, converted: result.converted, s3: s3Enabled && s3Compatible });
                         }
-                    } catch (error) {
-                        completedInBatch++;
+                    } else {
                         failed++;
-                        const errorMsg = error.name === 'AbortError' ? 'Upload timeout (5 min)' : error.message;
-                        results.push({ name: file.name, success: false, error: errorMsg });
+                        results.push({ name: file.name, success: false, error: result.error });
                     }
-                });
-
-                // Wait for all uploads in this batch to complete
-                await Promise.all(batchPromises);
+                } catch (error) {
+                    failed++;
+                    const errorMsg = error.name === 'AbortError' ? 'Upload timeout (2 min)' : error.message;
+                    results.push({ name: file.name, success: false, error: errorMsg });
+                }
             }
 
             progressDiv.classList.add('hidden');
