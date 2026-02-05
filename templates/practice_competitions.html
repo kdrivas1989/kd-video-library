@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Practice Competitions - Video Library</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <nav class="bg-gray-800 p-4 sticky top-0 z-10">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="/" class="text-2xl font-bold text-blue-400">Video Library</a>
+            <div class="flex items-center gap-4">
+                <a href="/admin" class="text-gray-400 hover:text-white">Admin</a>
+                <a href="/competitions" class="text-gray-400 hover:text-white">Competitions</a>
+                <a href="/practice-competitions" class="text-blue-400">Practice</a>
+                <a href="/logout" class="text-gray-400 hover:text-white">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold">Practice Competitions</h1>
+            <button onclick="showCreateModal()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg">
+                + New Practice
+            </button>
+        </div>
+
+        <!-- Info Box -->
+        <div class="bg-blue-900/50 border border-blue-700 rounded-lg p-4 mb-6">
+            <p class="text-blue-300 text-sm">
+                Practice competitions allow judges to train on specific categories. Assign judges to practice sessions
+                to help them prepare for real competitions.
+            </p>
+        </div>
+
+        <!-- Practice Competitions List -->
+        {% if practice_competitions %}
+        <div class="grid gap-4">
+            {% for practice in practice_competitions %}
+            <div class="bg-gray-800 rounded-lg p-6">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 class="text-xl font-bold mb-2">{{ practice.name }}</h2>
+                        <div class="flex items-center gap-4 text-sm text-gray-400 mb-4">
+                            <span>
+                                Category:
+                                <span class="text-cyan-400 font-medium">
+                                    {{ categories[practice.category].name if practice.category in categories else practice.category }}
+                                </span>
+                            </span>
+                            <span>Created by: {{ practice.created_by }}</span>
+                            <span>{{ practice.created_at[:10] }}</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="showAssignModal('{{ practice.id }}', '{{ practice.name }}')"
+                            class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm">
+                            Assign Judges
+                        </button>
+                        <button onclick="deletePractice('{{ practice.id }}', '{{ practice.name }}')"
+                            class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Assigned Judges -->
+                <div class="mt-4 pt-4 border-t border-gray-700">
+                    <h3 class="text-sm font-medium text-gray-400 mb-2">Assigned Judges:</h3>
+                    {% if practice.assigned_judges %}
+                    <div class="flex flex-wrap gap-2">
+                        {% for judge in practice.assigned_judges %}
+                        <span class="bg-green-600/20 text-green-400 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                            {{ judge }}
+                            <button onclick="unassignJudge('{{ practice.id }}', '{{ judge }}')"
+                                class="hover:text-red-400 ml-1">&times;</button>
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-gray-500 text-sm">No judges assigned yet</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-gray-800 rounded-lg p-8 text-center">
+            <p class="text-gray-400 mb-4">No practice competitions created yet</p>
+            <button onclick="showCreateModal()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg">
+                Create Your First Practice Competition
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Create Modal -->
+    <div id="createModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 class="text-xl font-bold mb-4">Create Practice Competition</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Name</label>
+                    <input type="text" id="practiceName" placeholder="e.g., 4-Way Practice Week 1"
+                        class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Category</label>
+                    <select id="practiceCategory"
+                        class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select a category...</option>
+                        {% for cat_id, cat in categories.items() %}
+                        <option value="{{ cat_id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="hideCreateModal()" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded">
+                    Cancel
+                </button>
+                <button onclick="createPractice()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded font-bold">
+                    Create
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assign Judges Modal -->
+    <div id="assignModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 class="text-xl font-bold mb-2">Assign Judges</h2>
+            <p class="text-gray-400 text-sm mb-4">Practice: <span id="assignPracticeName" class="text-white"></span></p>
+            <input type="hidden" id="assignPracticeId">
+
+            <div class="max-h-64 overflow-y-auto space-y-2">
+                {% for judge in judges %}
+                <label class="flex items-center gap-3 p-2 hover:bg-gray-700 rounded cursor-pointer judge-checkbox-label"
+                    data-username="{{ judge.username }}">
+                    <input type="checkbox" class="judge-checkbox w-4 h-4" value="{{ judge.username }}">
+                    <span class="flex-1">
+                        <span class="font-medium">{{ judge.name }}</span>
+                        <span class="text-gray-400 text-sm ml-2">@{{ judge.username }}</span>
+                    </span>
+                    <span class="text-xs px-2 py-0.5 rounded
+                        {% if judge.role == 'event_judge' %}bg-green-600{% else %}bg-gray-600{% endif %}">
+                        {{ judge.role|replace('_', ' ')|title }}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="hideAssignModal()" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded">
+                    Close
+                </button>
+                <button onclick="saveAssignments()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-bold">
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAssignedJudges = [];
+
+        function showCreateModal() {
+            document.getElementById('createModal').classList.remove('hidden');
+            document.getElementById('practiceName').value = '';
+            document.getElementById('practiceCategory').value = '';
+            document.getElementById('practiceName').focus();
+        }
+
+        function hideCreateModal() {
+            document.getElementById('createModal').classList.add('hidden');
+        }
+
+        async function createPractice() {
+            const name = document.getElementById('practiceName').value.trim();
+            const category = document.getElementById('practiceCategory').value;
+
+            if (!name) {
+                alert('Please enter a name');
+                return;
+            }
+            if (!category) {
+                alert('Please select a category');
+                return;
+            }
+
+            try {
+                const response = await fetch('/practice-competition/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, category })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert(result.error || 'Failed to create practice competition');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        function showAssignModal(practiceId, practiceName) {
+            document.getElementById('assignModal').classList.remove('hidden');
+            document.getElementById('assignPracticeId').value = practiceId;
+            document.getElementById('assignPracticeName').textContent = practiceName;
+
+            // Find current assignments from the page
+            const practiceCard = document.querySelector(`button[onclick*="'${practiceId}'"]`).closest('.bg-gray-800');
+            const badges = practiceCard.querySelectorAll('.bg-green-600\\/20');
+            currentAssignedJudges = Array.from(badges).map(b => b.textContent.trim().replace('×', '').trim());
+
+            // Check the appropriate checkboxes
+            document.querySelectorAll('.judge-checkbox').forEach(cb => {
+                cb.checked = currentAssignedJudges.includes(cb.value);
+            });
+        }
+
+        function hideAssignModal() {
+            document.getElementById('assignModal').classList.add('hidden');
+        }
+
+        async function saveAssignments() {
+            const practiceId = document.getElementById('assignPracticeId').value;
+            const selectedJudges = Array.from(document.querySelectorAll('.judge-checkbox:checked')).map(cb => cb.value);
+
+            // Find judges to add and remove
+            const toAdd = selectedJudges.filter(j => !currentAssignedJudges.includes(j));
+            const toRemove = currentAssignedJudges.filter(j => !selectedJudges.includes(j));
+
+            try {
+                // Add new assignments
+                for (const judge of toAdd) {
+                    await fetch(`/practice-competition/${practiceId}/assign`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ judge_username: judge })
+                    });
+                }
+
+                // Remove old assignments
+                for (const judge of toRemove) {
+                    await fetch(`/practice-competition/${practiceId}/unassign`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ judge_username: judge })
+                    });
+                }
+
+                location.reload();
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function unassignJudge(practiceId, judgeUsername) {
+            if (!confirm(`Remove ${judgeUsername} from this practice?`)) return;
+
+            try {
+                const response = await fetch(`/practice-competition/${practiceId}/unassign`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ judge_username: judgeUsername })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert(result.error || 'Failed to remove judge');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function deletePractice(practiceId, practiceName) {
+            if (!confirm(`Delete practice competition "${practiceName}"? This cannot be undone.`)) return;
+
+            try {
+                const response = await fetch(`/practice-competition/${practiceId}/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert(result.error || 'Failed to delete');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        // Close modals on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                hideCreateModal();
+                hideAssignModal();
+            }
+        });
+    </script>
+</body>
+</html>

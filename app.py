@@ -798,6 +798,28 @@ def init_db():
         except:
             pass
 
+        # Practice competitions tables
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS practice_competitions (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                status TEXT DEFAULT 'active'
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS practice_assignments (
+                id TEXT PRIMARY KEY,
+                practice_id TEXT NOT NULL,
+                judge_username TEXT NOT NULL,
+                assigned_at TEXT NOT NULL,
+                FOREIGN KEY (practice_id) REFERENCES practice_competitions(id)
+            )
+        ''')
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 username TEXT PRIMARY KEY,
@@ -4663,6 +4685,159 @@ def competitions_list():
         import traceback
         traceback.print_exc()
         return f"Error loading competitions: {str(e)}", 500
+
+
+# Practice Competitions Routes
+@app.route('/practice-competitions')
+@chief_judge_required
+def practice_competitions_list():
+    """Show all practice competitions (chief judge only)."""
+    practice_comps = get_all_practice_competitions()
+    judges = get_all_users()
+    judges = [u for u in judges if u.get('role') in ['judge', 'event_judge']]
+
+    return render_template('practice_competitions.html',
+                         practice_competitions=practice_comps,
+                         judges=judges,
+                         categories=CATEGORIES,
+                         is_admin=session.get('role') == 'admin')
+
+
+@app.route('/practice-competition/create', methods=['POST'])
+@chief_judge_required
+def create_practice_competition():
+    """Create a new practice competition."""
+    data = request.json
+    name = data.get('name', '').strip()
+    category = data.get('category', '').strip()
+
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+    if not category:
+        return jsonify({'error': 'Category is required'}), 400
+
+    practice_id = str(uuid.uuid4())
+    practice_data = {
+        'id': practice_id,
+        'name': name,
+        'category': category,
+        'created_by': session.get('username'),
+        'created_at': datetime.now().isoformat(),
+        'status': 'active'
+    }
+
+    if USE_SUPABASE:
+        supabase.table('practice_competitions').insert(practice_data).execute()
+    else:
+        db = get_sqlite_db()
+        db.execute('''
+            INSERT INTO practice_competitions (id, name, category, created_by, created_at, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (practice_data['id'], practice_data['name'], practice_data['category'],
+              practice_data['created_by'], practice_data['created_at'], practice_data['status']))
+        db.commit()
+
+    return jsonify({'success': True, 'id': practice_id})
+
+
+@app.route('/practice-competition/<practice_id>/assign', methods=['POST'])
+@chief_judge_required
+def assign_judge_to_practice(practice_id):
+    """Assign a judge to a practice competition."""
+    data = request.json
+    judge_username = data.get('judge_username', '').strip()
+
+    if not judge_username:
+        return jsonify({'error': 'Judge username is required'}), 400
+
+    # Check if already assigned
+    if USE_SUPABASE:
+        existing = supabase.table('practice_assignments').select('id').eq('practice_id', practice_id).eq('judge_username', judge_username).execute()
+        if existing.data:
+            return jsonify({'error': 'Judge already assigned'}), 400
+
+        assignment_id = str(uuid.uuid4())
+        supabase.table('practice_assignments').insert({
+            'id': assignment_id,
+            'practice_id': practice_id,
+            'judge_username': judge_username,
+            'assigned_at': datetime.now().isoformat()
+        }).execute()
+    else:
+        db = get_sqlite_db()
+        existing = db.execute('SELECT id FROM practice_assignments WHERE practice_id = ? AND judge_username = ?',
+                             (practice_id, judge_username)).fetchone()
+        if existing:
+            return jsonify({'error': 'Judge already assigned'}), 400
+
+        assignment_id = str(uuid.uuid4())
+        db.execute('''
+            INSERT INTO practice_assignments (id, practice_id, judge_username, assigned_at)
+            VALUES (?, ?, ?, ?)
+        ''', (assignment_id, practice_id, judge_username, datetime.now().isoformat()))
+        db.commit()
+
+    return jsonify({'success': True})
+
+
+@app.route('/practice-competition/<practice_id>/unassign', methods=['POST'])
+@chief_judge_required
+def unassign_judge_from_practice(practice_id):
+    """Remove a judge from a practice competition."""
+    data = request.json
+    judge_username = data.get('judge_username', '').strip()
+
+    if not judge_username:
+        return jsonify({'error': 'Judge username is required'}), 400
+
+    if USE_SUPABASE:
+        supabase.table('practice_assignments').delete().eq('practice_id', practice_id).eq('judge_username', judge_username).execute()
+    else:
+        db = get_sqlite_db()
+        db.execute('DELETE FROM practice_assignments WHERE practice_id = ? AND judge_username = ?',
+                  (practice_id, judge_username))
+        db.commit()
+
+    return jsonify({'success': True})
+
+
+@app.route('/practice-competition/<practice_id>/delete', methods=['POST'])
+@chief_judge_required
+def delete_practice_competition(practice_id):
+    """Delete a practice competition."""
+    if USE_SUPABASE:
+        supabase.table('practice_assignments').delete().eq('practice_id', practice_id).execute()
+        supabase.table('practice_competitions').delete().eq('id', practice_id).execute()
+    else:
+        db = get_sqlite_db()
+        db.execute('DELETE FROM practice_assignments WHERE practice_id = ?', (practice_id,))
+        db.execute('DELETE FROM practice_competitions WHERE id = ?', (practice_id,))
+        db.commit()
+
+    return jsonify({'success': True})
+
+
+def get_all_practice_competitions():
+    """Get all practice competitions with assigned judges."""
+    if USE_SUPABASE:
+        result = supabase.table('practice_competitions').select('*').order('created_at', desc=True).execute()
+        practice_comps = result.data or []
+
+        # Get assignments for each practice competition
+        for pc in practice_comps:
+            assignments = supabase.table('practice_assignments').select('judge_username').eq('practice_id', pc['id']).execute()
+            pc['assigned_judges'] = [a['judge_username'] for a in (assignments.data or [])]
+    else:
+        db = get_sqlite_db()
+        practice_comps = [dict(row) for row in db.execute(
+            'SELECT * FROM practice_competitions ORDER BY created_at DESC').fetchall()]
+
+        for pc in practice_comps:
+            assignments = db.execute('SELECT judge_username FROM practice_assignments WHERE practice_id = ?',
+                                    (pc['id'],)).fetchall()
+            pc['assigned_judges'] = [a['judge_username'] for a in assignments]
+
+    return practice_comps
 
 
 @app.route('/competition/<comp_id>')
