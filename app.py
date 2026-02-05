@@ -3002,14 +3002,14 @@ def bulk_import_urls():
 
         for url in urls:
             try:
-                # Extract title from URL
-                # For Dropbox: get filename from URL
-                # For YouTube/Vimeo: fetch from API
+                # Extract title from URL - NO external API calls for speed/reliability
                 title = ''
                 yt_meta = None
                 vimeo_meta = None
 
-                if 'dropbox.com' in url.lower() or 'dropboxusercontent.com' in url.lower():
+                url_lower = url.lower()
+
+                if 'dropbox.com' in url_lower or 'dropboxusercontent.com' in url_lower:
                     # Extract filename from Dropbox URL
                     import urllib.parse
                     parsed = urllib.parse.urlparse(url)
@@ -3021,21 +3021,23 @@ def bulk_import_urls():
                             filename = filename.split('?')[0]
                         title = os.path.splitext(filename)[0].replace('_', ' ').replace('-', ' ')
 
-                elif 'youtube.com' in url.lower() or 'youtu.be' in url.lower():
-                    # Fetch YouTube metadata
-                    yt_meta = fetch_youtube_metadata(url)
-                    if yt_meta:
-                        title = yt_meta.get('title', 'YouTube Video')
-                    else:
-                        title = 'YouTube Video'
+                elif 'youtube.com' in url_lower or 'youtu.be' in url_lower:
+                    # Extract video ID for title and thumbnail - no API call
+                    yt_id = None
+                    if 'youtu.be/' in url:
+                        yt_id = url.split('youtu.be/')[-1].split('?')[0]
+                    elif 'v=' in url:
+                        yt_id = url.split('v=')[-1].split('&')[0]
+                    title = f'YouTube Video {yt_id}' if yt_id else 'YouTube Video'
+                    yt_meta = {'thumbnail': f'https://img.youtube.com/vi/{yt_id}/hqdefault.jpg'} if yt_id else None
 
-                elif 'vimeo.com' in url.lower():
-                    # Fetch Vimeo metadata
-                    vimeo_meta = fetch_vimeo_metadata(url)
-                    if vimeo_meta:
-                        title = vimeo_meta.get('title', 'Vimeo Video')
-                    else:
-                        title = 'Vimeo Video'
+                elif 'vimeo.com' in url_lower:
+                    # Extract video ID for title - no API call
+                    vimeo_id = url.rstrip('/').split('/')[-1].split('?')[0]
+                    # Handle unlisted videos with hash
+                    if '/' in vimeo_id:
+                        vimeo_id = vimeo_id.split('/')[0]
+                    title = f'Vimeo Video {vimeo_id}' if vimeo_id.isdigit() else 'Vimeo Video'
 
                 else:
                     # Generic URL - try to get filename
