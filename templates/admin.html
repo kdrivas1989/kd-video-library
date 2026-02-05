@@ -206,9 +206,17 @@ https://www.youtube.com/watch?v=xxxxx"
                 </div>
                 <div>
                     <label class="block text-gray-300 mb-2">Folder/Showcase (optional)</label>
-                    <input type="text" id="vimeoFolder" placeholder="Leave empty for all videos"
-                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
-                    <p class="text-xs text-gray-500 mt-1">Folder ID or showcase name to filter</p>
+                    <div class="flex gap-2">
+                        <select id="vimeoFolder"
+                            class="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="">All Videos</option>
+                        </select>
+                        <button type="button" onclick="loadVimeoFolders()"
+                            class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-sm whitespace-nowrap">
+                            Load Folders
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1" id="vimeoFolderStatus">Click "Load Folders" to see available folders</p>
                 </div>
             </div>
             <div class="flex items-center gap-4 mb-4">
@@ -759,6 +767,63 @@ https://www.youtube.com/watch?v=xxxxx"
         let vimeoDetectedCategory = null;
         let vimeoDetectedSubcategory = null;
         let vimeoFolderName = '';
+        let vimeoFoldersLoaded = false;
+
+        async function loadVimeoFolders() {
+            const token = document.getElementById('vimeoAccessToken').value.trim();
+            const folderSelect = document.getElementById('vimeoFolder');
+            const statusEl = document.getElementById('vimeoFolderStatus');
+
+            if (!token) {
+                alert('Please enter your Vimeo access token first');
+                return;
+            }
+
+            statusEl.textContent = 'Loading folders...';
+
+            try {
+                const response = await fetch('/admin/fetch-vimeo-folders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Clear existing options except "All Videos"
+                    folderSelect.innerHTML = '<option value="">All Videos</option>';
+
+                    // Add folders sorted by name
+                    const folders = result.folders.sort((a, b) => a.name.localeCompare(b.name));
+                    for (const folder of folders) {
+                        const option = document.createElement('option');
+                        option.value = folder.id;
+                        option.textContent = `${folder.name} (${folder.video_count} videos)`;
+                        if (folder.detected_category) {
+                            option.textContent += ` [${folder.detected_category}]`;
+                        }
+                        folderSelect.appendChild(option);
+                    }
+
+                    vimeoFoldersLoaded = true;
+                    statusEl.textContent = `Loaded ${folders.length} folder(s)`;
+                    statusEl.classList.add('text-green-400');
+                    statusEl.classList.remove('text-red-400');
+
+                    // Save token since it worked
+                    localStorage.setItem('vimeoAccessToken', token);
+                } else {
+                    statusEl.textContent = 'Error: ' + result.error;
+                    statusEl.classList.add('text-red-400');
+                    statusEl.classList.remove('text-green-400');
+                }
+            } catch (err) {
+                statusEl.textContent = 'Error: ' + err.message;
+                statusEl.classList.add('text-red-400');
+                statusEl.classList.remove('text-green-400');
+            }
+        }
 
         async function fetchVimeoVideos() {
             const token = document.getElementById('vimeoAccessToken').value.trim();
@@ -959,6 +1024,11 @@ https://www.youtube.com/watch?v=xxxxx"
 
         // Update display when checkbox changes
         document.getElementById('vimeoIncludeTitles')?.addEventListener('change', displayVimeoVideos);
+
+        // Auto-load Vimeo folders if token is saved
+        if (document.getElementById('vimeoAccessToken')?.value) {
+            setTimeout(loadVimeoFolders, 500);
+        }
 
         function handleDragOver(e) {
             e.preventDefault();
