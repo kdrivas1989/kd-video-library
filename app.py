@@ -4507,51 +4507,37 @@ def bulk_set_event():
 
 
 def generate_thumbnail_from_s3_video(video_url, video_id):
-    """Download S3 video, generate thumbnail, upload to S3, return thumbnail URL."""
+    """Generate thumbnail from S3 video URL using ffmpeg (streams directly, no full download)."""
     import tempfile
-    import urllib.request
 
     if not USE_S3:
         return None
 
-    temp_video = None
     temp_thumb = None
 
     try:
-        # Create temp files
-        temp_video = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+        # Create temp file for thumbnail
         temp_thumb = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
-        temp_video.close()
         temp_thumb.close()
 
-        # Download video from S3/CloudFront
-        print(f"[THUMB] Downloading video: {video_url[:80]}...")
-        req = urllib.request.Request(video_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=30) as response:
-            with open(temp_video.name, 'wb') as f:
-                # Read in chunks to handle large files
-                while True:
-                    chunk = response.read(1024 * 1024)  # 1MB chunks
-                    if not chunk:
-                        break
-                    f.write(chunk)
-
-        # Generate thumbnail with ffmpeg
+        # Use ffmpeg to read directly from URL (streams only what's needed)
         print(f"[THUMB] Generating thumbnail for {video_id}...")
         result = subprocess.run([
-            'ffmpeg', '-y', '-i', temp_video.name,
-            '-ss', '00:00:02', '-vframes', '1',
+            'ffmpeg', '-y',
+            '-ss', '2',  # Seek to 2 seconds BEFORE opening (faster)
+            '-i', video_url,
+            '-vframes', '1',
             '-vf', 'scale=320:-1',
             temp_thumb.name
-        ], capture_output=True, timeout=30)
+        ], capture_output=True, timeout=15)
 
         if result.returncode != 0:
-            print(f"[THUMB] FFmpeg error: {result.stderr.decode()[:200]}")
+            print(f"[THUMB] FFmpeg error for {video_id}: {result.stderr.decode()[:200]}")
             return None
 
         # Check if thumbnail was created
         if not os.path.exists(temp_thumb.name) or os.path.getsize(temp_thumb.name) == 0:
-            print(f"[THUMB] Thumbnail file not created or empty")
+            print(f"[THUMB] Thumbnail file not created or empty for {video_id}")
             return None
 
         # Upload thumbnail to S3
@@ -4562,18 +4548,19 @@ def generate_thumbnail_from_s3_video(video_url, video_id):
         thumb_url = upload_to_s3(thumb_data, thumb_filename, 'image/jpeg', 'thumbnails')
 
         if thumb_url:
-            print(f"[THUMB] Uploaded thumbnail: {thumb_url}")
+            print(f"[THUMB] Uploaded: {thumb_url}")
 
         return thumb_url
 
+    except subprocess.TimeoutExpired:
+        print(f"[THUMB] Timeout for {video_id}")
+        return None
     except Exception as e:
-        print(f"[THUMB] Error generating thumbnail for {video_id}: {e}")
+        print(f"[THUMB] Error for {video_id}: {e}")
         return None
     finally:
-        # Clean up temp files
+        # Clean up temp file
         try:
-            if temp_video and os.path.exists(temp_video.name):
-                os.unlink(temp_video.name)
             if temp_thumb and os.path.exists(temp_thumb.name):
                 os.unlink(temp_thumb.name)
         except:
@@ -4600,8 +4587,8 @@ def refresh_thumbnails():
         if not missing_thumbs:
             return jsonify({'success': True, 'message': 'All videos already have thumbnails', 'updated': 0})
 
-        # Process 50 videos per request
-        batch = missing_thumbs[:50]
+        # Process 10 videos per request
+        batch = missing_thumbs[:10]
         updated = 0
         errors = []
 
