@@ -72,9 +72,31 @@
             </div>
         </div>
 
+        <!-- S3 Upload Status Banner -->
+        <div id="s3StatusBanner" class="hidden bg-green-900/30 border border-green-700 rounded-lg p-4 mb-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <div>
+                        <span class="text-green-400 font-medium">AWS S3 Connected</span>
+                        <span id="s3BucketName" class="text-gray-400 ml-2"></span>
+                    </div>
+                </div>
+                <span class="text-gray-400 text-sm">Videos will be uploaded directly to S3</span>
+            </div>
+        </div>
+
         <!-- Direct File Upload -->
         <div class="bg-gray-800 rounded-lg p-6 mb-8">
-            <h2 class="text-xl font-bold mb-4">Upload Video Files</h2>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold">Upload Video Files</h2>
+                <div id="uploadDestination" class="text-sm">
+                    <span class="text-gray-400">Upload to: </span>
+                    <span id="uploadDestinationLabel" class="text-blue-400">Local/Supabase</span>
+                </div>
+            </div>
             <p class="text-gray-400 text-sm mb-4">Drag & drop video files or click to select. MP4, WebM, MOV supported. MTS/AVI/MKV will be converted.</p>
             <div class="flex flex-wrap gap-4 items-end mb-4">
                 <div class="w-48">
@@ -495,6 +517,29 @@ https://www.youtube.com/watch?v=xxxxx"
     <script>
         const categories = {{ categories | tojson }};
         let pendingFiles = []; // Store files selected from Dropbox
+        let s3Enabled = false;
+        let s3Bucket = null;
+
+        // Check S3 status on page load
+        async function checkS3Status() {
+            try {
+                const response = await fetch('/admin/s3-status');
+                const result = await response.json();
+                s3Enabled = result.enabled;
+                s3Bucket = result.bucket;
+
+                if (s3Enabled) {
+                    document.getElementById('s3StatusBanner').classList.remove('hidden');
+                    document.getElementById('s3BucketName').textContent = `(${s3Bucket})`;
+                    document.getElementById('uploadDestinationLabel').textContent = 'AWS S3';
+                    document.getElementById('uploadDestinationLabel').classList.remove('text-blue-400');
+                    document.getElementById('uploadDestinationLabel').classList.add('text-green-400');
+                }
+            } catch (err) {
+                console.log('S3 status check failed:', err);
+            }
+        }
+        checkS3Status();
 
         // File Upload
         function updateUploadSubcategories() {
@@ -1087,8 +1132,13 @@ https://www.youtube.com/watch?v=xxxxx"
                 formData.append('title', file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '));
                 formData.append('background', 'true');
 
+                // Choose upload endpoint based on S3 status
+                const ext = file.name.split('.').pop().toLowerCase();
+                const s3Compatible = ['mp4', 'webm', 'mov', 'm4v', 'ogg', 'ogv'].includes(ext);
+                const uploadUrl = (s3Enabled && s3Compatible) ? '/admin/upload-to-s3' : '/admin/upload-video';
+
                 try {
-                    const response = await fetch('/admin/upload-video', {
+                    const response = await fetch(uploadUrl, {
                         method: 'POST',
                         body: formData
                     });
@@ -1102,7 +1152,8 @@ https://www.youtube.com/watch?v=xxxxx"
                             startConversionPolling();
                         } else {
                             uploaded++;
-                            results.push({ name: file.name, success: true, converted: result.converted });
+                            const dest = (s3Enabled && s3Compatible) ? ' (S3)' : '';
+                            results.push({ name: file.name, success: true, converted: result.converted, s3: s3Enabled && s3Compatible });
                         }
                     } else {
                         failed++;
@@ -1128,7 +1179,7 @@ https://www.youtube.com/watch?v=xxxxx"
                     <div class="max-h-32 overflow-y-auto text-sm">
                         ${results.map(r => `
                             <div class="${r.success ? (r.background ? 'text-yellow-400' : 'text-green-400') : 'text-red-400'}">
-                                ${r.success ? (r.background ? '⏳' : '✓') : '✗'} ${r.name} ${r.background ? '(converting...)' : ''} ${r.converted ? '(converted)' : ''} ${r.error ? '- ' + r.error : ''}
+                                ${r.success ? (r.background ? '⏳' : '✓') : '✗'} ${r.name} ${r.background ? '(converting...)' : ''} ${r.converted ? '(converted)' : ''} ${r.s3 ? '(S3)' : ''} ${r.error ? '- ' + r.error : ''}
                             </div>
                         `).join('')}
                     </div>

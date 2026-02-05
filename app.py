@@ -70,6 +70,93 @@ except ImportError as e:
 # Supabase Storage bucket name
 SUPABASE_BUCKET = 'videos'
 
+# AWS S3 Configuration
+try:
+    import boto3
+    from botocore.exceptions import ClientError, NoCredentialsError
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    AWS_S3_BUCKET = os.environ.get('AWS_S3_BUCKET')
+    AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
+    AWS_CLOUDFRONT_DOMAIN = os.environ.get('AWS_CLOUDFRONT_DOMAIN', '')  # Optional CDN
+
+    if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_S3_BUCKET:
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_REGION
+        )
+        USE_S3 = True
+        print(f"[STARTUP] AWS S3 configured: Bucket={AWS_S3_BUCKET}, Region={AWS_REGION}")
+    else:
+        s3_client = None
+        USE_S3 = False
+        print(f"[STARTUP] AWS S3 not configured (optional)")
+except ImportError:
+    s3_client = None
+    USE_S3 = False
+    print(f"[STARTUP] boto3 not installed, S3 disabled")
+
+
+def upload_to_s3(file_data, filename, content_type='video/mp4', folder='videos'):
+    """Upload a file to AWS S3 and return the public URL."""
+    if not USE_S3 or not s3_client:
+        return None
+
+    try:
+        # Create S3 key (path)
+        s3_key = f"{folder}/{filename}" if folder else filename
+
+        # Upload to S3
+        s3_client.put_object(
+            Bucket=AWS_S3_BUCKET,
+            Key=s3_key,
+            Body=file_data,
+            ContentType=content_type
+        )
+
+        # Return URL (CloudFront if configured, otherwise direct S3)
+        if AWS_CLOUDFRONT_DOMAIN:
+            url = f"https://{AWS_CLOUDFRONT_DOMAIN}/{s3_key}"
+        else:
+            url = f"https://{AWS_S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+
+        return url
+    except Exception as e:
+        print(f"S3 upload error: {e}")
+        return None
+
+
+def delete_from_s3(s3_key):
+    """Delete a file from AWS S3."""
+    if not USE_S3 or not s3_client:
+        return False
+
+    try:
+        s3_client.delete_object(Bucket=AWS_S3_BUCKET, Key=s3_key)
+        return True
+    except Exception as e:
+        print(f"S3 delete error: {e}")
+        return False
+
+
+def get_s3_presigned_url(s3_key, expires_in=3600):
+    """Generate a presigned URL for private S3 objects."""
+    if not USE_S3 or not s3_client:
+        return None
+
+    try:
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': AWS_S3_BUCKET, 'Key': s3_key},
+            ExpiresIn=expires_in
+        )
+        return url
+    except Exception as e:
+        print(f"S3 presigned URL error: {e}")
+        return None
+
 def upload_to_supabase_storage(file_path, storage_path):
     """Upload a file to Supabase Storage."""
     if not USE_SUPABASE or not supabase:
@@ -3610,6 +3697,123 @@ def upload_video():
 
     except Exception as e:
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+
+
+@app.route('/admin/upload-to-s3', methods=['POST'])
+@admin_required
+def upload_to_s3_endpoint():
+    """Upload a video file directly to AWS S3."""
+    if not USE_S3:
+        return jsonify({'error': 'S3 is not configured. Add AWS credentials to environment variables.'}), 400
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    # Get form data
+    title = request.form.get('title', '').strip()
+    category = request.form.get('category', '') or 'uncategorized'
+    subcategory = request.form.get('subcategory', '')
+    event = request.form.get('event', '').strip()
+
+    if category not in CATEGORIES:
+        category = 'uncategorized'
+
+    # Check file extension
+    filename = secure_filename(file.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    allowed_extensions = ('.mp4', '.webm', '.mov', '.m4v', '.ogg', '.ogv')
+
+    if ext not in allowed_extensions:
+        return jsonify({'error': f'Invalid file type for S3. Allowed: {", ".join(allowed_extensions)}. Convert MTS/AVI locally first.'}), 400
+
+    video_id = str(uuid.uuid4())[:8]
+
+    # Generate title from filename if not provided
+    if not title:
+        title = os.path.splitext(filename)[0].replace('_', ' ').replace('-', ' ')
+
+    # Auto-detect category from filename if uncategorized
+    category_auto = False
+    if category == 'uncategorized' or not category:
+        detected_cat, detected_sub, detected_event = detect_category_from_filename(file.filename)
+        if detected_cat and detected_cat in CATEGORIES:
+            category = detected_cat
+            category_auto = True
+            if detected_sub and not subcategory:
+                subcategory = detected_sub
+        if detected_event and not event:
+            event = detected_event
+
+    try:
+        # Read file data
+        file_data = file.read()
+
+        # Determine content type
+        content_types = {
+            '.mp4': 'video/mp4',
+            '.webm': 'video/webm',
+            '.mov': 'video/quicktime',
+            '.m4v': 'video/mp4',
+            '.ogg': 'video/ogg',
+            '.ogv': 'video/ogg'
+        }
+        content_type = content_types.get(ext, 'video/mp4')
+
+        # Create S3 filename with category folder structure
+        s3_filename = f"{video_id}{ext}"
+        s3_folder = f"{category}/{subcategory}" if subcategory else category
+
+        # Upload to S3
+        video_url = upload_to_s3(file_data, s3_filename, content_type, s3_folder)
+
+        if not video_url:
+            return jsonify({'error': 'Failed to upload to S3'}), 500
+
+        # Save video record to database
+        save_video({
+            'id': video_id,
+            'title': title,
+            'description': '',
+            'url': video_url,
+            'thumbnail': '',  # Could generate thumbnail with ffmpeg if needed
+            'category': category,
+            'subcategory': subcategory,
+            'tags': '',
+            'duration': '',
+            'created_at': datetime.now().isoformat(),
+            'views': 0,
+            'video_type': 's3',
+            'local_file': '',
+            'event': event,
+            'category_auto': category_auto,
+            's3_key': f"{s3_folder}/{s3_filename}"
+        })
+
+        return jsonify({
+            'success': True,
+            'message': 'Video uploaded to S3 successfully',
+            'id': video_id,
+            'url': video_url
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'S3 upload failed: {str(e)}'}), 500
+
+
+@app.route('/admin/s3-status', methods=['GET'])
+@admin_required
+def s3_status():
+    """Check S3 configuration status."""
+    return jsonify({
+        'enabled': USE_S3,
+        'bucket': AWS_S3_BUCKET if USE_S3 else None,
+        'region': AWS_REGION if USE_S3 else None,
+        'cloudfront': AWS_CLOUDFRONT_DOMAIN if USE_S3 and AWS_CLOUDFRONT_DOMAIN else None
+    })
 
 
 @app.route('/admin/import-folder', methods=['POST'])
