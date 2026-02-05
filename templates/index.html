@@ -20,6 +20,9 @@
                     </button>
                 </form>
                 {% if is_logged_in %}
+                    {% if is_chief_judge or is_admin %}
+                    <a href="/practice-competitions" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg">Practice Comp</a>
+                    {% endif %}
                     {% if is_admin %}
                     <a href="/admin" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg">Admin</a>
                     {% endif %}
