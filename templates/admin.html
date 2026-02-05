@@ -51,6 +51,12 @@
                 </button>
                 <p id="migrateS3Message" class="text-sm mt-2 hidden"></p>
 
+                <p class="text-gray-400 text-sm mb-3 mt-4">Delete all Vimeo videos (cannot be migrated to S3)</p>
+                <button onclick="deleteVimeoVideos()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm">
+                    Delete Vimeo Videos
+                </button>
+                <p id="deleteVimeoMessage" class="text-sm mt-2 hidden"></p>
+
                 <p class="text-gray-400 text-sm mb-3 mt-4">Remove duplicate videos (same URL or title+duration)</p>
                 <button onclick="fixDuplicates()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm">
                     Fix Duplicates
@@ -1021,6 +1027,37 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Migrate to S3';
+            }
+        }
+
+        // Delete Vimeo Videos
+        async function deleteVimeoVideos() {
+            if (!confirm('This will permanently delete ALL Vimeo videos from the database. Continue?')) {
+                return;
+            }
+
+            const msgDiv = document.getElementById('deleteVimeoMessage');
+            msgDiv.textContent = 'Deleting Vimeo videos...';
+            msgDiv.className = 'text-sm mt-2 text-yellow-400';
+            msgDiv.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/admin/delete-vimeo-videos', { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    msgDiv.textContent = result.message;
+                    msgDiv.className = 'text-sm mt-2 text-green-400';
+                    if (result.deleted > 0) {
+                        setTimeout(() => location.reload(), 2000);
+                    }
+                } else {
+                    msgDiv.textContent = result.error || 'Error deleting videos';
+                    msgDiv.className = 'text-sm mt-2 text-red-400';
+                }
+            } catch (error) {
+                msgDiv.textContent = 'Error: ' + error.message;
+                msgDiv.className = 'text-sm mt-2 text-red-400';
             }
         }
 

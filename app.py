@@ -4268,6 +4268,31 @@ def browse_folders():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/admin/delete-vimeo-videos', methods=['POST'])
+@admin_required
+def delete_vimeo_videos():
+    """Delete all Vimeo videos from the database."""
+    deleted = 0
+    try:
+        if USE_SUPABASE:
+            # Get all Vimeo videos
+            result = supabase.table('videos').select('id, url').execute()
+            for video in result.data:
+                if video.get('url') and 'vimeo.com' in video['url']:
+                    supabase.table('videos').delete().eq('id', video['id']).execute()
+                    deleted += 1
+        else:
+            db = get_sqlite_db()
+            cursor = db.execute("SELECT COUNT(*) FROM videos WHERE url LIKE '%vimeo.com%'")
+            deleted = cursor.fetchone()[0]
+            db.execute("DELETE FROM videos WHERE url LIKE '%vimeo.com%'")
+            db.commit()
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    return jsonify({'success': True, 'message': f'Deleted {deleted} Vimeo videos', 'deleted': deleted})
+
+
 @app.route('/admin/fix-duplicates', methods=['POST'])
 @admin_required
 def fix_duplicates():
