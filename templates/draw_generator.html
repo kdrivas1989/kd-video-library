@@ -562,7 +562,7 @@
                 blocksEl.innerHTML = Object.entries(fs4wayBlocks).map(([num, name]) =>
                     `<div class="text-center cursor-pointer hover:opacity-80" onclick="openModal('/static/formations/FS-${num}.png', '${num} - ${name}')">
                         <div class="font-bold text-lg">${num}</div>
-                        <img src="/static/formations/FS-${num}.png" alt="${num}" class="w-24 h-56 object-contain bg-white rounded mx-auto">
+                        <img src="/static/formations/FS-${num}.png" alt="${num}" class="w-24 bg-white rounded mx-auto">
                         <div class="text-xs text-gray-400 mt-1">${name}</div>
                     </div>`
                 ).join('');
