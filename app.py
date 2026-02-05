@@ -2584,8 +2584,7 @@ def admin_dashboard():
         events = []
         category_counts = {}
 
-    user = get_current_user()
-    is_admin = user and user.get('role') == 'admin'
+    is_admin = session.get('role') == 'admin'
 
     return render_template('admin.html',
                          videos=videos,
