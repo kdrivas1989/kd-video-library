@@ -7,6 +7,7 @@ load_dotenv()
 
 import os
 import re
+import time
 import uuid
 import json
 import subprocess
@@ -28,6 +29,7 @@ from io import BytesIO
 # Background conversion job tracking
 conversion_jobs = {}
 conversion_lock = threading.Lock()
+MAX_CONCURRENT_CONVERSIONS = 1  # Limit to prevent server overload
 
 # PDF generation
 try:
@@ -2098,9 +2100,19 @@ def get_video_duration_seconds(file_path):
 def background_convert_video(job_id, input_path, output_path, video_data, temp_file=None):
     """Run video conversion in background thread with real-time progress."""
     try:
+        # Wait in queue if too many conversions are running
         with conversion_lock:
-            conversion_jobs[job_id]['status'] = 'converting'
+            conversion_jobs[job_id]['status'] = 'queued'
             conversion_jobs[job_id]['progress'] = 0
+
+        while True:
+            with conversion_lock:
+                active_count = sum(1 for j in conversion_jobs.values()
+                                   if j.get('status') == 'converting')
+                if active_count < MAX_CONCURRENT_CONVERSIONS:
+                    conversion_jobs[job_id]['status'] = 'converting'
+                    break
+            time.sleep(2)  # Check every 2 seconds
 
         # Get input video duration for progress calculation
         total_duration = get_video_duration_seconds(input_path)
