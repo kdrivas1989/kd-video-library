@@ -125,6 +125,12 @@
                         Set Event
                     </button>
                 </div>
+                <!-- Sort by Team/Round -->
+                <div class="flex items-center gap-2 border-l border-gray-600 pl-4">
+                    <button onclick="sortByTeamRound()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-medium">
+                        Sort by Team/Round
+                    </button>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -648,6 +654,51 @@
             } catch (err) {
                 alert('Error: ' + err.message);
             }
+        }
+
+        // Sort videos by team number, then round number
+        function sortByTeamRound() {
+            // Find all video grids on the page
+            const grids = document.querySelectorAll('#videosGrid, .folder-content > div');
+
+            grids.forEach(grid => {
+                const videos = Array.from(grid.querySelectorAll('.video-card'));
+                if (videos.length === 0) return;
+
+                // Parse team and round from title
+                // Format: "226 5" - last two numbers are team (226) and round (5)
+                function parseTeamRound(title) {
+                    const nums = title.match(/\d+/g);
+                    if (nums && nums.length >= 2) {
+                        const team = parseInt(nums[nums.length - 2]);
+                        const round = parseInt(nums[nums.length - 1]);
+                        return { team, round };
+                    } else if (nums && nums.length === 1) {
+                        return { team: parseInt(nums[0]), round: 0 };
+                    }
+                    return { team: 999999, round: 999999 };
+                }
+
+                videos.sort((a, b) => {
+                    // Get title from the video card
+                    const titleA = a.querySelector('h3, .font-semibold, a')?.textContent?.trim() || '';
+                    const titleB = b.querySelector('h3, .font-semibold, a')?.textContent?.trim() || '';
+
+                    const parsedA = parseTeamRound(titleA);
+                    const parsedB = parseTeamRound(titleB);
+
+                    // Sort by team first, then by round
+                    if (parsedA.team !== parsedB.team) {
+                        return parsedA.team - parsedB.team;
+                    }
+                    return parsedA.round - parsedB.round;
+                });
+
+                // Re-append in sorted order
+                videos.forEach(video => grid.appendChild(video));
+            });
+
+            alert('Sorted by team/round');
         }
 
         async function renameFolder(folderId, currentName) {
