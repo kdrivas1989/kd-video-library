@@ -663,11 +663,13 @@
 
         // Sort videos by team number, then round number
         function sortByTeamRound() {
-            // Find all video grids on the page
-            const grids = document.querySelectorAll('#videosGrid, .folder-content > div');
+            // Find all video grids on the page (grids have the grid class and data-folder attribute, or are #videosGrid)
+            const grids = document.querySelectorAll('#videosGrid, [data-folder].grid, div.grid[class*="grid-cols"]');
 
             grids.forEach(grid => {
-                const videos = Array.from(grid.querySelectorAll('.video-card'));
+                // Skip if this isn't actually a grid with video cards
+                if (!grid.classList.contains('grid')) return;
+                const videos = Array.from(grid.querySelectorAll(':scope > .video-card'));
                 if (videos.length === 0) return;
 
                 // Parse team and round from title
