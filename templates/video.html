@@ -1170,6 +1170,11 @@
         let videoStartTime = {{ video.start_time|default(0, true) }};
         let workingTimeVideoStart = null; // Captured when judge first starts timer
         let freezeFrameVideoTime = null; // Captured when timer ends (T or natural)
+
+        // Replay state variables (must be declared early for timeupdate listener)
+        let replayAutoStartPending = false;
+        let replayStopAtFreezeFrame = false;
+        let replayStartedTime = null;
         const videoId = '{{ video.id }}';
         const currentAssignmentId = {% if current_assignment %}'{{ current_assignment.id }}'{% else %}null{% endif %};
 
@@ -3582,10 +3587,6 @@
             `;
             document.body.appendChild(modal);
         }
-
-        let replayAutoStartPending = false; // Flag to auto-start timer on replay
-        let replayStopAtFreezeFrame = false; // Flag to stop at freeze frame during replay
-        let replayStartedTime = null; // Track the replay start position to avoid false triggers
 
         function replayVideo() {
             // Stop timer but keep scores
