@@ -4277,8 +4277,8 @@ def assignments_page():
     """Manage video assignments (chief judge and above)."""
     videos = get_all_videos()
     users = get_all_users()
-    # Allow any user to be assigned for practice judging
-    judges = [u for u in users if u['role'] != 'admin']  # Exclude only admins
+    # Allow any user to be assigned (including admins)
+    judges = users  # Include all users including admins
     assignments = get_all_assignments()
     total_assignment_count = get_assignment_count()
 
