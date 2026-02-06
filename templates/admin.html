@@ -1094,13 +1094,15 @@
         }
 
         // Scan Durations
+        let durationScanInterval = null;
+
         async function scanDurations() {
             const btn = document.getElementById('scanDurationsBtn');
             const msgDiv = document.getElementById('scanDurationsMessage');
 
             btn.disabled = true;
-            btn.textContent = 'Scanning...';
-            msgDiv.textContent = 'Scanning videos for duration (this may take a while)...';
+            btn.textContent = 'Starting...';
+            msgDiv.textContent = 'Starting duration scan...';
             msgDiv.className = 'text-sm mt-2 text-yellow-400';
             msgDiv.classList.remove('hidden');
 
@@ -1109,12 +1111,12 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    msgDiv.textContent = result.message;
-                    msgDiv.className = 'text-sm mt-2 text-green-400';
-                    btn.disabled = false;
-                    btn.textContent = 'Scan Durations';
+                    btn.textContent = 'Scanning...';
+                    // Start polling for status
+                    durationScanInterval = setInterval(checkDurationScanStatus, 2000);
+                    checkDurationScanStatus();
                 } else {
-                    msgDiv.textContent = result.error || 'Error scanning durations';
+                    msgDiv.textContent = result.error || 'Error starting scan';
                     msgDiv.className = 'text-sm mt-2 text-red-400';
                     btn.disabled = false;
                     btn.textContent = 'Scan Durations';
@@ -1126,6 +1128,33 @@
                 btn.textContent = 'Scan Durations';
             }
         }
+
+        async function checkDurationScanStatus() {
+            const btn = document.getElementById('scanDurationsBtn');
+            const msgDiv = document.getElementById('scanDurationsMessage');
+
+            try {
+                const response = await fetch('/admin/scan-durations/status');
+                const status = await response.json();
+
+                if (status.running) {
+                    msgDiv.textContent = `Scanning ${status.current}/${status.total}: ${status.current_video}... (${status.updated} updated, ${status.skipped} skipped, ${status.failed} failed)`;
+                    msgDiv.className = 'text-sm mt-2 text-yellow-400';
+                } else {
+                    // Scan complete
+                    clearInterval(durationScanInterval);
+                    msgDiv.textContent = `Complete: ${status.updated} updated, ${status.skipped} already had duration, ${status.failed} failed`;
+                    msgDiv.className = 'text-sm mt-2 text-green-400';
+                    btn.disabled = false;
+                    btn.textContent = 'Scan Durations';
+                }
+            } catch (error) {
+                console.error('Error checking scan status:', error);
+            }
+        }
+
+        // Check if scan is already running on page load
+        checkDurationScanStatus();
 
         let thumbsProcessed = 0;
         let thumbsTotal = 0;

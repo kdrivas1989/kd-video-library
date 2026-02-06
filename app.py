@@ -2447,21 +2447,41 @@ def get_video_duration_from_url(url):
     return None
 
 
-def scan_and_update_video_durations():
-    """Scan all videos and update their durations."""
-    videos = get_all_videos()
-    updated = 0
-    failed = 0
-    skipped = 0
+# Duration scan status tracking
+duration_scan_status = {
+    'running': False,
+    'updated': 0,
+    'failed': 0,
+    'skipped': 0,
+    'total': 0,
+    'current': 0,
+    'current_video': ''
+}
 
-    for video in videos:
+
+def scan_and_update_video_durations_background():
+    """Scan all videos and update their durations (runs in background)."""
+    global duration_scan_status
+
+    duration_scan_status['running'] = True
+    duration_scan_status['updated'] = 0
+    duration_scan_status['failed'] = 0
+    duration_scan_status['skipped'] = 0
+    duration_scan_status['current'] = 0
+
+    videos = get_all_videos()
+    duration_scan_status['total'] = len(videos)
+
+    for i, video in enumerate(videos):
+        duration_scan_status['current'] = i + 1
+        duration_scan_status['current_video'] = video.get('title', '')[:50]
+
         # Skip if already has duration
         if video.get('duration') and video['duration'].strip():
-            skipped += 1
+            duration_scan_status['skipped'] += 1
             continue
 
         duration = None
-        video_id = video['id']
 
         # Try local file first
         local_file = video.get('local_file')
@@ -2480,12 +2500,26 @@ def scan_and_update_video_durations():
         if duration:
             video['duration'] = duration
             save_video(video)
-            updated += 1
+            duration_scan_status['updated'] += 1
             print(f"[DURATION] Updated {video['title']}: {duration}")
         else:
-            failed += 1
+            duration_scan_status['failed'] += 1
 
-    return {'updated': updated, 'failed': failed, 'skipped': skipped}
+    duration_scan_status['running'] = False
+    print(f"[DURATION] Scan complete: {duration_scan_status['updated']} updated, {duration_scan_status['skipped']} skipped, {duration_scan_status['failed']} failed")
+
+
+def scan_and_update_video_durations():
+    """Start background duration scan."""
+    import threading
+    if duration_scan_status['running']:
+        return {'error': 'Scan already running'}
+
+    thread = threading.Thread(target=scan_and_update_video_durations_background)
+    thread.daemon = True
+    thread.start()
+
+    return {'started': True, 'total': len(get_all_videos())}
 
 
 import re
@@ -5220,13 +5254,23 @@ def migrate_to_s3():
 @app.route('/admin/scan-durations', methods=['POST'])
 @admin_required
 def scan_video_durations():
-    """Scan all videos and update their durations."""
+    """Start background scan of all videos to update their durations."""
     result = scan_and_update_video_durations()
+    if 'error' in result:
+        return jsonify({'success': False, 'error': result['error']}), 400
     return jsonify({
         'success': True,
-        'message': f"Updated {result['updated']} videos, {result['skipped']} already had duration, {result['failed']} failed",
+        'message': f"Duration scan started for {result['total']} videos",
+        'background': True,
         **result
     })
+
+
+@app.route('/admin/scan-durations/status')
+@admin_required
+def scan_video_durations_status():
+    """Get status of background duration scan."""
+    return jsonify(duration_scan_status)
 
 
 @app.route('/admin/import-folder', methods=['POST'])
