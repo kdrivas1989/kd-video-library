@@ -26,7 +26,12 @@
 
     <div class="container mx-auto px-4 py-8">
         <h1 class="text-3xl font-bold mb-2">My Assignments</h1>
-        <p class="text-gray-400 mb-8">Videos assigned to you for review</p>
+        <p class="text-gray-400 mb-8">
+            Videos assigned to you for review
+            {% if total_assignments > 0 %}
+            <span class="text-gray-500">({{ total_assignments }} total{% if total_pages > 1 %}, page {{ page }} of {{ total_pages }}{% endif %})</span>
+            {% endif %}
+        </p>
 
         {% if error_message %}
         <div class="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-6">
@@ -124,6 +129,38 @@
             </div>
             {% endfor %}
         </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div class="flex justify-center items-center gap-2 mt-8">
+            {% if page > 1 %}
+            <a href="?page=1" class="px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 text-sm">First</a>
+            <a href="?page={{ page - 1 }}" class="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">
+                &larr; Previous
+            </a>
+            {% endif %}
+
+            <div class="flex gap-1">
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == page %}
+                    <span class="px-4 py-2 rounded bg-blue-600 text-white font-bold">{{ p }}</span>
+                    {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                    <a href="?page={{ p }}" class="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">{{ p }}</a>
+                    {% elif p == page - 3 or p == page + 3 %}
+                    <span class="px-2 py-2 text-gray-500">...</span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            {% if page < total_pages %}
+            <a href="?page={{ page + 1 }}" class="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">
+                Next &rarr;
+            </a>
+            <a href="?page={{ total_pages }}" class="px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 text-sm">Last</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
         {% else %}
         <div class="text-center py-16 text-gray-500">
             <svg class="w-24 h-24 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">

@@ -3388,19 +3388,27 @@ def my_assignments():
     username = session.get('username')
     error_message = None
 
+    # Pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 24, type=int)  # 24 fits nicely in grid
+    per_page = min(per_page, 100)  # Max 100 per page
+
     try:
-        assignments = get_assignments_for_user(username)
+        all_assignments = get_assignments_for_user(username)
     except Exception as e:
         print(f"Error fetching assignments: {e}")
-        assignments = []
+        all_assignments = []
         error_message = f"Error loading assignments: {str(e)[:100]}"
 
-    # Limit assignments displayed for performance (can add pagination later)
-    MAX_DISPLAY = 100
-    total_assignments = len(assignments)
-    if total_assignments > MAX_DISPLAY:
-        print(f"DEBUG my_assignments: Limiting {total_assignments} assignments to {MAX_DISPLAY}")
-        assignments = assignments[:MAX_DISPLAY]
+    # Calculate pagination
+    total_assignments = len(all_assignments)
+    total_pages = (total_assignments + per_page - 1) // per_page  # Ceiling division
+    page = max(1, min(page, total_pages)) if total_pages > 0 else 1
+
+    # Slice assignments for current page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    assignments = all_assignments[start_idx:end_idx]
 
     # Batch load video details to avoid N+1 queries
     if assignments:
@@ -3449,7 +3457,11 @@ def my_assignments():
                          categories=CATEGORIES,
                          is_admin=session.get('role') == 'admin',
                          is_chief_judge=session.get('role') in ['admin', 'chief_judge'],
-                         error_message=error_message)
+                         error_message=error_message,
+                         page=page,
+                         per_page=per_page,
+                         total_pages=total_pages,
+                         total_assignments=total_assignments)
 
 
 @app.route('/my-assignments/competition')
