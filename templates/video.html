@@ -485,6 +485,9 @@
                                     <span id="fsJudgeSpread" class="font-mono text-gray-300">0</span>
                                     <span id="fsSpreadWarning" class="text-red-400 text-sm hidden">⚠️ Large spread</span>
                                 </div>
+                                <button onclick="saveFsScore()" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-medium">
+                                    Save Score
+                                </button>
                             </div>
                         </div>
 
@@ -4549,6 +4552,37 @@
             } else {
                 document.getElementById('fsSpreadWarning').classList.add('hidden');
             }
+        }
+
+        function saveFsScore() {
+            const judges = [];
+            for (let i = 1; i <= currentJudgeCount; i++) {
+                const input = document.getElementById('fsJ' + i);
+                if (input && input.value !== '') {
+                    judges.push(parseInt(input.value) || 0);
+                }
+            }
+
+            if (judges.length === 0) {
+                alert('Please enter at least one judge score');
+                return;
+            }
+
+            const scoreData = {
+                id: Date.now(),
+                timestamp: new Date().toLocaleString(),
+                type: 'fs-multijudge',
+                judges: judges,
+                average: parseFloat(document.getElementById('fsJudgeAverage').textContent),
+                spread: parseInt(document.getElementById('fsJudgeSpread').textContent),
+                round: 'FS Round ' + (savedScores.filter(s => s.type === 'fs-multijudge').length + 1),
+                judgeCount: currentJudgeCount
+            };
+
+            savedScores.push(scoreData);
+            localStorage.setItem('practiceScores_' + videoId, JSON.stringify(savedScores));
+            displaySavedScores();
+            alert('Score saved: ' + scoreData.average + ' points');
         }
 
         function calculateCfAverage() {
