@@ -5711,14 +5711,59 @@
 
         // Show confirm score modal when timer ends
         function showConfirmScoreModal() {
-            const score = xCount - qCount;
             const workingTime = document.getElementById('timerDisplay').textContent;
-
-            document.getElementById('confirmScoreValue').textContent = score + ' pts';
             document.getElementById('confirmWorkingTimeValue').textContent = workingTime;
 
-            // Populate bust explanations
-            populateBustExplanations();
+            // Check if artistic panel is active
+            const artisticPanel = document.getElementById('artisticMultiJudgePanel');
+            const isArtisticMode = artisticPanel && !artisticPanel.classList.contains('hidden');
+
+            if (isArtisticMode) {
+                // Show artistic scoring summary
+                const totalScore = document.getElementById('artTotalScore')?.textContent || '0.00';
+                const difficulty = document.getElementById('artDifficulty')?.value || '0';
+                const execAvg = document.getElementById('artExecAvg')?.textContent || '0.00';
+                const presAvg = document.getElementById('artPresAvg')?.textContent || '0.00';
+                const camTotal = document.getElementById('artCamTotal')?.textContent || '0.00';
+
+                document.getElementById('confirmScoreValue').textContent = totalScore;
+                document.getElementById('confirmScoreValue').classList.remove('text-green-400');
+                document.getElementById('confirmScoreValue').classList.add('text-yellow-400');
+
+                // Update bust explanations section to show artistic breakdown
+                const bustList = document.getElementById('bustExplanationsList');
+                bustList.innerHTML = `
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div class="bg-gray-700 rounded p-2 text-center">
+                            <div class="text-gray-400 text-xs">Difficulty</div>
+                            <div class="text-cyan-400 font-mono font-bold">${difficulty}</div>
+                        </div>
+                        <div class="bg-gray-700 rounded p-2 text-center">
+                            <div class="text-gray-400 text-xs">Execution</div>
+                            <div class="text-cyan-400 font-mono font-bold">${execAvg}</div>
+                        </div>
+                        <div class="bg-gray-700 rounded p-2 text-center">
+                            <div class="text-gray-400 text-xs">Presentation</div>
+                            <div class="text-cyan-400 font-mono font-bold">${presAvg}</div>
+                        </div>
+                        <div class="bg-gray-700 rounded p-2 text-center">
+                            <div class="text-gray-400 text-xs">Camera</div>
+                            <div class="text-red-400 font-mono font-bold">${camTotal}</div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('bustExplanationsSection').querySelector('h3').textContent = 'Score Breakdown';
+            } else {
+                // Show FS-style scoring
+                const score = xCount - qCount;
+                document.getElementById('confirmScoreValue').textContent = score + ' pts';
+                document.getElementById('confirmScoreValue').classList.remove('text-yellow-400');
+                document.getElementById('confirmScoreValue').classList.add('text-green-400');
+
+                // Populate bust explanations
+                populateBustExplanations();
+                document.getElementById('bustExplanationsSection').querySelector('h3').textContent = 'Bust Explanations';
+            }
 
             document.getElementById('confirmScoreModal').classList.remove('hidden');
         }
