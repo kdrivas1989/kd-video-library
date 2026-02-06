@@ -1499,17 +1499,16 @@
             const container = document.getElementById('videoListContainer');
             const videos = Array.from(container.querySelectorAll('.video-list-item'));
 
-            // Parse team and round from title (e.g., "453 4" = team 453, round 4)
+            // Parse team and round from title
+            // Format: "3 168 4001 10" - last two numbers are team (4001) and round (10)
+            // Also handles "453 4" format
             function parseTeamRound(title) {
-                // Match patterns like "Team 453 Round 4", "453 4", "453_4", "453-4"
-                const match = title.match(/(\d+)\D*(\d+)/);
-                if (match) {
-                    return { team: parseInt(match[1]), round: parseInt(match[2]) };
-                }
-                // Try to find any numbers
                 const nums = title.match(/\d+/g);
                 if (nums && nums.length >= 2) {
-                    return { team: parseInt(nums[0]), round: parseInt(nums[1]) };
+                    // Take the last two numbers as team and round
+                    const team = parseInt(nums[nums.length - 2]);
+                    const round = parseInt(nums[nums.length - 1]);
+                    return { team, round };
                 } else if (nums && nums.length === 1) {
                     return { team: parseInt(nums[0]), round: 0 };
                 }
