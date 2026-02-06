@@ -1171,10 +1171,10 @@
         let workingTimeVideoStart = null; // Captured when judge first starts timer
         let freezeFrameVideoTime = null; // Captured when timer ends (T or natural)
 
-        // Replay state variables (must be declared early for timeupdate listener)
-        let replayAutoStartPending = false;
-        let replayStopAtFreezeFrame = false;
-        let replayStartedTime = null;
+        // Replay state variables (using var for proper hoisting)
+        var replayAutoStartPending = false;
+        var replayStopAtFreezeFrame = false;
+        var replayStartedTime = null;
         const videoId = '{{ video.id }}';
         const currentAssignmentId = {% if current_assignment %}'{{ current_assignment.id }}'{% else %}null{% endif %};
 
@@ -2981,11 +2981,8 @@
             }
         }
 
-        // Initialize event type on page load (after timer variables are declared)
-        autoSelectEventType();
-        updateEventType();
-
         // USPA Dive Pool Rules per Event/Class (from SCM Chapter 9)
+        // Note: Must be declared before updateEventType() is called
         const divePoolRules = {
             // 4-Way FS
             '4way-fs': {
@@ -3187,6 +3184,10 @@
 
             resetTimer();
         }
+
+        // Initialize event type on page load (after all functions and constants are declared)
+        autoSelectEventType();
+        updateEventType();
 
         function getEventDuration() {
             const select = document.getElementById('eventType');
