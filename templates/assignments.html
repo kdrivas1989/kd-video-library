@@ -199,14 +199,17 @@
             if (selectedOption && selectedOption.dataset.subcategories) {
                 try {
                     const subcategories = JSON.parse(selectedOption.dataset.subcategories);
-                    for (const [key, value] of Object.entries(subcategories)) {
-                        const opt = document.createElement('option');
-                        opt.value = key;
-                        opt.textContent = value.name || key;
-                        opt.dataset.subsubcategories = JSON.stringify(value.subcategories || {});
-                        subcategorySelect.appendChild(opt);
+                    // Handle array format: [{id: 'xxx', name: 'XXX', subcategories: [...]}]
+                    if (Array.isArray(subcategories)) {
+                        subcategories.forEach(sub => {
+                            const opt = document.createElement('option');
+                            opt.value = sub.id;
+                            opt.textContent = sub.name;
+                            opt.dataset.subsubcategories = JSON.stringify(sub.subcategories || []);
+                            subcategorySelect.appendChild(opt);
+                        });
                     }
-                } catch (e) {}
+                } catch (e) { console.error('Error parsing subcategories:', e); }
             }
         }
 
@@ -221,13 +224,16 @@
             if (selectedOption && selectedOption.dataset.subsubcategories) {
                 try {
                     const subsubcategories = JSON.parse(selectedOption.dataset.subsubcategories);
-                    for (const [key, value] of Object.entries(subsubcategories)) {
-                        const opt = document.createElement('option');
-                        opt.value = key;
-                        opt.textContent = value.name || key;
-                        subSubcategorySelect.appendChild(opt);
+                    // Handle array format: [{id: 'xxx', name: 'XXX'}]
+                    if (Array.isArray(subsubcategories)) {
+                        subsubcategories.forEach(subsub => {
+                            const opt = document.createElement('option');
+                            opt.value = subsub.id;
+                            opt.textContent = subsub.name;
+                            subSubcategorySelect.appendChild(opt);
+                        });
                     }
-                } catch (e) {}
+                } catch (e) { console.error('Error parsing subsubcategories:', e); }
             }
         }
 
