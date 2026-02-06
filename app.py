@@ -640,12 +640,13 @@ def send_assignment_email(email, judge_name, judge_username, video_count, assign
         print(f"No email provided for judge {judge_name}")
         return False
 
-    msg = MIMEMultipart()
+    msg = MIMEMultipart('alternative')
     msg['From'] = SMTP_FROM_EMAIL or SMTP_USERNAME
     msg['To'] = email
     msg['Subject'] = f'Video Library - You Have Been Assigned {video_count} Video(s) to Judge'
 
-    body = f"""Hello {judge_name},
+    # Plain text fallback
+    plain_body = f"""Hello {judge_name},
 
 You have been assigned {video_count} video(s) to judge by {assigner_name}.
 
@@ -658,7 +659,94 @@ Your username: {judge_username}
 
 Thank you for your service as a judge!
 """
-    msg.attach(MIMEText(body, 'plain'))
+
+    # HTML email
+    html_body = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #1a1a2e;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1a1a2e; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #16213e; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px;">📹 Video Library</h1>
+                            <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 14px;">Judging Assignment Notification</p>
+                        </td>
+                    </tr>
+
+                    <!-- Body -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <h2 style="color: #ffffff; margin: 0 0 20px 0; font-size: 22px;">Hello {judge_name}!</h2>
+
+                            <p style="color: #b0b0b0; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+                                You have been assigned videos to judge by <strong style="color: #ffffff;">{assigner_name}</strong>.
+                            </p>
+
+                            <!-- Video Count Box -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+                                <tr>
+                                    <td style="background-color: #1a1a2e; border-radius: 8px; padding: 25px; text-align: center; border: 1px solid #333;">
+                                        <p style="color: #667eea; font-size: 48px; font-weight: bold; margin: 0;">{video_count}</p>
+                                        <p style="color: #b0b0b0; font-size: 14px; margin: 5px 0 0 0; text-transform: uppercase; letter-spacing: 1px;">Videos to Judge</p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #ff6b6b; font-size: 16px; font-weight: bold; margin: 0 0 25px 0; text-align: center;">
+                                ⏰ Please complete your assignments as soon as possible.
+                            </p>
+
+                            <!-- CTA Button -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 30px;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{APP_URL}/my-assignments" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-size: 16px; font-weight: bold;">
+                                            View My Assignments
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Login Info -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1a1a2e; border-radius: 8px; border: 1px solid #333;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <p style="color: #b0b0b0; font-size: 14px; margin: 0 0 10px 0;">Your login credentials:</p>
+                                        <p style="color: #ffffff; font-size: 16px; margin: 0;">
+                                            <strong>Username:</strong> <span style="color: #667eea; font-family: monospace; background-color: #0f0f23; padding: 3px 8px; border-radius: 4px;">{judge_username}</span>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #0f0f23; padding: 20px 30px; text-align: center; border-top: 1px solid #333;">
+                            <p style="color: #666; font-size: 12px; margin: 0;">
+                                Thank you for your service as a judge!
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
+
+    msg.attach(MIMEText(plain_body, 'plain'))
+    msg.attach(MIMEText(html_body, 'html'))
 
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
