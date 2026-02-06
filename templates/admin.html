@@ -895,37 +895,118 @@
 
                 const ext = file.name.split('.').pop().toLowerCase();
                 const s3Compatible = ['mp4', 'webm', 'mov', 'm4v', 'ogg', 'ogv'].includes(ext);
-                const uploadUrl = (s3Enabled && s3Compatible) ? '/admin/upload-to-s3' : '/admin/upload-video';
 
                 try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 120000);
+                    // Use direct S3 upload if S3 is enabled and file is compatible
+                    if (s3Enabled && s3Compatible) {
+                        // Step 1: Get presigned URL
+                        const presignedResponse = await fetch('/admin/s3-presigned-upload', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                filename: file.name,
+                                content_type: file.type || 'video/mp4',
+                                category: categoryToUse || '',
+                                subcategory: manualSubcategory,
+                                title: file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '),
+                                event: eventToUse
+                            })
+                        });
+                        const presignedResult = await presignedResponse.json();
 
-                    const response = await fetch(uploadUrl, {
-                        method: 'POST',
-                        body: formData,
-                        signal: controller.signal
-                    });
-                    clearTimeout(timeoutId);
+                        if (!presignedResult.success) {
+                            throw new Error(presignedResult.error || 'Failed to get upload URL');
+                        }
 
-                    const result = await response.json();
+                        // Step 2: Upload directly to S3 with progress
+                        await new Promise((resolve, reject) => {
+                            const xhr = new XMLHttpRequest();
+                            xhr.open('PUT', presignedResult.presigned_url, true);
+                            xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
 
-                    if (result.success) {
-                        if (result.background) {
-                            backgroundJobs++;
-                            results.push({ name: file.name, success: true, background: true });
-                            startConversionPolling();
-                        } else {
+                            xhr.upload.onprogress = (e) => {
+                                if (e.lengthComputable) {
+                                    const percent = Math.round((e.loaded / e.total) * 100);
+                                    progressDiv.innerHTML = `
+                                        <div class="flex items-center gap-3">
+                                            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500"></div>
+                                            <span>Uploading ${i + 1}/${filesWithMeta.length}: ${file.name}</span>
+                                        </div>
+                                        <div class="mt-2 bg-gray-700 rounded-full h-2 overflow-hidden">
+                                            <div class="bg-green-500 h-full transition-all" style="width: ${percent}%"></div>
+                                        </div>
+                                        <div class="mt-1 text-sm text-gray-400">${percent}% - Uploading directly to S3...</div>
+                                    `;
+                                }
+                            };
+
+                            xhr.onload = () => {
+                                if (xhr.status >= 200 && xhr.status < 300) {
+                                    resolve();
+                                } else {
+                                    reject(new Error(`S3 upload failed: ${xhr.status}`));
+                                }
+                            };
+
+                            xhr.onerror = () => reject(new Error('Network error during S3 upload'));
+                            xhr.send(file);
+                        });
+
+                        // Step 3: Notify server that upload is complete
+                        const completeResponse = await fetch('/admin/s3-upload-complete', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                video_id: presignedResult.video_id,
+                                s3_key: presignedResult.s3_key,
+                                final_url: presignedResult.final_url,
+                                filename: file.name,
+                                title: file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '),
+                                category: categoryToUse || '',
+                                subcategory: manualSubcategory,
+                                event: eventToUse
+                            })
+                        });
+                        const completeResult = await completeResponse.json();
+
+                        if (completeResult.success) {
                             uploaded++;
-                            results.push({ name: file.name, success: true, s3: s3Enabled && s3Compatible });
+                            results.push({ name: file.name, success: true, s3: true });
+                        } else {
+                            failed++;
+                            results.push({ name: file.name, success: false, error: completeResult.error });
                         }
                     } else {
-                        failed++;
-                        results.push({ name: file.name, success: false, error: result.error });
+                        // Use server-side upload for non-S3 or conversion-needed files
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min timeout
+
+                        const response = await fetch('/admin/upload-video', {
+                            method: 'POST',
+                            body: formData,
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            if (result.background) {
+                                backgroundJobs++;
+                                results.push({ name: file.name, success: true, background: true });
+                                startConversionPolling();
+                            } else {
+                                uploaded++;
+                                results.push({ name: file.name, success: true, s3: false });
+                            }
+                        } else {
+                            failed++;
+                            results.push({ name: file.name, success: false, error: result.error });
+                        }
                     }
                 } catch (error) {
                     failed++;
-                    const errorMsg = error.name === 'AbortError' ? 'Upload timeout (2 min)' : error.message;
+                    const errorMsg = error.name === 'AbortError' ? 'Upload timeout' : error.message;
                     results.push({ name: file.name, success: false, error: errorMsg });
                 }
             }

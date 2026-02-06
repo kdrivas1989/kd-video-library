@@ -320,6 +320,27 @@ def get_s3_presigned_url(s3_key, expires_in=3600):
         print(f"S3 presigned URL error: {e}")
         return None
 
+
+def get_s3_presigned_upload_url(s3_key, content_type='video/mp4', expires_in=3600):
+    """Generate a presigned URL for uploading directly to S3."""
+    if not USE_S3 or not s3_client:
+        return None
+
+    try:
+        url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': AWS_S3_BUCKET,
+                'Key': s3_key,
+                'ContentType': content_type
+            },
+            ExpiresIn=expires_in
+        )
+        return url
+    except Exception as e:
+        print(f"S3 presigned upload URL error: {e}")
+        return None
+
 def upload_to_supabase_storage(file_path, storage_path):
     """Upload a file to Supabase Storage."""
     if not USE_SUPABASE or not supabase:
@@ -5194,6 +5215,113 @@ def s3_status():
         'bucket': AWS_S3_BUCKET if USE_S3 else None,
         'region': AWS_REGION if USE_S3 else None,
         'cloudfront': AWS_CLOUDFRONT_DOMAIN if USE_S3 and AWS_CLOUDFRONT_DOMAIN else None
+    })
+
+
+@app.route('/admin/s3-presigned-upload', methods=['POST'])
+@admin_required
+def get_presigned_upload_url():
+    """Generate a presigned URL for direct S3 upload."""
+    if not USE_S3:
+        return jsonify({'error': 'S3 is not configured'}), 400
+
+    data = request.get_json()
+    filename = data.get('filename', '')
+    content_type = data.get('content_type', 'video/mp4')
+    category = data.get('category', 'uncategorized')
+    subcategory = data.get('subcategory', '')
+    title = data.get('title', '')
+    event = data.get('event', '')
+
+    if not filename:
+        return jsonify({'error': 'Filename is required'}), 400
+
+    # Generate video ID and S3 key
+    video_id = str(uuid.uuid4())[:8]
+    ext = os.path.splitext(filename)[1].lower()
+
+    # Keep original extension for the S3 key
+    s3_key = f"videos/{video_id}{ext}"
+
+    # Generate presigned URL (valid for 1 hour)
+    presigned_url = get_s3_presigned_upload_url(s3_key, content_type, expires_in=3600)
+
+    if not presigned_url:
+        return jsonify({'error': 'Failed to generate presigned URL'}), 500
+
+    # Generate the final S3 URL (what the video will be accessible at)
+    if AWS_CLOUDFRONT_DOMAIN:
+        final_url = f"https://{AWS_CLOUDFRONT_DOMAIN}/{s3_key}"
+    else:
+        final_url = f"https://{AWS_S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+
+    return jsonify({
+        'success': True,
+        'presigned_url': presigned_url,
+        'video_id': video_id,
+        's3_key': s3_key,
+        'final_url': final_url
+    })
+
+
+@app.route('/admin/s3-upload-complete', methods=['POST'])
+@admin_required
+def s3_upload_complete():
+    """Called after direct S3 upload completes to create database entry."""
+    data = request.get_json()
+    video_id = data.get('video_id')
+    s3_key = data.get('s3_key')
+    final_url = data.get('final_url')
+    filename = data.get('filename', '')
+    title = data.get('title', '')
+    category = data.get('category', 'uncategorized')
+    subcategory = data.get('subcategory', '')
+    event = data.get('event', '')
+
+    if not video_id or not final_url:
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    # Auto-detect category from filename if uncategorized
+    category_auto = False
+    if category == 'uncategorized' or not category:
+        detected_cat, detected_sub, detected_event = detect_category_from_filename(filename)
+        if detected_cat and detected_cat in CATEGORIES:
+            category = detected_cat
+            category_auto = True
+            if detected_sub and not subcategory:
+                subcategory = detected_sub
+        if detected_event and not event:
+            event = detected_event
+
+    # Generate title from filename if not provided
+    if not title:
+        title = os.path.splitext(filename)[0].replace('_', ' ').replace('-', ' ')
+
+    # Save to database
+    video_data = {
+        'id': video_id,
+        'title': title,
+        'description': '',
+        'url': final_url,
+        'thumbnail': None,  # Thumbnail will be generated separately if needed
+        'category': category,
+        'subcategory': subcategory,
+        'tags': '',
+        'duration': None,
+        'created_at': datetime.now().isoformat(),
+        'views': 0,
+        'video_type': 'url',
+        'local_file': '',
+        'event': event,
+        'category_auto': category_auto
+    }
+
+    save_video(video_data)
+
+    return jsonify({
+        'success': True,
+        'video_id': video_id,
+        'message': 'Video saved successfully'
     })
 
 
