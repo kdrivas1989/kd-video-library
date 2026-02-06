@@ -2412,8 +2412,10 @@ def get_video_thumbnail(url):
 def get_video_duration(file_path):
     """Get video duration using ffprobe."""
     try:
+        # Use full path to ffprobe for systemd compatibility
+        ffprobe_cmd = '/usr/bin/ffprobe'
         result = subprocess.run(
-            ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+            [ffprobe_cmd, '-v', 'quiet', '-show_entries', 'format=duration',
              '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
             capture_output=True, text=True
         )
@@ -2428,10 +2430,12 @@ def get_video_duration(file_path):
 def get_video_duration_from_url(url):
     """Get video duration from URL using ffprobe."""
     try:
+        # Use full path to ffprobe for systemd compatibility
+        ffprobe_cmd = '/usr/bin/ffprobe'
         result = subprocess.run(
-            ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+            [ffprobe_cmd, '-v', 'quiet', '-show_entries', 'format=duration',
              '-of', 'default=noprint_wrappers=1:nokey=1', url],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, timeout=60
         )
         if result.returncode == 0 and result.stdout.strip():
             seconds = float(result.stdout.strip())
