@@ -608,144 +608,143 @@
 
                             <!-- FREE ROUTINE PANEL -->
                             <div id="artFreeRoutinePanel">
-                                <!-- Difficulty Score -->
-                                <div class="mb-4 p-3 bg-gray-800 rounded">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-gray-300 text-sm font-medium">Difficulty Score</span>
-                                            <span id="artDifficultyPresetBadge" class="hidden px-2 py-0.5 text-xs bg-green-600 rounded">PRE-SET</span>
-                                        </div>
-                                        <span class="text-xs text-gray-500">0.0 - 10.0</span>
+                                <!-- Judge Mode Toggle -->
+                                <div class="mb-4 flex items-center gap-4">
+                                    <span class="text-gray-400 text-sm">Judge Mode:</span>
+                                    <div class="flex rounded overflow-hidden">
+                                        <button type="button" id="btnArtSoloJudge" onclick="setArtisticJudgeMode('solo')"
+                                            class="px-3 py-1 text-sm bg-blue-600 text-white">Single Judge</button>
+                                        <button type="button" id="btnArtPanelJudge" onclick="setArtisticJudgeMode('panel')"
+                                            class="px-3 py-1 text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">3-Judge Panel</button>
                                     </div>
-                                    <div class="flex items-center gap-3">
-                                        <input type="number" id="artDifficulty" min="0" max="10" step="0.1" placeholder="0.0"
+                                </div>
+
+                                <!-- SINGLE JUDGE MODE -->
+                                <div id="artSoloJudgePanel">
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                        <div class="bg-gray-800 rounded p-3">
+                                            <label class="text-gray-400 text-xs block mb-1">Difficulty (0-10)</label>
+                                            <input type="number" id="artDifficulty" min="0" max="10" step="0.1" placeholder="0.0"
+                                                class="w-full px-3 py-2 rounded bg-gray-700 text-white text-center font-mono text-xl"
+                                                oninput="calculateUSPAArtisticScores()">
+                                            <span id="artDifficultyPresetBadge" class="hidden text-xs text-green-400 mt-1 block text-center">PRE-SET</span>
+                                        </div>
+                                        <div class="bg-gray-800 rounded p-3">
+                                            <label class="text-gray-400 text-xs block mb-1">Execution (0-10)</label>
+                                            <input type="number" id="artExecution" min="0" max="10" step="0.1" placeholder="0.0"
+                                                class="w-full px-3 py-2 rounded bg-gray-700 text-white text-center font-mono text-xl"
+                                                oninput="calculateUSPAArtisticScores()">
+                                        </div>
+                                        <div class="bg-gray-800 rounded p-3">
+                                            <label class="text-gray-400 text-xs block mb-1">Presentation (0-10)</label>
+                                            <input type="number" id="artPresentation" min="0" max="10" step="0.1" placeholder="0.0"
+                                                class="w-full px-3 py-2 rounded bg-gray-700 text-white text-center font-mono text-xl"
+                                                oninput="calculateUSPAArtisticScores()">
+                                        </div>
+                                        <div class="bg-gray-800 rounded p-3">
+                                            <label class="text-gray-400 text-xs block mb-1">Technical (0-10)</label>
+                                            <input type="number" id="artTechnical" min="0" max="10" step="0.1" placeholder="0.0"
+                                                class="w-full px-3 py-2 rounded bg-gray-700 text-white text-center font-mono text-xl"
+                                                oninput="calculateUSPAArtisticScores()">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 3-JUDGE PANEL MODE -->
+                                <div id="artPanelJudgePanel" class="hidden">
+                                    <!-- Difficulty Score -->
+                                    <div class="mb-4 p-3 bg-gray-800 rounded">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="text-gray-300 text-sm font-medium">Difficulty Score (0-10)</span>
+                                        </div>
+                                        <input type="number" id="artDifficultyPanel" min="0" max="10" step="0.1" placeholder="0.0"
                                             class="w-24 px-3 py-2 rounded bg-gray-700 text-white text-center font-mono text-lg" onchange="calculateUSPAArtisticScores()">
-                                        {% if is_chief_judge or is_admin %}
-                                        <button type="button" onclick="presetDifficultyForAllJudges()" class="px-3 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 rounded">
-                                            Pre-Set for All Judges
-                                        </button>
-                                        {% endif %}
+                                    </div>
+
+                                    <!-- Execution (3 judges) -->
+                                    <div class="mb-4 p-3 bg-gray-800 rounded">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="text-gray-300 text-sm font-medium">Execution Deductions</span>
+                                            <span class="text-xs text-gray-500">Negative values</span>
+                                        </div>
+                                        <div class="grid grid-cols-3 gap-3">
+                                            <div class="text-center">
+                                                <label class="text-xs text-gray-500 block mb-1">Judge 1</label>
+                                                <input type="number" id="artExecJ1" min="-10" max="0" step="0.1" value="0"
+                                                    class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                            </div>
+                                            <div class="text-center">
+                                                <label class="text-xs text-gray-500 block mb-1">Judge 2</label>
+                                                <input type="number" id="artExecJ2" min="-10" max="0" step="0.1" value="0"
+                                                    class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                            </div>
+                                            <div class="text-center">
+                                                <label class="text-xs text-gray-500 block mb-1">Judge 3</label>
+                                                <input type="number" id="artExecJ3" min="-10" max="0" step="0.1" value="0"
+                                                    class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                            </div>
+                                        </div>
+                                        <div class="text-right mt-2 text-sm">Avg: <span id="artExecAvg" class="text-red-400 font-mono font-bold">0.00</span></div>
+                                    </div>
+
+                                    <!-- Presentation (3 judges) -->
+                                    <div class="mb-4 p-3 bg-gray-800 rounded">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="text-gray-300 text-sm font-medium">Presentation (0-10)</span>
+                                        </div>
+                                        <div class="grid grid-cols-3 gap-3">
+                                            <div class="text-center">
+                                                <label class="text-xs text-gray-500 block mb-1">Judge 1</label>
+                                                <input type="number" id="artPresJ1" min="0" max="10" step="0.1"
+                                                    class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                            </div>
+                                            <div class="text-center">
+                                                <label class="text-xs text-gray-500 block mb-1">Judge 2</label>
+                                                <input type="number" id="artPresJ2" min="0" max="10" step="0.1"
+                                                    class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                            </div>
+                                            <div class="text-center">
+                                                <label class="text-xs text-gray-500 block mb-1">Judge 3</label>
+                                                <input type="number" id="artPresJ3" min="0" max="10" step="0.1"
+                                                    class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                            </div>
+                                        </div>
+                                        <div class="text-right mt-2 text-sm">Avg: <span id="artPresAvg" class="text-cyan-400 font-mono font-bold">0.00</span></div>
                                     </div>
                                 </div>
 
-                                <!-- Execution Deductions -->
-                                <div class="mb-4 p-3 bg-gray-800 rounded">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <span class="text-gray-300 text-sm font-medium">Execution Deductions</span>
-                                        <span class="text-xs text-gray-500">3 Judges</span>
-                                    </div>
-
-                                    <!-- Deduction types vary by discipline -->
-                                    <div id="execDeductionTypes" class="mb-3">
-                                        <div class="grid grid-cols-2 gap-2 text-xs mb-2">
-                                            <div class="text-gray-400">Missing element: <span class="text-red-400">-0.2 to -1.0</span></div>
-                                            <div class="text-gray-400">Off heading/wobble: <span class="text-red-400">-0.1 to -0.3</span></div>
-                                            <div id="freeflyCriteria" class="hidden contents">
-                                                <div class="text-gray-400">Teamwork issues: <span class="text-red-400">-0.5</span></div>
-                                            </div>
+                                <!-- Camera Deductions (shared) -->
+                                <details class="bg-gray-800 rounded mb-4">
+                                    <summary class="p-3 cursor-pointer text-gray-300 text-sm font-medium flex items-center justify-between">
+                                        <span>Camera Deductions</span>
+                                        <span id="artCamTotal" class="text-red-400 font-mono">0.00</span>
+                                    </summary>
+                                    <div class="p-3 pt-0 border-t border-gray-700">
+                                        <div class="grid grid-cols-2 gap-2 mb-2">
+                                            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
+                                                <input type="checkbox" id="camOutOfFrame" onchange="calculateUSPAArtisticScores()" class="rounded">
+                                                <span>Out of frame (-1.5)</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
+                                                <input type="checkbox" id="camOffCenter" onchange="calculateUSPAArtisticScores()" class="rounded">
+                                                <span>Off-center (-0.3)</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
+                                                <input type="checkbox" id="camProximity" onchange="calculateUSPAArtisticScores()" class="rounded">
+                                                <span>Proximity issues (-2.0)</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
+                                                <input type="checkbox" id="camCropping" onchange="calculateUSPAArtisticScores()" class="rounded">
+                                                <span>Cropping (-0.3)</span>
+                                            </label>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <label class="text-xs text-gray-500">Custom:</label>
+                                            <input type="number" id="camCustomDeduction" min="-10" max="0" step="0.1" value="0"
+                                                class="w-20 px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" onchange="calculateUSPAArtisticScores()">
                                         </div>
                                     </div>
-
-                                    <!-- Judge inputs for execution -->
-                                    <div class="grid grid-cols-3 gap-3">
-                                        <div class="text-center">
-                                            <label class="text-xs text-gray-500 block mb-1">Judge 1</label>
-                                            <input type="number" id="artExecJ1" min="-10" max="0" step="0.1" value="0" placeholder="0.0"
-                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
-                                            <div class="mt-1 flex gap-1 justify-center flex-wrap">
-                                                <button type="button" onclick="addExecDeduction(1, -0.2)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.2</button>
-                                                <button type="button" onclick="addExecDeduction(1, -0.5)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.5</button>
-                                                <button type="button" onclick="addExecDeduction(1, -1.0)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-1.0</button>
-                                            </div>
-                                        </div>
-                                        <div class="text-center">
-                                            <label class="text-xs text-gray-500 block mb-1">Judge 2</label>
-                                            <input type="number" id="artExecJ2" min="-10" max="0" step="0.1" value="0" placeholder="0.0"
-                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
-                                            <div class="mt-1 flex gap-1 justify-center flex-wrap">
-                                                <button type="button" onclick="addExecDeduction(2, -0.2)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.2</button>
-                                                <button type="button" onclick="addExecDeduction(2, -0.5)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.5</button>
-                                                <button type="button" onclick="addExecDeduction(2, -1.0)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-1.0</button>
-                                            </div>
-                                        </div>
-                                        <div class="text-center">
-                                            <label class="text-xs text-gray-500 block mb-1">Judge 3</label>
-                                            <input type="number" id="artExecJ3" min="-10" max="0" step="0.1" value="0" placeholder="0.0"
-                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
-                                            <div class="mt-1 flex gap-1 justify-center flex-wrap">
-                                                <button type="button" onclick="addExecDeduction(3, -0.2)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.2</button>
-                                                <button type="button" onclick="addExecDeduction(3, -0.5)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.5</button>
-                                                <button type="button" onclick="addExecDeduction(3, -1.0)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-1.0</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right mt-2 text-sm">
-                                        Avg Deduction: <span id="artExecAvg" class="text-red-400 font-mono font-bold">0.00</span>
-                                    </div>
-                                </div>
-
-                                <!-- Presentation Score -->
-                                <div class="mb-4 p-3 bg-gray-800 rounded">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <span class="text-gray-300 text-sm font-medium">Presentation</span>
-                                        <span class="text-xs text-gray-500">Creativity, flow, choreography (0-10)</span>
-                                    </div>
-                                    <div class="grid grid-cols-3 gap-3">
-                                        <div class="text-center">
-                                            <label class="text-xs text-gray-500 block mb-1">Judge 1</label>
-                                            <input type="number" id="artPresJ1" min="0" max="10" step="0.1" placeholder="0.0"
-                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
-                                        </div>
-                                        <div class="text-center">
-                                            <label class="text-xs text-gray-500 block mb-1">Judge 2</label>
-                                            <input type="number" id="artPresJ2" min="0" max="10" step="0.1" placeholder="0.0"
-                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
-                                        </div>
-                                        <div class="text-center">
-                                            <label class="text-xs text-gray-500 block mb-1">Judge 3</label>
-                                            <input type="number" id="artPresJ3" min="0" max="10" step="0.1" placeholder="0.0"
-                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
-                                        </div>
-                                    </div>
-                                    <div class="text-right mt-2 text-sm">
-                                        Avg: <span id="artPresAvg" class="text-cyan-400 font-mono font-bold">0.00</span>
-                                    </div>
-                                </div>
-
-                                <!-- Camera Deductions -->
-                                <div class="mb-4 p-3 bg-gray-800 rounded">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <span class="text-gray-300 text-sm font-medium">Camera Deductions</span>
-                                        <span id="artCameraTotal" class="text-red-400 font-mono font-bold">0.00</span>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
-                                            <input type="checkbox" id="camOutOfFrame" onchange="calculateUSPAArtisticScores()" class="rounded">
-                                            <span>Out of frame <span class="text-red-400 text-xs">(-1.0 to -2.0)</span></span>
-                                        </label>
-                                        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
-                                            <input type="checkbox" id="camOffCenter" onchange="calculateUSPAArtisticScores()" class="rounded">
-                                            <span>Off-center <span class="text-red-400 text-xs">(-0.1 to -0.5)</span></span>
-                                        </label>
-                                        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
-                                            <input type="checkbox" id="camProximity" onchange="calculateUSPAArtisticScores()" class="rounded">
-                                            <span>Proximity issues <span class="text-red-400 text-xs">(-2.0)</span></span>
-                                        </label>
-                                        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
-                                            <input type="checkbox" id="camCropping" onchange="calculateUSPAArtisticScores()" class="rounded">
-                                            <span>Cropping <span class="text-red-400 text-xs">(-0.1 to -0.5)</span></span>
-                                        </label>
-                                        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
-                                            <input type="checkbox" id="camEquipment" onchange="calculateUSPAArtisticScores()" class="rounded">
-                                            <span>Equipment in frame <span class="text-red-400 text-xs">(-0.1)</span></span>
-                                        </label>
-                                    </div>
-                                    <div class="mt-2">
-                                        <label class="text-xs text-gray-500">Custom camera deduction:</label>
-                                        <input type="number" id="camCustomDeduction" min="-10" max="0" step="0.1" value="0"
-                                            class="w-20 px-2 py-1 ml-2 rounded bg-gray-700 text-white text-center font-mono text-sm" onchange="calculateUSPAArtisticScores()">
-                                    </div>
-                                </div>
+                                </details>
                             </div>
 
                             <!-- COMPULSORY ROUTINE PANEL -->
@@ -5143,6 +5142,33 @@
         let artisticRoutineType = 'free'; // 'free' or 'compulsory'
         let artisticDiscipline = 'freestyle'; // 'freestyle' or 'freefly'
         let artisticDifficultyPreset = null; // Preset difficulty from chief judge
+        let artisticJudgeMode = 'solo'; // 'solo' or 'panel'
+
+        function setArtisticJudgeMode(mode) {
+            artisticJudgeMode = mode;
+            const btnSolo = document.getElementById('btnArtSoloJudge');
+            const btnPanel = document.getElementById('btnArtPanelJudge');
+            const soloPanel = document.getElementById('artSoloJudgePanel');
+            const panelPanel = document.getElementById('artPanelJudgePanel');
+
+            if (mode === 'solo') {
+                btnSolo.classList.remove('bg-gray-700', 'text-gray-300');
+                btnSolo.classList.add('bg-blue-600', 'text-white');
+                btnPanel.classList.remove('bg-blue-600', 'text-white');
+                btnPanel.classList.add('bg-gray-700', 'text-gray-300');
+                soloPanel.classList.remove('hidden');
+                panelPanel.classList.add('hidden');
+            } else {
+                btnPanel.classList.remove('bg-gray-700', 'text-gray-300');
+                btnPanel.classList.add('bg-blue-600', 'text-white');
+                btnSolo.classList.remove('bg-blue-600', 'text-white');
+                btnSolo.classList.add('bg-gray-700', 'text-gray-300');
+                panelPanel.classList.remove('hidden');
+                soloPanel.classList.add('hidden');
+            }
+
+            calculateUSPAArtisticScores();
+        }
 
         function setArtisticRoutineType(type) {
             artisticRoutineType = type;
@@ -5208,54 +5234,69 @@
         }
 
         function calculateFreeRoutineScores() {
-            // Get Difficulty score
-            const difficulty = parseFloat(document.getElementById('artDifficulty').value) || 0;
+            let difficulty, execution, presentation, technical;
 
-            // Calculate Execution deductions average (negative values)
-            const execDeductions = [];
-            for (let i = 1; i <= 3; i++) {
-                const input = document.getElementById('artExecJ' + i);
-                if (input && input.value !== '') {
-                    execDeductions.push(parseFloat(input.value) || 0);
-                }
+            if (artisticJudgeMode === 'solo') {
+                // SOLO MODE: Get scores from single judge inputs
+                difficulty = parseFloat(document.getElementById('artDifficulty').value) || 0;
+                execution = parseFloat(document.getElementById('artExecution').value) || 0;
+                presentation = parseFloat(document.getElementById('artPresentation').value) || 0;
+                technical = parseFloat(document.getElementById('artTechnical').value) || 0;
+            } else {
+                // PANEL MODE: Get scores from 3-judge panel
+                difficulty = parseFloat(document.getElementById('artDifficultyPanel').value) || 0;
+
+                // Execution: average of 3 judges (these are deductions, so negative values)
+                const execJ1 = parseFloat(document.getElementById('artExecJ1').value) || 0;
+                const execJ2 = parseFloat(document.getElementById('artExecJ2').value) || 0;
+                const execJ3 = parseFloat(document.getElementById('artExecJ3').value) || 0;
+                const execScores = [execJ1, execJ2, execJ3].filter(s => s !== 0);
+                const execAvg = execScores.length > 0 ? execScores.reduce((a, b) => a + b, 0) / execScores.length : 0;
+                execution = 10 + execAvg; // Convert deductions to score (10 - deductions)
+
+                // Update execution average display
+                const execAvgEl = document.getElementById('artExecAvg');
+                if (execAvgEl) execAvgEl.textContent = execAvg.toFixed(2);
+
+                // Presentation: average of 3 judges
+                const presJ1 = parseFloat(document.getElementById('artPresJ1').value) || 0;
+                const presJ2 = parseFloat(document.getElementById('artPresJ2').value) || 0;
+                const presJ3 = parseFloat(document.getElementById('artPresJ3').value) || 0;
+                const presScores = [presJ1, presJ2, presJ3].filter(s => s > 0);
+                presentation = presScores.length > 0 ? presScores.reduce((a, b) => a + b, 0) / presScores.length : 0;
+
+                // Update presentation average display
+                const presAvgEl = document.getElementById('artPresAvg');
+                if (presAvgEl) presAvgEl.textContent = presentation.toFixed(2);
+
+                // Panel mode doesn't have separate technical score
+                technical = 0;
             }
-            const execAvg = execDeductions.length > 0 ?
-                execDeductions.reduce((a, b) => a + b, 0) / execDeductions.length : 0;
-            document.getElementById('artExecAvg').textContent = execAvg.toFixed(2);
 
-            // Execution score = 10 - avg deductions (deductions are negative, so this adds them)
-            const execScore = 10 + execAvg; // execAvg is negative
-
-            // Calculate Presentation average
-            const presScores = [];
-            for (let i = 1; i <= 3; i++) {
-                const input = document.getElementById('artPresJ' + i);
-                if (input && input.value !== '') {
-                    presScores.push(parseFloat(input.value) || 0);
-                }
-            }
-            const presAvg = presScores.length > 0 ?
-                presScores.reduce((a, b) => a + b, 0) / presScores.length : 0;
-            document.getElementById('artPresAvg').textContent = presAvg.toFixed(2);
-
-            // Calculate Camera deductions
+            // Calculate Camera deductions (shared between both modes)
             let cameraDeductions = 0;
-            if (document.getElementById('camOutOfFrame').checked) cameraDeductions -= 1.5;
-            if (document.getElementById('camOffCenter').checked) cameraDeductions -= 0.3;
-            if (document.getElementById('camProximity').checked) cameraDeductions -= 2.0;
-            if (document.getElementById('camCropping').checked) cameraDeductions -= 0.3;
-            if (document.getElementById('camEquipment').checked) cameraDeductions -= 0.1;
-            cameraDeductions += parseFloat(document.getElementById('camCustomDeduction').value) || 0;
-            document.getElementById('artCameraTotal').textContent = cameraDeductions.toFixed(2);
+            if (document.getElementById('camOutOfFrame')?.checked) cameraDeductions -= 1.5;
+            if (document.getElementById('camOffCenter')?.checked) cameraDeductions -= 0.3;
+            if (document.getElementById('camProximity')?.checked) cameraDeductions -= 2.0;
+            if (document.getElementById('camCropping')?.checked) cameraDeductions -= 0.3;
+            cameraDeductions += parseFloat(document.getElementById('camCustomDeduction')?.value) || 0;
 
-            // Update summary display
-            document.getElementById('artSummaryDiff').textContent = difficulty.toFixed(2);
-            document.getElementById('artSummaryExec').textContent = execScore.toFixed(2);
-            document.getElementById('artSummaryPres').textContent = presAvg.toFixed(2);
-            document.getElementById('artSummaryCam').textContent = cameraDeductions.toFixed(2);
+            // Update camera total display
+            const camTotalEl = document.getElementById('artCamTotal');
+            if (camTotalEl) camTotalEl.textContent = cameraDeductions.toFixed(2);
 
-            // Free Routine Formula: Difficulty + Execution + Presentation + Camera
-            const total = difficulty + execScore + presAvg + cameraDeductions;
+            // Update summary display (if elements exist)
+            const summaryDiff = document.getElementById('artSummaryDiff');
+            const summaryExec = document.getElementById('artSummaryExec');
+            const summaryPres = document.getElementById('artSummaryPres');
+            const summaryCam = document.getElementById('artSummaryCam');
+            if (summaryDiff) summaryDiff.textContent = difficulty.toFixed(2);
+            if (summaryExec) summaryExec.textContent = execution.toFixed(2);
+            if (summaryPres) summaryPres.textContent = presentation.toFixed(2);
+            if (summaryCam) summaryCam.textContent = cameraDeductions.toFixed(2);
+
+            // Total = Difficulty + Execution + Presentation + Technical + Camera
+            const total = difficulty + execution + presentation + technical + cameraDeductions;
             document.getElementById('artTotalScore').textContent = total.toFixed(2);
         }
 
@@ -5375,36 +5416,57 @@
             let endpoint = '';
             if (artisticRoutineType === 'free') {
                 endpoint = '/artistic/free-routine/score';
-                scorePayload.difficulty = {
-                    score: parseFloat(document.getElementById('artDifficulty').value) || 0,
-                    preset: artisticDifficultyPreset !== null
-                };
-                scorePayload.execution = {
-                    judges: [
-                        { deductions: parseFloat(document.getElementById('artExecJ1').value) || 0 },
-                        { deductions: parseFloat(document.getElementById('artExecJ2').value) || 0 },
-                        { deductions: parseFloat(document.getElementById('artExecJ3').value) || 0 }
-                    ],
-                    average: parseFloat(document.getElementById('artExecAvg').textContent) || 0
-                };
-                scorePayload.presentation = {
-                    judges: [
-                        { score: parseFloat(document.getElementById('artPresJ1').value) || 0 },
-                        { score: parseFloat(document.getElementById('artPresJ2').value) || 0 },
-                        { score: parseFloat(document.getElementById('artPresJ3').value) || 0 }
-                    ],
-                    average: parseFloat(document.getElementById('artPresAvg').textContent) || 0
-                };
+                scorePayload.judge_mode = artisticJudgeMode;
+
+                if (artisticJudgeMode === 'solo') {
+                    // SOLO MODE - single judge scores
+                    scorePayload.difficulty = {
+                        score: parseFloat(document.getElementById('artDifficulty').value) || 0,
+                        preset: artisticDifficultyPreset !== null
+                    };
+                    scorePayload.execution = {
+                        score: parseFloat(document.getElementById('artExecution').value) || 0
+                    };
+                    scorePayload.presentation = {
+                        score: parseFloat(document.getElementById('artPresentation').value) || 0
+                    };
+                    scorePayload.technical = {
+                        score: parseFloat(document.getElementById('artTechnical').value) || 0
+                    };
+                } else {
+                    // PANEL MODE - 3-judge scores
+                    scorePayload.difficulty = {
+                        score: parseFloat(document.getElementById('artDifficultyPanel').value) || 0,
+                        preset: artisticDifficultyPreset !== null
+                    };
+                    scorePayload.execution = {
+                        judges: [
+                            { deductions: parseFloat(document.getElementById('artExecJ1').value) || 0 },
+                            { deductions: parseFloat(document.getElementById('artExecJ2').value) || 0 },
+                            { deductions: parseFloat(document.getElementById('artExecJ3').value) || 0 }
+                        ],
+                        average: parseFloat(document.getElementById('artExecAvg').textContent) || 0
+                    };
+                    scorePayload.presentation = {
+                        judges: [
+                            { score: parseFloat(document.getElementById('artPresJ1').value) || 0 },
+                            { score: parseFloat(document.getElementById('artPresJ2').value) || 0 },
+                            { score: parseFloat(document.getElementById('artPresJ3').value) || 0 }
+                        ],
+                        average: parseFloat(document.getElementById('artPresAvg').textContent) || 0
+                    };
+                }
+
+                // Camera deductions (shared by both modes)
                 scorePayload.camera = {
                     deductions: {
-                        outOfFrame: document.getElementById('camOutOfFrame').checked,
-                        offCenter: document.getElementById('camOffCenter').checked,
-                        proximity: document.getElementById('camProximity').checked,
-                        cropping: document.getElementById('camCropping').checked,
-                        equipment: document.getElementById('camEquipment').checked,
-                        custom: parseFloat(document.getElementById('camCustomDeduction').value) || 0
+                        outOfFrame: document.getElementById('camOutOfFrame')?.checked || false,
+                        offCenter: document.getElementById('camOffCenter')?.checked || false,
+                        proximity: document.getElementById('camProximity')?.checked || false,
+                        cropping: document.getElementById('camCropping')?.checked || false,
+                        custom: parseFloat(document.getElementById('camCustomDeduction')?.value) || 0
                     },
-                    total: parseFloat(document.getElementById('artCameraTotal').textContent) || 0
+                    total: parseFloat(document.getElementById('artCamTotal')?.textContent) || 0
                 };
             } else {
                 endpoint = '/artistic/compulsory/score';
