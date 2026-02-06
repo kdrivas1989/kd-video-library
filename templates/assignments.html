@@ -437,28 +437,55 @@
             }
         }
 
+        // Parse team and round from title string
+        // Format: "[Event] [Category] [TeamNumber] [TeamName] [Round]"
+        // Example: "2024USPAOpenNationalChampionships Freeflying Open 6001 ZJDescend 1"
+        // Team: 4-digit number (6001), Round: last number (1)
+        function parseTeamRoundFromTitle(title) {
+            const nums = title.match(/\d+/g) || [];
+
+            // Find team number: look for 3-4 digit numbers (team IDs like 6001)
+            let team = null;
+            for (const num of nums) {
+                const n = parseInt(num);
+                if (n >= 100 && n <= 9999) {
+                    team = n;
+                    break;
+                }
+            }
+
+            // Round is the last number in the title (usually 1-10)
+            let round = null;
+            if (nums.length > 0) {
+                const lastNum = parseInt(nums[nums.length - 1]);
+                // Round should be a small number (1-20 typically)
+                if (lastNum >= 1 && lastNum <= 20) {
+                    round = lastNum;
+                }
+            }
+
+            return { team, round };
+        }
+
         function sortByTeamRound() {
             const grid = document.getElementById('videoGrid');
             const items = Array.from(grid.children);
 
             items.sort((a, b) => {
-                // Get video title from the text content
                 const titleA = a.querySelector('.text-white.truncate')?.textContent || '';
                 const titleB = b.querySelector('.text-white.truncate')?.textContent || '';
 
-                // Extract numbers (team number, round number)
-                const numsA = titleA.match(/\d+/g) || [];
-                const numsB = titleB.match(/\d+/g) || [];
+                const parsedA = parseTeamRoundFromTitle(titleA);
+                const parsedB = parseTeamRoundFromTitle(titleB);
 
-                // First number is team, second is round
-                const teamA = numsA.length > 0 ? parseInt(numsA[0]) : 9999;
-                const teamB = numsB.length > 0 ? parseInt(numsB[0]) : 9999;
-                const roundA = numsA.length > 1 ? parseInt(numsA[1]) : 0;
-                const roundB = numsB.length > 1 ? parseInt(numsB[1]) : 0;
+                const teamA = parsedA.team || 9999;
+                const teamB = parsedB.team || 9999;
+                const roundA = parsedA.round || 0;
+                const roundB = parsedB.round || 0;
 
-                // Sort by team first, then by round
-                if (teamA !== teamB) return teamA - teamB;
-                return roundA - roundB;
+                // Sort by round first, then by team (Round 1 all teams, Round 2 all teams, etc.)
+                if (roundA !== roundB) return roundA - roundB;
+                return teamA - teamB;
             });
 
             // Reorder items in DOM
@@ -468,11 +495,7 @@
         // Parse team and round from video item
         function parseVideoTeamRound(item) {
             const title = item.querySelector('.text-white.truncate')?.textContent || '';
-            const nums = title.match(/\d+/g) || [];
-            return {
-                team: nums.length > 0 ? parseInt(nums[0]) : null,
-                round: nums.length > 1 ? parseInt(nums[1]) : null
-            };
+            return parseTeamRoundFromTitle(title);
         }
 
         // Populate team and round dropdowns
@@ -598,12 +621,8 @@
         // Parse round from assignment row
         function parseAssignmentRound(row) {
             const title = row.dataset.videoTitle || '';
-            // Look for "Round X" or "Rd X" or just numbers after common patterns
-            const roundMatch = title.match(/(?:Round|Rd)\s*(\d+)/i) || title.match(/R(\d+)/i);
-            if (roundMatch) return parseInt(roundMatch[1]);
-            // Fallback: get second number in title (Team X Round Y)
-            const nums = title.match(/\d+/g) || [];
-            return nums.length > 1 ? parseInt(nums[1]) : null;
+            const parsed = parseTeamRoundFromTitle(title);
+            return parsed.round;
         }
 
         // Populate assignment round dropdown
