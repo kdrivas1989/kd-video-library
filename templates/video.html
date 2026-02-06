@@ -3625,6 +3625,18 @@
             const workingStart = workingTimeVideoStart !== null ? workingTimeVideoStart : (videoStartTime || 0);
             const replayStartTime = Math.max(0, workingStart - 2);
 
+            // DEBUG: Show what values we're using
+            console.log('REPLAY DEBUG:', {
+                workingTimeVideoStart,
+                videoStartTime,
+                workingStart,
+                replayStartTime,
+                freezeFrameVideoTime,
+                currentVideoTime: video ? video.currentTime : 'no video'
+            });
+            document.getElementById('timerStatus').textContent =
+                `Replay: start=${replayStartTime.toFixed(1)}s, freeze=${freezeFrameVideoTime ? freezeFrameVideoTime.toFixed(1) : 'none'}`;
+
             // Set flags for replay behavior AFTER calculating replayStartTime
             replayAutoStartPending = false; // Will enable after seek completes
             replayStopAtFreezeFrame = false; // Don't enable until playing
@@ -3636,11 +3648,14 @@
                 // Use seeked event to know when seek completes
                 const onSeeked = () => {
                     video.removeEventListener('seeked', onSeeked);
+                    console.log('SEEKED: video.currentTime=', video.currentTime);
                     // Now enable the flags and play
                     replayAutoStartPending = true;
                     video.play().then(() => {
+                        console.log('PLAYING: video.currentTime=', video.currentTime);
                         // Enable freeze frame check only after play starts
                         setTimeout(() => {
+                            console.log('ENABLING FREEZE CHECK: video.currentTime=', video.currentTime);
                             if (freezeFrameVideoTime !== null) {
                                 replayStopAtFreezeFrame = true;
                             }
