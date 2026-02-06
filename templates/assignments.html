@@ -645,7 +645,11 @@
             const selectedTeams = getSelectedValues('teamFilter');
             const selectedRounds = getSelectedValues('roundFilter');
 
-            document.querySelectorAll('.video-item').forEach(item => {
+            const grid = document.getElementById('videoGrid');
+            const items = Array.from(grid.querySelectorAll('.video-item'));
+
+            // First, filter items
+            items.forEach(item => {
                 const parsed = parseVideoTeamRound(item);
                 let show = true;
 
@@ -661,6 +665,24 @@
 
                 item.style.display = show ? '' : 'none';
             });
+
+            // Then sort visible items by team number (within selected rounds)
+            items.sort((a, b) => {
+                const parsedA = parseVideoTeamRound(a);
+                const parsedB = parseVideoTeamRound(b);
+
+                const teamA = parsedA.team || 9999;
+                const teamB = parsedB.team || 9999;
+                const roundA = parsedA.round || 0;
+                const roundB = parsedB.round || 0;
+
+                // Sort by team first, then by round
+                if (teamA !== teamB) return teamA - teamB;
+                return roundA - roundB;
+            });
+
+            // Reorder items in DOM
+            items.forEach(item => grid.appendChild(item));
         }
 
         // Clear all filters
