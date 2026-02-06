@@ -42,26 +42,57 @@
         </div>
         {% endif %}
 
-        <!-- Status Filter -->
-        <div class="flex gap-4 mb-6">
-            <button onclick="filterByStatus('')" class="status-filter px-4 py-2 rounded-lg bg-blue-600 text-white" data-status="">
-                All ({{ assignments|length }})
-            </button>
-            <button onclick="filterByStatus('pending')" class="status-filter px-4 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600" data-status="pending">
-                Pending ({{ assignments|selectattr('status', 'equalto', 'pending')|list|length }})
-            </button>
-            <button onclick="filterByStatus('in_progress')" class="status-filter px-4 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600" data-status="in_progress">
-                In Progress ({{ assignments|selectattr('status', 'equalto', 'in_progress')|list|length }})
-            </button>
-            <button onclick="filterByStatus('completed')" class="status-filter px-4 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600" data-status="completed">
-                Completed ({{ assignments|selectattr('status', 'equalto', 'completed')|list|length }})
-            </button>
+        <!-- Filters -->
+        <div class="flex flex-wrap gap-4 mb-6">
+            <!-- Status Filter -->
+            <div class="flex gap-2 items-center">
+                <span class="text-gray-400 text-sm">Status:</span>
+                <button onclick="filterByStatus('')" class="status-filter px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm" data-status="">
+                    All
+                </button>
+                <button onclick="filterByStatus('pending')" class="status-filter px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 text-sm" data-status="pending">
+                    Pending
+                </button>
+                <button onclick="filterByStatus('in_progress')" class="status-filter px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 text-sm" data-status="in_progress">
+                    In Progress
+                </button>
+                <button onclick="filterByStatus('completed')" class="status-filter px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 text-sm" data-status="completed">
+                    Completed
+                </button>
+            </div>
+
+            <!-- Category Filter -->
+            <div class="flex gap-2 items-center">
+                <span class="text-gray-400 text-sm">Category:</span>
+                <select id="categoryFilter" onchange="filterByCategory(this.value)"
+                    class="px-3 py-1.5 rounded-lg bg-gray-700 text-white text-sm border-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Categories</option>
+                    {% for cat_id, cat in categories.items() %}
+                    <option value="{{ cat_id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Sort -->
+            <div class="flex gap-2 items-center">
+                <span class="text-gray-400 text-sm">Sort:</span>
+                <select id="sortFilter" onchange="sortAssignments(this.value)"
+                    class="px-3 py-1.5 rounded-lg bg-gray-700 text-white text-sm border-none focus:ring-2 focus:ring-blue-500">
+                    <option value="team_round">By Team & Round</option>
+                    <option value="round_team">By Round & Team</option>
+                    <option value="date_desc">Newest First</option>
+                    <option value="date_asc">Oldest First</option>
+                    <option value="title_asc">Title A-Z</option>
+                    <option value="title_desc">Title Z-A</option>
+                    <option value="category">By Category</option>
+                </select>
+            </div>
         </div>
 
         {% if assignments %}
         <div class="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="assignmentsGrid">
             {% for a in assignments %}
-            <div class="assignment-card bg-gray-800 rounded-lg overflow-hidden" data-status="{{ a.status }}">
+            <div class="assignment-card bg-gray-800 rounded-lg overflow-hidden" data-status="{{ a.status }}" data-category="{{ a.video.category|default('', true) }}" data-title="{{ a.video.title|default('', true) }}" data-date="{{ a.created_at|default('', true) }}">
                 <a href="/video/{{ a.video_id }}" class="block">
                     <div class="aspect-video bg-gray-700 relative">
                         {% if a.video.thumbnail %}
@@ -208,10 +239,19 @@
     </div>
 
     <script>
-        let currentFilter = '';
+        let currentStatusFilter = '';
+        let currentCategoryFilter = '';
+
+        function applyFilters() {
+            document.querySelectorAll('.assignment-card').forEach(card => {
+                const matchesStatus = !currentStatusFilter || card.dataset.status === currentStatusFilter;
+                const matchesCategory = !currentCategoryFilter || card.dataset.category === currentCategoryFilter;
+                card.style.display = (matchesStatus && matchesCategory) ? '' : 'none';
+            });
+        }
 
         function filterByStatus(status) {
-            currentFilter = status;
+            currentStatusFilter = status;
 
             // Update button styles
             document.querySelectorAll('.status-filter').forEach(btn => {
@@ -224,14 +264,72 @@
                 }
             });
 
-            // Filter cards
-            document.querySelectorAll('.assignment-card').forEach(card => {
-                if (!status || card.dataset.status === status) {
-                    card.style.display = '';
-                } else {
-                    card.style.display = 'none';
+            applyFilters();
+        }
+
+        function filterByCategory(category) {
+            currentCategoryFilter = category;
+            applyFilters();
+        }
+
+        function parseTeamRound(title) {
+            // Parse team and round numbers from title
+            // Common formats: "201 1" (team 201, round 1), "3 168 4001 10" etc.
+            const numbers = (title || '').match(/\d+/g) || [];
+            if (numbers.length >= 2) {
+                // Assume first number is team, second is round (or last is round)
+                return {
+                    team: parseInt(numbers[0]) || 0,
+                    round: parseInt(numbers[numbers.length - 1]) || 0
+                };
+            } else if (numbers.length === 1) {
+                return { team: parseInt(numbers[0]) || 0, round: 0 };
+            }
+            return { team: 0, round: 0 };
+        }
+
+        function sortAssignments(sortBy) {
+            const grid = document.getElementById('assignmentsGrid');
+            if (!grid) return;
+
+            const cards = Array.from(grid.querySelectorAll('.assignment-card'));
+
+            cards.sort((a, b) => {
+                const titleA = a.dataset.title || '';
+                const titleB = b.dataset.title || '';
+                const parsedA = parseTeamRound(titleA);
+                const parsedB = parseTeamRound(titleB);
+
+                switch (sortBy) {
+                    case 'team_round':
+                        // Sort by team first, then by round
+                        if (parsedA.team !== parsedB.team) {
+                            return parsedA.team - parsedB.team;
+                        }
+                        return parsedA.round - parsedB.round;
+                    case 'round_team':
+                        // Sort by round first, then by team
+                        if (parsedA.round !== parsedB.round) {
+                            return parsedA.round - parsedB.round;
+                        }
+                        return parsedA.team - parsedB.team;
+                    case 'date_desc':
+                        return (b.dataset.date || '').localeCompare(a.dataset.date || '');
+                    case 'date_asc':
+                        return (a.dataset.date || '').localeCompare(b.dataset.date || '');
+                    case 'title_asc':
+                        return titleA.localeCompare(titleB);
+                    case 'title_desc':
+                        return titleB.localeCompare(titleA);
+                    case 'category':
+                        return (a.dataset.category || '').localeCompare(b.dataset.category || '');
+                    default:
+                        return 0;
                 }
             });
+
+            // Re-append in sorted order
+            cards.forEach(card => grid.appendChild(card));
         }
 
         async function updateStatus(assignmentId, newStatus) {
