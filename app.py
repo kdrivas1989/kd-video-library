@@ -3385,48 +3385,54 @@ def delete_assignment_route(assignment_id):
 @judge_required
 def my_assignments():
     """View videos assigned to current user."""
-    import signal
-
-    def timeout_handler(signum, frame):
-        raise TimeoutError("Database request timed out")
-
     username = session.get('username')
     error_message = None
 
     try:
-        # Set a 10 second timeout for database operations
-        if hasattr(signal, 'SIGALRM'):
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(10)
-
         assignments = get_assignments_for_user(username)
-
-        if hasattr(signal, 'SIGALRM'):
-            signal.alarm(0)  # Cancel the alarm
-    except TimeoutError as e:
-        print(f"Timeout fetching assignments: {e}")
-        assignments = []
-        error_message = "Database connection timed out. Please refresh the page."
     except Exception as e:
         print(f"Error fetching assignments: {e}")
         assignments = []
         error_message = f"Error loading assignments: {str(e)[:100]}"
 
-    # Get video details for each assignment (with individual error handling)
-    for a in assignments:
+    # Batch load video details to avoid N+1 queries
+    if assignments:
         try:
-            video = get_video(a['video_id'])
-            a['video'] = video if video else {}
-        except Exception as e:
-            print(f"Error fetching video {a.get('video_id')}: {e}")
-            a['video'] = {}
+            video_ids = list(set(a['video_id'] for a in assignments if a.get('video_id')))
+            assigner_usernames = list(set(a['assigned_by'] for a in assignments if a.get('assigned_by')))
 
-        try:
-            assigner = get_user(a['assigned_by'])
-            a['assigner'] = assigner if assigner else {}
+            # Create lookup dictionaries
+            videos_lookup = {}
+            assigners_lookup = {}
+
+            # Batch fetch videos (limit to avoid timeout)
+            for vid in video_ids[:50]:  # Limit to prevent timeout
+                try:
+                    video = get_video(vid)
+                    if video:
+                        videos_lookup[vid] = video
+                except:
+                    pass
+
+            # Batch fetch assigners
+            for uname in assigner_usernames[:20]:
+                try:
+                    user = get_user(uname)
+                    if user:
+                        assigners_lookup[uname] = user
+                except:
+                    pass
+
+            # Apply lookups to assignments
+            for a in assignments:
+                a['video'] = videos_lookup.get(a.get('video_id'), {})
+                a['assigner'] = assigners_lookup.get(a.get('assigned_by'), {})
+
         except Exception as e:
-            print(f"Error fetching assigner {a.get('assigned_by')}: {e}")
-            a['assigner'] = {}
+            print(f"Error batch loading details: {e}")
+            for a in assignments:
+                a['video'] = {}
+                a['assigner'] = {}
 
     return render_template('my_assignments.html',
                          assignments=assignments,
