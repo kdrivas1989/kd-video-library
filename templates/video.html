@@ -3585,6 +3585,7 @@
 
         let replayAutoStartPending = false; // Flag to auto-start timer on replay
         let replayStopAtFreezeFrame = false; // Flag to stop at freeze frame during replay
+        let replayStartedTime = null; // Track the replay start position to avoid false triggers
 
         function replayVideo() {
             // Stop timer but keep scores
@@ -3619,14 +3620,15 @@
             speedCompleted = false;
             timerStartTime = 0;
 
-            // Set flags for replay behavior
-            replayAutoStartPending = true;
-            replayStopAtFreezeFrame = freezeFrameVideoTime !== null;
-
             // Reset video to 2 seconds BEFORE working time starts (gives judges time to prepare)
             // Use captured working time start from first view, or fall back to preset videoStartTime
             const workingStart = workingTimeVideoStart !== null ? workingTimeVideoStart : (videoStartTime || 0);
             const replayStartTime = Math.max(0, workingStart - 2);
+
+            // Set flags for replay behavior AFTER calculating replayStartTime
+            replayAutoStartPending = true;
+            replayStopAtFreezeFrame = freezeFrameVideoTime !== null;
+            replayStartedTime = replayStartTime; // Track where we're starting from
 
             if (video) {
                 video.pause();
@@ -3660,8 +3662,12 @@
             }
 
             // Stop at freeze frame if in replay mode
-            if (replayStopAtFreezeFrame && freezeFrameVideoTime !== null && currentTime >= freezeFrameVideoTime) {
+            // Only check if we've progressed past the replay start point (prevents false trigger from pre-seek time)
+            if (replayStopAtFreezeFrame && freezeFrameVideoTime !== null &&
+                replayStartedTime !== null && currentTime > replayStartedTime + 0.5 &&
+                currentTime >= freezeFrameVideoTime) {
                 replayStopAtFreezeFrame = false;
+                replayStartedTime = null;
                 // Stop like when T was pressed
                 if (video) video.pause();
                 if (vimeoPlayer) vimeoPlayer.pause();
