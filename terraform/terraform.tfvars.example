@@ -1,0 +1,28 @@
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to git
+
+aws_region    = "us-east-2"
+instance_name = "video-library"
+bundle_id     = "nano_3_0"
+environment   = "production"
+
+git_repo_url = "https://github.com/kdrivas1989/kd-video-library.git"
+
+# Supabase
+supabase_url = "https://your-project.supabase.co"
+supabase_key = "your-supabase-key"
+
+# AWS S3 (for video storage)
+aws_access_key_id     = "your-aws-access-key"
+aws_secret_access_key = "your-aws-secret-key"
+s3_bucket             = "uspa-video-library"
+
+# App
+secret_key      = "your-secret-key"
+dropbox_app_key = "your-dropbox-key"
+
+# SMTP
+smtp_server   = "smtp.gmail.com"
+smtp_port     = "587"
+smtp_username = "your-email@gmail.com"
+smtp_password = "your-app-password"

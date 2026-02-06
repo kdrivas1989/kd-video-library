@@ -2675,6 +2675,7 @@ def admin_create_user():
     name = data.get('name', '').strip()
     email = data.get('email', '').strip().lower()
     role = data.get('role', 'judge')
+    send_email = data.get('send_email', True)
 
     if not username or not name:
         return jsonify({'error': 'Username and name are required'}), 400
@@ -2698,20 +2699,41 @@ def admin_create_user():
         'must_change_password': 1
     })
 
-    # Send welcome email with credentials
+    # Send welcome email with credentials if requested
     email_sent = False
-    if email:
-        email_sent = send_welcome_email(email, username, default_password, name)
-
     message = 'User created with default password'
-    if email_sent:
-        message += ' - welcome email sent'
-    elif email:
-        message += ' - failed to send welcome email'
-    else:
+
+    if send_email and email:
+        email_sent = send_welcome_email(email, username, default_password, name)
+        if email_sent:
+            message += ' - welcome email sent'
+        else:
+            message += ' - failed to send welcome email'
+    elif send_email and not email:
         message += ' - no email provided'
 
     return jsonify({'success': True, 'message': message})
+
+
+@app.route('/admin/user/<username>/send-credentials', methods=['POST'])
+@admin_required
+def admin_send_credentials(username):
+    """Send login credentials email to an existing user."""
+    user = get_user(username)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    email = user.get('email')
+    if not email:
+        return jsonify({'error': 'User has no email address'}), 400
+
+    name = user.get('name', username)
+    password = user.get('password', 'password')
+
+    if send_welcome_email(email, username, password, name):
+        return jsonify({'success': True, 'message': f'Credentials sent to {email}'})
+    else:
+        return jsonify({'error': 'Failed to send email'}), 500
 
 
 @app.route('/admin/user/<username>/update', methods=['POST'])
