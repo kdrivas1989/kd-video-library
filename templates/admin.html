@@ -736,6 +736,15 @@
             }
         }
 
+        // Warn before leaving during upload
+        window.addEventListener('beforeunload', function(e) {
+            if (isUploading || uploadQueue.length > 0) {
+                e.preventDefault();
+                e.returnValue = 'Upload in progress. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        });
+
         async function processUploadQueue() {
             if (isUploading || uploadQueue.length === 0) return;
 
@@ -871,7 +880,7 @@
                         ${categoryToUse ? `<span class="text-green-400 ml-2">Category: ${categoryToUse}</span>` : ''}
                         ${willAutoDetect ? `<span class="text-yellow-400 ml-2">Auto-detecting from filename...</span>` : ''}
                     </div>
-                    <p class="text-gray-500 text-xs mt-2">You can drop more folders - they will be queued</p>
+                    <p class="text-gray-500 text-xs mt-2">You can drop more folders - they will be queued. Open in new tab to browse while uploading.</p>
                 `;
 
                 const formData = new FormData();
