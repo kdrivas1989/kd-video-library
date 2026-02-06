@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>http://videos.kd-evolution.com/videoupload</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
     {% if dropbox_app_key %}
     <script src="https://www.dropbox.com/static/api/2/dropins.js" id="dropboxjs" data-app-key="{{ dropbox_app_key }}"></script>
     {% endif %}
@@ -158,7 +157,8 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                 </svg>
                 <p class="text-gray-400">Drag & drop files or folders here</p>
-                <p class="text-gray-500 text-sm mt-2">MP4, WebM, MOV, MTS, AVI, MKV</p>
+                <p class="text-green-500 text-sm mt-2">Supported: MP4, WebM, MOV</p>
+                <p class="text-yellow-500 text-xs mt-1">MKV, AVI, MTS need to be converted to MP4 first</p>
                 <p class="text-gray-600 text-xs mt-1">Folder structure: EventName/Category/videos.mp4</p>
             </div>
             <div id="uploadProgress" class="mt-4 hidden"></div>
@@ -853,30 +853,11 @@
                 const categoryToUse = fileCategory || manualCategory;
                 const willAutoDetect = !categoryToUse;
 
-                // Check if file needs conversion
+                // Check if file needs conversion - skip and show message
                 if (fileNeedsConversion(file.name)) {
-                    const queueInfo = uploadQueue.length > 0 ? `<span class="text-blue-400 ml-2">(${uploadQueue.length} more queued)</span>` : '';
-                    progressDiv.innerHTML = `
-                        <div class="flex items-center gap-3">
-                            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500"></div>
-                            <span>Converting ${i + 1}/${filesWithMeta.length}: ${file.name}</span>
-                            ${queueInfo}
-                        </div>
-                        <div class="mt-2 text-sm">
-                            <span id="conversionStatus" class="text-orange-400">Loading converter...</span>
-                        </div>
-                        <p class="text-gray-500 text-xs mt-2">Converting to MP4 in your browser before upload</p>
-                    `;
-
-                    const convertedFile = await convertToMp4(file);
-                    if (convertedFile) {
-                        file = convertedFile;
-                        converted++;
-                    } else {
-                        failed++;
-                        results.push({ name: file.name, success: false, error: 'Conversion failed' });
-                        continue;
-                    }
+                    failed++;
+                    results.push({ name: file.name, success: false, error: 'Needs conversion to MP4' });
+                    continue;
                 }
 
                 const queueInfo = uploadQueue.length > 0 ? `<span class="text-blue-400 ml-2">(${uploadQueue.length} more queued)</span>` : '';
