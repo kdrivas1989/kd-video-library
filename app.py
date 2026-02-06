@@ -4985,6 +4985,184 @@ def export_urls():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# Chunked upload storage
+chunked_uploads = {}
+CHUNK_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'chunk_uploads')
+os.makedirs(CHUNK_UPLOAD_DIR, exist_ok=True)
+
+
+@app.route('/admin/upload-chunk', methods=['POST'])
+@admin_required
+def upload_chunk():
+    """Receive a chunk of a file upload."""
+    upload_id = request.form.get('upload_id')
+    chunk_index = int(request.form.get('chunk_index', 0))
+    total_chunks = int(request.form.get('total_chunks', 1))
+    filename = request.form.get('filename', 'unknown')
+
+    if 'chunk' not in request.files:
+        return jsonify({'error': 'No chunk data'}), 400
+
+    chunk = request.files['chunk']
+
+    # Create upload directory
+    upload_dir = os.path.join(CHUNK_UPLOAD_DIR, upload_id)
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # Save chunk
+    chunk_path = os.path.join(upload_dir, f'chunk_{chunk_index:05d}')
+    chunk.save(chunk_path)
+
+    # Track progress
+    if upload_id not in chunked_uploads:
+        chunked_uploads[upload_id] = {
+            'filename': filename,
+            'total_chunks': total_chunks,
+            'received_chunks': set(),
+            'created_at': datetime.now().isoformat()
+        }
+
+    chunked_uploads[upload_id]['received_chunks'].add(chunk_index)
+    received = len(chunked_uploads[upload_id]['received_chunks'])
+
+    return jsonify({
+        'success': True,
+        'chunk_index': chunk_index,
+        'received': received,
+        'total': total_chunks,
+        'complete': received == total_chunks
+    })
+
+
+@app.route('/admin/upload-chunk-complete', methods=['POST'])
+@admin_required
+def upload_chunk_complete():
+    """Assemble chunks and process the complete file."""
+    data = request.get_json()
+    upload_id = data.get('upload_id')
+    filename = data.get('filename', 'video.mp4')
+    category = data.get('category', 'uncategorized')
+    subcategory = data.get('subcategory', '')
+    title = data.get('title', '')
+    event = data.get('event', '')
+
+    if not upload_id:
+        return jsonify({'error': 'Missing upload_id'}), 400
+
+    upload_dir = os.path.join(CHUNK_UPLOAD_DIR, upload_id)
+    if not os.path.exists(upload_dir):
+        return jsonify({'error': 'Upload not found'}), 404
+
+    # Get all chunks and sort them
+    chunk_files = sorted([f for f in os.listdir(upload_dir) if f.startswith('chunk_')])
+
+    if not chunk_files:
+        return jsonify({'error': 'No chunks found'}), 400
+
+    # Generate video ID and output path
+    video_id = str(uuid.uuid4())[:8]
+    ext = os.path.splitext(filename)[1].lower()
+    output_filename = f"{video_id}{ext}"
+    output_path = os.path.join(VIDEOS_FOLDER, output_filename)
+
+    # Assemble chunks into final file
+    try:
+        with open(output_path, 'wb') as outfile:
+            for chunk_file in chunk_files:
+                chunk_path = os.path.join(upload_dir, chunk_file)
+                with open(chunk_path, 'rb') as infile:
+                    outfile.write(infile.read())
+                os.remove(chunk_path)  # Clean up chunk
+
+        # Remove upload directory
+        os.rmdir(upload_dir)
+
+        # Clean up tracking
+        if upload_id in chunked_uploads:
+            del chunked_uploads[upload_id]
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to assemble file: {str(e)}'}), 500
+
+    # Auto-detect category from filename
+    category_auto = False
+    if category == 'uncategorized' or not category:
+        detected_cat, detected_sub, detected_event = detect_category_from_filename(filename)
+        if detected_cat and detected_cat in CATEGORIES:
+            category = detected_cat
+            category_auto = True
+            if detected_sub and not subcategory:
+                subcategory = detected_sub
+        if detected_event and not event:
+            event = detected_event
+
+    # Generate title from filename if not provided
+    if not title:
+        title = os.path.splitext(filename)[0].replace('_', ' ').replace('-', ' ')
+
+    # Check if conversion needed
+    needs_conversion = ext in CONVERSION_FORMATS
+
+    # Create job for background processing
+    job_id = str(uuid.uuid4())[:8]
+    session_id = session.get('_id', request.remote_addr)
+
+    video_data = {
+        'id': video_id,
+        'title': title,
+        'description': '',
+        'url': '',
+        'thumbnail': None,
+        'category': category,
+        'subcategory': subcategory,
+        'tags': '',
+        'duration': None,
+        'created_at': datetime.now().isoformat(),
+        'views': 0,
+        'video_type': 'local',
+        'local_file': output_filename,
+        'event': event,
+        'category_auto': category_auto
+    }
+
+    with conversion_lock:
+        conversion_jobs[job_id] = {
+            'job_id': job_id,
+            'video_id': video_id,
+            'filename': filename,
+            'title': title,
+            'status': 'queued',
+            'progress': 0,
+            'session_id': session_id,
+            'created_at': datetime.now().isoformat(),
+            'error': None
+        }
+
+    if needs_conversion:
+        # Start background conversion
+        thread = threading.Thread(
+            target=background_convert_video,
+            args=(job_id, output_path, os.path.join(VIDEOS_FOLDER, f"{video_id}.mp4"), video_data, None)
+        )
+    else:
+        # Start background S3 upload
+        thread = threading.Thread(
+            target=background_upload_to_s3,
+            args=(job_id, output_path, video_data)
+        )
+
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({
+        'success': True,
+        'background': True,
+        'job_id': job_id,
+        'video_id': video_id,
+        'message': 'File assembled - processing in background'
+    })
+
+
 @app.route('/admin/upload-video', methods=['POST'])
 @admin_required
 def upload_video():

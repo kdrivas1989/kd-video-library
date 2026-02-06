@@ -970,31 +970,92 @@
                             results.push({ name: file.name, success: false, error: completeResult.error });
                         }
                     } else {
-                        // Use server-side upload for non-S3 or conversion-needed files
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min timeout
+                        // Use chunked upload for files that need conversion (MKV, AVI, etc.)
+                        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+                        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                        const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+                        const mbTotal = (file.size / 1024 / 1024).toFixed(1);
 
-                        const response = await fetch('/admin/upload-video', {
-                            method: 'POST',
-                            body: formData,
-                            signal: controller.signal
-                        });
-                        clearTimeout(timeoutId);
+                        let uploadedChunks = 0;
+                        let chunkFailed = false;
 
-                        const result = await response.json();
+                        // Upload each chunk
+                        for (let chunkIndex = 0; chunkIndex < totalChunks && !chunkFailed; chunkIndex++) {
+                            const start = chunkIndex * CHUNK_SIZE;
+                            const end = Math.min(start + CHUNK_SIZE, file.size);
+                            const chunk = file.slice(start, end);
 
-                        if (result.success) {
-                            if (result.background) {
+                            const percent = Math.round((chunkIndex / totalChunks) * 100);
+                            const mbUploaded = (start / 1024 / 1024).toFixed(1);
+                            progressDiv.innerHTML = `
+                                <div class="flex items-center gap-3">
+                                    <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500"></div>
+                                    <span>Uploading ${i + 1}/${filesWithMeta.length}: ${file.name}</span>
+                                </div>
+                                <div class="mt-2 bg-gray-700 rounded-full h-2 overflow-hidden">
+                                    <div class="bg-green-500 h-full transition-all" style="width: ${percent}%"></div>
+                                </div>
+                                <div class="mt-1 text-sm text-gray-400">${percent}% (${mbUploaded}/${mbTotal} MB) - Chunk ${chunkIndex + 1}/${totalChunks}</div>
+                            `;
+
+                            const chunkFormData = new FormData();
+                            chunkFormData.append('chunk', chunk);
+                            chunkFormData.append('upload_id', uploadId);
+                            chunkFormData.append('chunk_index', chunkIndex);
+                            chunkFormData.append('total_chunks', totalChunks);
+                            chunkFormData.append('filename', file.name);
+
+                            try {
+                                const chunkResponse = await fetch('/admin/upload-chunk', {
+                                    method: 'POST',
+                                    body: chunkFormData
+                                });
+                                const chunkResult = await chunkResponse.json();
+                                if (!chunkResult.success) {
+                                    chunkFailed = true;
+                                    failed++;
+                                    results.push({ name: file.name, success: false, error: chunkResult.error || 'Chunk upload failed' });
+                                } else {
+                                    uploadedChunks++;
+                                }
+                            } catch (chunkError) {
+                                chunkFailed = true;
+                                failed++;
+                                results.push({ name: file.name, success: false, error: 'Chunk upload error: ' + chunkError.message });
+                            }
+                        }
+
+                        // If all chunks uploaded, complete the upload
+                        if (!chunkFailed && uploadedChunks === totalChunks) {
+                            progressDiv.innerHTML = `
+                                <div class="flex items-center gap-3">
+                                    <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500"></div>
+                                    <span>Assembling ${file.name}...</span>
+                                </div>
+                            `;
+
+                            const completeResponse = await fetch('/admin/upload-chunk-complete', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    upload_id: uploadId,
+                                    filename: file.name,
+                                    title: file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' '),
+                                    category: categoryToUse || '',
+                                    subcategory: manualSubcategory,
+                                    event: eventToUse
+                                })
+                            });
+                            const completeResult = await completeResponse.json();
+
+                            if (completeResult.success) {
                                 backgroundJobs++;
                                 results.push({ name: file.name, success: true, background: true });
                                 startConversionPolling();
                             } else {
-                                uploaded++;
-                                results.push({ name: file.name, success: true, s3: false });
+                                failed++;
+                                results.push({ name: file.name, success: false, error: completeResult.error });
                             }
-                        } else {
-                            failed++;
-                            results.push({ name: file.name, success: false, error: result.error });
                         }
                     }
                 } catch (error) {
