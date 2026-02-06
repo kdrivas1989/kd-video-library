@@ -452,13 +452,15 @@
 
         // Sort a single grid by team/round
         function sortGridByTeamRound(grid) {
-            const videos = Array.from(grid.querySelectorAll(':scope > .video-card'));
+            // Get direct children that are video cards
+            const videos = Array.from(grid.children).filter(el => el.classList.contains('video-card'));
             if (videos.length === 0) return;
 
             function parseTeamRound(title) {
                 const nums = title.match(/\d+/g);
                 if (nums && nums.length >= 2) {
-                    return { team: parseInt(nums[nums.length - 2]), round: parseInt(nums[nums.length - 1]) };
+                    // For "226 5" format: first number is team, second is round
+                    return { team: parseInt(nums[0]), round: parseInt(nums[1]) };
                 } else if (nums && nums.length === 1) {
                     return { team: parseInt(nums[0]), round: 0 };
                 }
@@ -470,18 +472,22 @@
                 const titleB = b.querySelector('h3')?.textContent?.trim() || '';
                 const parsedA = parseTeamRound(titleA);
                 const parsedB = parseTeamRound(titleB);
+                // Sort by team first, then by round
                 if (parsedA.team !== parsedB.team) return parsedA.team - parsedB.team;
                 return parsedA.round - parsedB.round;
             });
 
+            // Re-append in sorted order
             videos.forEach(video => grid.appendChild(video));
         }
 
-        // Auto-sort on page load
+        // Auto-sort on page load (with small delay to ensure DOM is ready)
         document.addEventListener('DOMContentLoaded', function() {
-            // Sort the main videosGrid if visible
-            const mainGrid = document.getElementById('videosGrid');
-            if (mainGrid) sortGridByTeamRound(mainGrid);
+            setTimeout(function() {
+                // Sort the main videosGrid if visible
+                const mainGrid = document.getElementById('videosGrid');
+                if (mainGrid) sortGridByTeamRound(mainGrid);
+            }, 100);
         });
 
         function selectFolderVideos(folderId) {
