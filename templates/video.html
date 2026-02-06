@@ -3607,6 +3607,9 @@
             // Update formations display for new event type
             updateFormations();
 
+            // Update scoring panel based on event type
+            updateMultiJudgePanelVisibility();
+
             resetTimer();
         }
 
@@ -4974,40 +4977,38 @@
             document.getElementById('cfMultiJudgePanel').classList.add('hidden');
             document.getElementById('artisticMultiJudgePanel').classList.add('hidden');
 
-            if (!multiJudgeModeEnabled) return;
-
-            // Determine which panel to show based on category first, then event type
-            // Category-based detection (most reliable)
+            // Category and event type lists
             const artisticCategories = ['ae', 'artistic', 'artistic_events'];
             const cfCategories = ['cf', 'canopy_formation', 'canopy'];
-            const cpCategories = ['cp', 'canopy_piloting'];
-
-            // Event type lists for fallback
-            const fsEvents = ['4way', '8way', '4way-vfs', 'vfs', '4way-inter', '8way-inter', '10way', '4way-fs', '2way-mfs', '16way'];
-            const cfEvents = ['2way-cf', '4way-cf', '4way-cf-rotation', '8way-cf', 'cf-2way', 'cf-4way', 'cf-8way', '4way-cf-seq', '4way-cf-rot', '2way-cf-seq'];
             const artisticEvents = ['freefly', 'freestyle', 'artistic-freefly', 'artistic-freestyle',
                                     'fs-artistic', 'artistic', 'freefly-ae', 'freestyle-ae'];
+            const fsEvents = ['4way', '8way', '4way-vfs', 'vfs', '4way-inter', '8way-inter', '10way', '4way-fs', '2way-mfs', '16way'];
+            const cfEvents = ['2way-cf', '4way-cf', '4way-cf-rotation', '8way-cf', 'cf-2way', 'cf-4way', 'cf-8way', '4way-cf-seq', '4way-cf-rot', '2way-cf-seq'];
 
-            // Check category first (most reliable)
-            if (artisticCategories.includes(category.toLowerCase())) {
+            // ALWAYS show artistic panel for artistic events (regardless of multi-judge mode)
+            const isArtisticCategory = artisticCategories.includes(category.toLowerCase());
+            const isArtisticEvent = artisticEvents.includes(eventType);
+
+            if (isArtisticCategory || isArtisticEvent) {
                 document.getElementById('artisticMultiJudgePanel').classList.remove('hidden');
-                // Auto-select discipline based on subcategory
+                // Auto-select discipline based on subcategory or event type
                 const subcategory = '{{ video.subcategory|default("", true) }}'.toLowerCase();
-                if (subcategory.includes('freefly') || subcategory.includes('ff')) {
+                if (subcategory.includes('freefly') || subcategory.includes('ff') || eventType === 'freefly') {
                     setArtisticDiscipline('freefly');
                 } else {
                     setArtisticDiscipline('freestyle');
                 }
-            } else if (cfCategories.includes(category.toLowerCase())) {
+                return; // Artistic panel shown, done
+            }
+
+            // For non-artistic events, require multi-judge mode to show panels
+            if (!multiJudgeModeEnabled) return;
+
+            // Show appropriate panel for other categories
+            if (cfCategories.includes(category.toLowerCase()) || cfEvents.includes(eventType)) {
                 document.getElementById('cfMultiJudgePanel').classList.remove('hidden');
-            } else if (fsEvents.includes(eventType)) {
-                document.getElementById('fsMultiJudgePanel').classList.remove('hidden');
-            } else if (cfEvents.includes(eventType)) {
-                document.getElementById('cfMultiJudgePanel').classList.remove('hidden');
-            } else if (artisticEvents.includes(eventType)) {
-                document.getElementById('artisticMultiJudgePanel').classList.remove('hidden');
             } else {
-                // Default to FS panel for unlisted events/categories
+                // Default to FS panel
                 document.getElementById('fsMultiJudgePanel').classList.remove('hidden');
             }
         }
