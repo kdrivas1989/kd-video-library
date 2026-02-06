@@ -12,6 +12,7 @@
             <a href="/" class="text-2xl font-bold text-blue-400">Video Library</a>
             <div class="flex items-center gap-4">
                 <a href="/competitions" class="text-gray-400 hover:text-white">Competitions</a>
+                <a href="/my-assignments" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg">My Assignments</a>
                 <a href="/assignments" class="text-blue-400">Assignments</a>
                 {% if is_admin or is_chief_judge %}
                 <a href="/videoupload" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg">Video Upload</a>
@@ -29,13 +30,15 @@
             <h2 class="text-xl font-bold mb-4">Create New Assignment</h2>
             <div class="grid md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                 <div>
-                    <label class="block text-gray-400 text-sm mb-2">Assign To</label>
-                    <select id="assignTo" class="w-full px-4 py-2 rounded bg-gray-700 text-white">
-                        <option value="">Select Judge</option>
+                    <label class="block text-gray-400 text-sm mb-2">Assign To (check multiple)</label>
+                    <div id="assignTo" class="w-full px-3 py-2 rounded bg-gray-700 text-white max-h-32 overflow-y-auto space-y-1">
                         {% for judge in judges %}
-                        <option value="{{ judge.username }}">{{ judge.name }} ({{ judge.role }})</option>
+                        <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-600 px-2 py-1 rounded">
+                            <input type="checkbox" value="{{ judge.username }}" class="judge-checkbox w-4 h-4 accent-blue-500">
+                            <span>{{ judge.name }} ({{ judge.role }})</span>
+                        </label>
                         {% endfor %}
-                    </select>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-gray-400 text-sm mb-2">Category</label>
@@ -296,11 +299,11 @@
         }
 
         async function assignSelected() {
-            const assignTo = document.getElementById('assignTo').value;
+            const selectedJudges = Array.from(document.querySelectorAll('.judge-checkbox:checked')).map(cb => cb.value);
             const notes = document.getElementById('assignNotes').value;
 
-            if (!assignTo) {
-                alert('Please select a judge');
+            if (selectedJudges.length === 0) {
+                alert('Please select at least one judge');
                 return;
             }
 
@@ -320,7 +323,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         video_ids: videoIds,
-                        assigned_to: assignTo,
+                        assigned_to: selectedJudges,
                         notes: notes
                     })
                 });

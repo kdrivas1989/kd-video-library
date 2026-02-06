@@ -28,6 +28,15 @@
         <h1 class="text-3xl font-bold mb-2">My Assignments</h1>
         <p class="text-gray-400 mb-8">Videos assigned to you for review</p>
 
+        {% if error_message %}
+        <div class="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-6">
+            <strong>Error:</strong> {{ error_message }}
+            <button onclick="location.reload()" class="ml-4 px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-white text-sm">
+                Retry
+            </button>
+        </div>
+        {% endif %}
+
         <!-- Status Filter -->
         <div class="flex gap-4 mb-6">
             <button onclick="filterByStatus('')" class="status-filter px-4 py-2 rounded-lg bg-blue-600 text-white" data-status="">

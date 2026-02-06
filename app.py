@@ -24,7 +24,39 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 from werkzeug.utils import secure_filename
 from functools import wraps
 import sqlite3
+import logging
+from logging.handlers import RotatingFileHandler
 from io import BytesIO
+
+# Setup upload failure logging
+upload_logger = logging.getLogger('upload_failures')
+upload_logger.setLevel(logging.INFO)
+# Create logs directory if it doesn't exist
+os.makedirs('logs', exist_ok=True)
+# Rotating file handler - max 5MB per file, keep 5 backups
+upload_handler = RotatingFileHandler('logs/upload_failures.log', maxBytes=5*1024*1024, backupCount=5)
+upload_handler.setFormatter(logging.Formatter(
+    '%(asctime)s | %(levelname)s | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+))
+upload_logger.addHandler(upload_handler)
+
+
+def log_upload_failure(reason, filename=None, user=None, file_size=None, content_type=None, extra=None):
+    """Log a video upload failure with detailed information."""
+    details = {
+        'reason': reason,
+        'filename': filename,
+        'user': user,
+        'file_size_bytes': file_size,
+        'content_type': content_type
+    }
+    if extra:
+        details.update(extra)
+    # Filter out None values for cleaner logs
+    details = {k: v for k, v in details.items() if v is not None}
+    upload_logger.error(json.dumps(details))
+
 
 # Background conversion job tracking
 conversion_jobs = {}  # In-memory cache for quick access
@@ -219,7 +251,43 @@ def upload_to_s3(file_data, filename, content_type='video/mp4', folder='videos')
 
         return url
     except Exception as e:
+        log_upload_failure('s3_upload_failed', filename=filename,
+                          file_size=len(file_data) if file_data else None,
+                          extra={'folder': folder, 'error': str(e)})
         print(f"S3 upload error: {e}")
+        return None
+
+
+def upload_to_s3_from_path(file_path, folder='videos'):
+    """Upload a file from disk to AWS S3 and return the public URL."""
+    if not USE_S3 or not s3_client:
+        return None
+
+    try:
+        filename = os.path.basename(file_path)
+        ext = os.path.splitext(filename)[1].lower()
+
+        # Determine content type
+        content_types = {
+            '.mp4': 'video/mp4',
+            '.webm': 'video/webm',
+            '.mov': 'video/quicktime',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.csv': 'text/csv'
+        }
+        content_type = content_types.get(ext, 'application/octet-stream')
+
+        with open(file_path, 'rb') as f:
+            file_data = f.read()
+
+        return upload_to_s3(file_data, filename, content_type, folder)
+    except Exception as e:
+        log_upload_failure('s3_upload_from_path_failed', filename=os.path.basename(file_path),
+                          file_size=os.path.getsize(file_path) if os.path.exists(file_path) else None,
+                          extra={'folder': folder, 'error': str(e)})
+        print(f"S3 upload from path error: {e}")
         return None
 
 
@@ -284,6 +352,10 @@ def upload_to_supabase_storage(file_path, storage_path):
         public_url = supabase.storage.from_(SUPABASE_BUCKET).get_public_url(storage_path)
         return public_url
     except Exception as e:
+        log_upload_failure('supabase_storage_upload_failed',
+                          filename=os.path.basename(file_path),
+                          file_size=os.path.getsize(file_path) if os.path.exists(file_path) else None,
+                          extra={'storage_path': storage_path, 'error': str(e)})
         print(f"Supabase Storage upload error: {e}")
         return None
 
@@ -878,6 +950,12 @@ def init_db():
         # Add score_approvals column if it doesn't exist (JSON: event_type -> round -> {approved_at, approved_by})
         try:
             cursor.execute('ALTER TABLE competitions ADD COLUMN score_approvals TEXT')
+        except:
+            pass
+
+        # Add artistic_difficulty_scores column if it doesn't exist (JSON: {"team_id:round_num": {"score": 7.5, "set_by": "user", "set_at": "timestamp"}})
+        try:
+            cursor.execute('ALTER TABLE competitions ADD COLUMN artistic_difficulty_scores TEXT')
         except:
             pass
 
@@ -2316,6 +2394,10 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
         process.wait()
 
         if process.returncode != 0:
+            log_upload_failure('background_ffmpeg_conversion_failed',
+                              filename=video_data.get('title'),
+                              extra={'job_id': job_id, 'video_id': video_data.get('id'),
+                                     'input_path': input_path, 'return_code': process.returncode})
             with conversion_lock:
                 conversion_jobs[job_id]['status'] = 'failed'
                 conversion_jobs[job_id]['error'] = 'FFmpeg conversion failed'
@@ -2352,12 +2434,37 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
         with conversion_lock:
             conversion_jobs[job_id]['progress'] = 90
 
-        # Upload to Supabase Storage if enabled
-        if USE_SUPABASE:
+        # Upload to cloud storage (prefer S3 over Supabase)
+        if USE_S3:
             with conversion_lock:
                 conversion_jobs[job_id]['status'] = 'uploading'
 
-            # Upload video file
+            # Upload video file to S3
+            video_filename = os.path.basename(output_path)
+            video_url = upload_to_s3_from_path(output_path, folder='videos')
+            if video_url:
+                video_data['url'] = video_url
+                video_data['video_type'] = 'url'
+                video_data['local_file'] = ''
+                # Clean up local file after upload
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+            else:
+                # Fallback to local if upload fails
+                video_data['local_file'] = video_filename
+
+            # Upload thumbnail to S3
+            if os.path.exists(thumbnail_path):
+                thumb_url = upload_to_s3_from_path(thumbnail_path, folder='thumbnails')
+                if thumb_url:
+                    video_data['thumbnail'] = thumb_url
+                    os.remove(thumbnail_path)
+
+        elif USE_SUPABASE:
+            with conversion_lock:
+                conversion_jobs[job_id]['status'] = 'uploading'
+
+            # Upload video file to Supabase
             video_filename = os.path.basename(output_path)
             video_url = upload_to_supabase_storage(output_path, f"videos/{video_filename}")
             if video_url:
@@ -2371,7 +2478,7 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
                 # Fallback to local if upload fails
                 video_data['local_file'] = video_filename
 
-            # Upload thumbnail
+            # Upload thumbnail to Supabase
             if os.path.exists(thumbnail_path):
                 thumb_url = upload_to_supabase_storage(thumbnail_path, f"thumbnails/{thumbnail_filename}")
                 if thumb_url:
@@ -2392,6 +2499,10 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
             save_conversion_job(conversion_jobs[job_id])
 
     except Exception as e:
+        import traceback
+        log_upload_failure('background_conversion_exception',
+                          filename=video_data.get('title') if video_data else None,
+                          extra={'job_id': job_id, 'error': str(e), 'traceback': traceback.format_exc()})
         with conversion_lock:
             if job_id in conversion_jobs:
                 conversion_jobs[job_id]['status'] = 'failed'
@@ -3223,28 +3334,38 @@ def assignments_page():
 @app.route('/assign-videos', methods=['POST'])
 @chief_judge_required
 def assign_videos():
-    """Assign multiple videos to a judge."""
+    """Assign multiple videos to one or more judges."""
     data = request.json
     video_ids = data.get('video_ids', [])
-    assigned_to = data.get('assigned_to', '')
+    assigned_to = data.get('assigned_to', [])
     notes = data.get('notes', '')
 
-    if not video_ids or not assigned_to:
-        return jsonify({'error': 'Video IDs and assignee are required'}), 400
+    # Handle both single string and array of judges (backwards compatible)
+    if isinstance(assigned_to, str):
+        assigned_to = [assigned_to] if assigned_to else []
 
-    # Verify judge exists
-    judge = get_user(assigned_to)
-    if not judge:
-        return jsonify({'error': 'Judge not found'}), 404
+    if not video_ids or not assigned_to:
+        return jsonify({'error': 'Video IDs and at least one assignee are required'}), 400
+
+    # Verify all judges exist
+    judge_names = []
+    for judge_username in assigned_to:
+        judge = get_user(judge_username)
+        if not judge:
+            return jsonify({'error': f'Judge not found: {judge_username}'}), 404
+        judge_names.append(judge['name'])
 
     assigned_by = session.get('username')
     count = 0
 
+    # Create assignments for each video and each judge
     for video_id in video_ids:
-        create_video_assignment(video_id, assigned_to, assigned_by, notes)
-        count += 1
+        for judge_username in assigned_to:
+            create_video_assignment(video_id, judge_username, assigned_by, notes)
+            count += 1
 
-    return jsonify({'success': True, 'message': f'Assigned {count} video(s) to {judge["name"]}'})
+    judge_list = ', '.join(judge_names)
+    return jsonify({'success': True, 'message': f'Created {count} assignment(s) for {len(judge_names)} judge(s): {judge_list}'})
 
 
 @app.route('/assignment/<assignment_id>/delete', methods=['POST'])
@@ -3259,21 +3380,55 @@ def delete_assignment_route(assignment_id):
 @judge_required
 def my_assignments():
     """View videos assigned to current user."""
-    username = session.get('username')
-    assignments = get_assignments_for_user(username)
+    import signal
 
-    # Get video details for each assignment
+    def timeout_handler(signum, frame):
+        raise TimeoutError("Database request timed out")
+
+    username = session.get('username')
+    error_message = None
+
+    try:
+        # Set a 10 second timeout for database operations
+        if hasattr(signal, 'SIGALRM'):
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(10)
+
+        assignments = get_assignments_for_user(username)
+
+        if hasattr(signal, 'SIGALRM'):
+            signal.alarm(0)  # Cancel the alarm
+    except TimeoutError as e:
+        print(f"Timeout fetching assignments: {e}")
+        assignments = []
+        error_message = "Database connection timed out. Please refresh the page."
+    except Exception as e:
+        print(f"Error fetching assignments: {e}")
+        assignments = []
+        error_message = f"Error loading assignments: {str(e)[:100]}"
+
+    # Get video details for each assignment (with individual error handling)
     for a in assignments:
-        video = get_video(a['video_id'])
-        a['video'] = video if video else {}
-        assigner = get_user(a['assigned_by'])
-        a['assigner'] = assigner if assigner else {}
+        try:
+            video = get_video(a['video_id'])
+            a['video'] = video if video else {}
+        except Exception as e:
+            print(f"Error fetching video {a.get('video_id')}: {e}")
+            a['video'] = {}
+
+        try:
+            assigner = get_user(a['assigned_by'])
+            a['assigner'] = assigner if assigner else {}
+        except Exception as e:
+            print(f"Error fetching assigner {a.get('assigned_by')}: {e}")
+            a['assigner'] = {}
 
     return render_template('my_assignments.html',
                          assignments=assignments,
                          categories=CATEGORIES,
                          is_admin=session.get('role') == 'admin',
-                         is_chief_judge=session.get('role') in ['admin', 'chief_judge'])
+                         is_chief_judge=session.get('role') in ['admin', 'chief_judge'],
+                         error_message=error_message)
 
 
 @app.route('/my-assignments/competition')
@@ -3792,12 +3947,23 @@ def export_urls():
 @admin_required
 def upload_video():
     """Upload a video file directly."""
+    user = session.get('username', 'unknown')
+
     if 'file' not in request.files:
+        log_upload_failure('no_file_in_request', user=user, extra={'endpoint': '/admin/upload-video'})
         return jsonify({'error': 'No file provided'}), 400
 
     file = request.files['file']
     if file.filename == '':
+        log_upload_failure('empty_filename', user=user, extra={'endpoint': '/admin/upload-video'})
         return jsonify({'error': 'No file selected'}), 400
+
+    # Get file info for logging
+    original_filename = file.filename
+    file.seek(0, 2)  # Seek to end
+    file_size = file.tell()
+    file.seek(0)  # Reset to beginning
+    content_type = file.content_type
 
     # Get form data
     title = request.form.get('title', '').strip()
@@ -3827,6 +3993,9 @@ def upload_video():
     allowed_extensions = ('.mp4', '.webm', '.mov', '.m4v', '.ogg', '.ogv', '.mts', '.m2ts', '.avi', '.mkv')
 
     if ext not in allowed_extensions:
+        log_upload_failure('invalid_file_type', filename=original_filename, user=user,
+                          file_size=file_size, content_type=content_type,
+                          extra={'extension': ext, 'allowed': allowed_extensions, 'endpoint': '/admin/upload-video'})
         return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
 
     video_id = str(uuid.uuid4())[:8]
@@ -3912,6 +4081,9 @@ def upload_video():
                 local_file = output_filename
             else:
                 os.remove(temp_path)
+                log_upload_failure('ffmpeg_conversion_failed', filename=original_filename, user=user,
+                                  file_size=file_size, content_type=content_type,
+                                  extra={'extension': ext, 'video_id': video_id})
                 return jsonify({'error': 'Failed to convert video. Make sure ffmpeg is installed.'}), 400
         else:
             # Save directly (no conversion needed)
@@ -3936,8 +4108,27 @@ def upload_video():
         video_type = 'local'
         final_local_file = local_file
 
-        if USE_SUPABASE:
-            # Upload video file
+        # Upload to cloud storage (prefer S3 over Supabase)
+        if USE_S3:
+            # Upload video file to S3
+            s3_video_url = upload_to_s3_from_path(output_path, folder='videos')
+            if s3_video_url:
+                video_url = s3_video_url
+                video_type = 'url'
+                final_local_file = ''
+                # Clean up local file after upload
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+
+            # Upload thumbnail to S3
+            if thumbnail and os.path.exists(thumbnail_path):
+                thumb_url = upload_to_s3_from_path(thumbnail_path, folder='thumbnails')
+                if thumb_url:
+                    thumbnail = thumb_url
+                    os.remove(thumbnail_path)
+
+        elif USE_SUPABASE:
+            # Fallback to Supabase if S3 not configured
             supabase_video_url = upload_to_supabase_storage(output_path, f"videos/{local_file}")
             if supabase_video_url:
                 video_url = supabase_video_url
@@ -3981,6 +4172,10 @@ def upload_video():
         })
 
     except Exception as e:
+        import traceback
+        log_upload_failure('exception', filename=original_filename, user=user,
+                          file_size=file_size, content_type=content_type,
+                          extra={'error': str(e), 'traceback': traceback.format_exc(), 'endpoint': '/admin/upload-video'})
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
 
 
@@ -5205,6 +5400,127 @@ def set_video_start_time(video_id):
         db.commit()
 
     return jsonify({'success': True, 'message': 'Start time saved', 'start_time': start_time})
+
+
+@app.route('/api/video/<video_id>/trim', methods=['POST'])
+@chief_judge_required
+def trim_video(video_id):
+    """Trim a video to save storage space (chief judge/admin only)."""
+    import subprocess
+    import tempfile
+    import shutil
+
+    data = request.json
+    start = float(data.get('start', 0))
+    end = float(data.get('end', 0))
+
+    if end <= start:
+        return jsonify({'error': 'End time must be greater than start time'}), 400
+
+    video = get_video(video_id)
+    if not video:
+        return jsonify({'error': 'Video not found'}), 404
+
+    video_src = video.get('video_src', '')
+    if not video_src:
+        return jsonify({'error': 'No video source found'}), 400
+
+    # Only allow trimming local/S3 videos
+    if not (video.get('is_local') or video.get('is_direct_url')):
+        return jsonify({'error': 'Can only trim local or S3 videos'}), 400
+
+    try:
+        # Determine the actual file path
+        if video_src.startswith('/static/videos/'):
+            # Local file
+            local_path = os.path.join(os.path.dirname(__file__), video_src.lstrip('/'))
+            is_s3 = False
+        elif 's3.amazonaws.com' in video_src or 's3.' in video_src:
+            # S3 file - download first
+            is_s3 = True
+            import urllib.request
+            temp_input = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+            urllib.request.urlretrieve(video_src, temp_input.name)
+            local_path = temp_input.name
+        else:
+            return jsonify({'error': 'Cannot trim this video type'}), 400
+
+        if not os.path.exists(local_path):
+            return jsonify({'error': 'Video file not found on server'}), 404
+
+        # Create temp output file
+        temp_output = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+        temp_output.close()
+
+        # Calculate duration
+        duration = end - start
+
+        # Use FFmpeg to trim the video
+        cmd = [
+            'ffmpeg', '-y',
+            '-ss', str(start),
+            '-i', local_path,
+            '-t', str(duration),
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-preset', 'fast',
+            '-movflags', '+faststart',
+            temp_output.name
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+
+        if result.returncode != 0:
+            os.unlink(temp_output.name)
+            return jsonify({'error': f'FFmpeg error: {result.stderr[:200]}'}), 500
+
+        # Get new file size
+        new_size = os.path.getsize(temp_output.name)
+
+        if is_s3:
+            # Re-upload to S3
+            new_url = upload_to_s3_from_path(temp_output.name, folder='videos')
+            os.unlink(temp_input.name)  # Clean up downloaded file
+            os.unlink(temp_output.name)
+
+            if new_url:
+                # Update database with new URL
+                if USE_SUPABASE:
+                    supabase.table('videos').update({
+                        'video_src': new_url,
+                        'start_time': 0  # Reset start time since video is trimmed
+                    }).eq('id', video_id).execute()
+                else:
+                    db = get_sqlite_db()
+                    db.execute('UPDATE videos SET video_src = ?, start_time = 0 WHERE id = ?', (new_url, video_id))
+                    db.commit()
+
+                return jsonify({'success': True, 'message': f'Video trimmed and re-uploaded. New size: {new_size // 1024}KB'})
+            else:
+                return jsonify({'error': 'Failed to upload trimmed video to S3'}), 500
+        else:
+            # Replace local file
+            original_size = os.path.getsize(local_path)
+            shutil.move(temp_output.name, local_path)
+
+            # Reset start time in database
+            if USE_SUPABASE:
+                supabase.table('videos').update({'start_time': 0}).eq('id', video_id).execute()
+            else:
+                db = get_sqlite_db()
+                db.execute('UPDATE videos SET start_time = 0 WHERE id = ?', (video_id,))
+                db.commit()
+
+            saved = original_size - new_size
+            return jsonify({
+                'success': True,
+                'message': f'Video trimmed. Saved {saved // 1024}KB ({saved // 1024 // 1024}MB)'
+            })
+
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Trimming timed out - video may be too large'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Error trimming video: {str(e)}'}), 500
 
 
 @app.route('/api/videos-by-event')
@@ -8437,12 +8753,23 @@ def get_video_info(video_id):
 @chief_judge_required
 def videographer_upload_video():
     """Upload a video file (chief judge and above)."""
+    user = session.get('username', 'unknown')
+
     if 'file' not in request.files:
+        log_upload_failure('no_file_in_request', user=user, extra={'endpoint': '/videographer/upload-video'})
         return jsonify({'error': 'No file provided'}), 400
 
     file = request.files['file']
     if file.filename == '':
+        log_upload_failure('empty_filename', user=user, extra={'endpoint': '/videographer/upload-video'})
         return jsonify({'error': 'No file selected'}), 400
+
+    # Get file info for logging
+    original_filename = file.filename
+    file.seek(0, 2)  # Seek to end
+    file_size = file.tell()
+    file.seek(0)  # Reset to beginning
+    content_type = file.content_type
 
     # Get form data
     title = request.form.get('title', '').strip()
@@ -8457,6 +8784,9 @@ def videographer_upload_video():
     allowed_extensions = ('.mp4', '.webm', '.mov', '.m4v', '.ogg', '.ogv', '.mts', '.m2ts', '.avi', '.mkv')
 
     if ext not in allowed_extensions:
+        log_upload_failure('invalid_file_type', filename=original_filename, user=user,
+                          file_size=file_size, content_type=content_type,
+                          extra={'extension': ext, 'allowed': allowed_extensions, 'endpoint': '/videographer/upload-video'})
         return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
 
     # Videographer uploads are manually assigned to team/round slots
@@ -8547,6 +8877,9 @@ def videographer_upload_video():
                 local_file = output_filename
             else:
                 os.remove(temp_path)
+                log_upload_failure('ffmpeg_conversion_failed', filename=original_filename, user=user,
+                                  file_size=file_size, content_type=content_type,
+                                  extra={'extension': ext, 'video_id': video_id})
                 return jsonify({'error': 'Failed to convert video. Make sure ffmpeg is installed.'}), 400
         else:
             # Save directly (no conversion needed)
@@ -8566,13 +8899,31 @@ def videographer_upload_video():
         # Get duration
         duration = get_video_duration(output_path)
 
-        # Upload to Supabase Storage if enabled
+        # Upload to cloud storage (prefer S3 over Supabase)
         video_url = ''
         video_type = 'local'
         final_local_file = local_file
 
-        if USE_SUPABASE:
-            # Upload video file
+        if USE_S3:
+            # Upload video file to S3
+            s3_video_url = upload_to_s3_from_path(output_path, folder='videos')
+            if s3_video_url:
+                video_url = s3_video_url
+                video_type = 'url'
+                final_local_file = ''
+                # Clean up local file after upload
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+
+            # Upload thumbnail to S3
+            if thumbnail and os.path.exists(thumbnail_path):
+                thumb_url = upload_to_s3_from_path(thumbnail_path, folder='thumbnails')
+                if thumb_url:
+                    thumbnail = thumb_url
+                    os.remove(thumbnail_path)
+
+        elif USE_SUPABASE:
+            # Fallback to Supabase if S3 not configured
             supabase_video_url = upload_to_supabase_storage(output_path, f"videos/{local_file}")
             if supabase_video_url:
                 video_url = supabase_video_url
@@ -8616,6 +8967,10 @@ def videographer_upload_video():
         })
 
     except Exception as e:
+        import traceback
+        log_upload_failure('exception', filename=original_filename, user=user,
+                          file_size=file_size, content_type=content_type,
+                          extra={'error': str(e), 'traceback': traceback.format_exc(), 'endpoint': '/videographer/upload-video'})
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
 
 
@@ -9890,6 +10245,195 @@ if SOCKETIO_ENABLED:
             # Clean up empty sessions
             if all(not j['connected'] for j in session['judges'].values()):
                 del panel_sessions[session_id]
+
+
+# ==================== ARTISTIC EVENTS SCORING ====================
+
+@app.route('/artistic/difficulty/<team_id>', methods=['POST'])
+@chief_judge_required
+def set_artistic_difficulty(team_id):
+    """Pre-set difficulty score for a team (chief judge only)."""
+    data = request.json
+    round_num = int(data.get('round_num', 1))
+    score = float(data.get('score', 0))
+
+    team = get_team(team_id)
+    if not team:
+        return jsonify({'error': 'Team not found'}), 404
+
+    competition = get_competition(team['competition_id'])
+    if not competition:
+        return jsonify({'error': 'Competition not found'}), 404
+
+    # Get existing difficulty scores or initialize
+    difficulty_scores = {}
+    if competition.get('artistic_difficulty_scores'):
+        try:
+            difficulty_scores = json.loads(competition['artistic_difficulty_scores'])
+        except:
+            difficulty_scores = {}
+
+    # Store the preset difficulty score
+    key = f"{team_id}:{round_num}"
+    difficulty_scores[key] = {
+        'score': score,
+        'set_by': session.get('username', ''),
+        'set_at': datetime.now().isoformat()
+    }
+
+    # Save back to competition
+    if USE_SUPABASE:
+        supabase.table('competitions').update({
+            'artistic_difficulty_scores': json.dumps(difficulty_scores)
+        }).eq('id', competition['id']).execute()
+    else:
+        db = get_sqlite_db()
+        db.execute('UPDATE competitions SET artistic_difficulty_scores = ? WHERE id = ?',
+                   (json.dumps(difficulty_scores), competition['id']))
+        db.commit()
+
+    return jsonify({'success': True, 'message': f'Difficulty {score} preset for round {round_num}'})
+
+
+@app.route('/artistic/difficulty/<team_id>/<int:round_num>', methods=['GET'])
+@login_required
+def get_artistic_difficulty(team_id, round_num):
+    """Get preset difficulty score for a team/round."""
+    team = get_team(team_id)
+    if not team:
+        return jsonify({'error': 'Team not found'}), 404
+
+    competition = get_competition(team['competition_id'])
+    if not competition:
+        return jsonify({'error': 'Competition not found'}), 404
+
+    difficulty_scores = {}
+    if competition.get('artistic_difficulty_scores'):
+        try:
+            difficulty_scores = json.loads(competition['artistic_difficulty_scores'])
+        except:
+            pass
+
+    key = f"{team_id}:{round_num}"
+    preset = difficulty_scores.get(key)
+
+    if preset:
+        return jsonify({
+            'success': True,
+            'preset': True,
+            'score': preset['score'],
+            'set_by': preset['set_by'],
+            'set_at': preset['set_at']
+        })
+    else:
+        return jsonify({'success': True, 'preset': False})
+
+
+@app.route('/artistic/free-routine/score', methods=['POST'])
+@event_judge_required
+def save_artistic_free_routine_score():
+    """Save a free routine score for artistic events."""
+    data = request.json
+
+    team_id = data.get('team_id')
+    round_num = int(data.get('round_num', 1))
+    video_id = data.get('video_id', '')
+
+    team = get_team(team_id)
+    if not team:
+        return jsonify({'error': 'Team not found'}), 404
+
+    # Build score_data JSON
+    score_data = {
+        'routine_type': 'free',
+        'discipline': data.get('discipline', 'freestyle'),
+        'difficulty': data.get('difficulty', {}),
+        'execution': data.get('execution', {}),
+        'presentation': data.get('presentation', {}),
+        'camera': data.get('camera', {}),
+        'final_score': float(data.get('final_score', 0)),
+        'scored_at': datetime.now().isoformat(),
+        'scored_by': session.get('username', '')
+    }
+
+    # Check if score already exists for this round
+    existing_scores = get_team_scores(team_id)
+    existing = next((s for s in existing_scores if s['round_num'] == round_num), None)
+
+    if existing:
+        score_id = existing['id']
+        if not video_id and existing.get('video_id'):
+            video_id = existing['video_id']
+    else:
+        score_id = str(uuid.uuid4())[:8]
+
+    save_score({
+        'id': score_id,
+        'competition_id': team['competition_id'],
+        'team_id': team_id,
+        'round_num': round_num,
+        'score': score_data['final_score'],
+        'score_data': json.dumps(score_data),
+        'video_id': video_id,
+        'scored_by': session.get('username', ''),
+        'rejump': 0,
+        'created_at': datetime.now().isoformat()
+    })
+
+    return jsonify({'success': True, 'message': 'Free routine score saved', 'score_id': score_id})
+
+
+@app.route('/artistic/compulsory/score', methods=['POST'])
+@event_judge_required
+def save_artistic_compulsory_score():
+    """Save a compulsory routine score for artistic events."""
+    data = request.json
+
+    team_id = data.get('team_id')
+    round_num = int(data.get('round_num', 1))
+    video_id = data.get('video_id', '')
+
+    team = get_team(team_id)
+    if not team:
+        return jsonify({'error': 'Team not found'}), 404
+
+    # Build score_data JSON
+    score_data = {
+        'routine_type': 'compulsory',
+        'discipline': data.get('discipline', 'freestyle'),
+        'sequences': data.get('sequences', []),
+        'presentation': data.get('presentation', {}),
+        'wrong_order': data.get('wrong_order', False),
+        'final_score': float(data.get('final_score', 0)),
+        'scored_at': datetime.now().isoformat(),
+        'scored_by': session.get('username', '')
+    }
+
+    # Check if score already exists for this round
+    existing_scores = get_team_scores(team_id)
+    existing = next((s for s in existing_scores if s['round_num'] == round_num), None)
+
+    if existing:
+        score_id = existing['id']
+        if not video_id and existing.get('video_id'):
+            video_id = existing['video_id']
+    else:
+        score_id = str(uuid.uuid4())[:8]
+
+    save_score({
+        'id': score_id,
+        'competition_id': team['competition_id'],
+        'team_id': team_id,
+        'round_num': round_num,
+        'score': score_data['final_score'],
+        'score_data': json.dumps(score_data),
+        'video_id': video_id,
+        'scored_by': session.get('username', ''),
+        'rejump': 0,
+        'created_at': datetime.now().isoformat()
+    })
+
+    return jsonify({'success': True, 'message': 'Compulsory routine score saved', 'score_id': score_id})
 
 
 if __name__ == '__main__':

@@ -21,6 +21,7 @@
                         Search
                     </button>
                 </form>
+                <a href="/my-assignments" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg">My Assignments</a>
                 {% if is_chief_judge or is_admin %}
                 <a href="/videoupload" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg">Video Upload</a>
                 {% endif %}
@@ -135,7 +136,7 @@
                         </div>
                     </div>
                     {% if video.is_local or video.is_direct_url %}
-                    <video class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" playsinline preload="metadata" tabindex="-1">
+                    <video class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" playsinline preload="metadata" tabindex="-1" controls>
                         {% if '.webm' in video.video_src|lower %}
                         <source src="{{ video.video_src }}" type="video/webm">
                         {% elif '.ogg' in video.video_src|lower or '.ogv' in video.video_src|lower %}
@@ -207,6 +208,51 @@
                             </span>
                         </div>
                     </div>
+
+                    <!-- Confirm Score Button (appears after replay) -->
+                    <div id="confirmScoreRow" class="hidden mt-4 pt-4 border-t border-gray-700">
+                        <button onclick="confirmScore()" id="confirmScoreBtn"
+                            class="w-full py-4 rounded-lg bg-green-600 hover:bg-green-700 text-xl font-bold text-white shadow-lg transition-all">
+                            ✓ Confirm Score
+                        </button>
+                        <p class="text-gray-500 text-sm text-center mt-2">Click to finalize and save your score for this video</p>
+                    </div>
+
+                    {% if (is_chief_judge or is_admin) and (video.is_local or video.is_direct_url) %}
+                    <!-- Video Trim Panel (Chief Judge/Admin Only) -->
+                    <div class="mt-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-center justify-between flex-wrap gap-4">
+                            <div class="flex items-center gap-3">
+                                <span class="text-gray-400 text-sm font-medium">Trim Video:</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-500 text-xs">Start:</span>
+                                    <input type="number" id="trimStart" step="0.1" min="0" value="0"
+                                        class="w-20 px-2 py-1 rounded bg-gray-700 text-white text-sm font-mono">
+                                    <button onclick="setTrimStart()" class="px-2 py-1 rounded bg-gray-600 hover:bg-gray-500 text-xs">
+                                        Set Current
+                                    </button>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-500 text-xs">End:</span>
+                                    <input type="number" id="trimEnd" step="0.1" min="0" value="0"
+                                        class="w-20 px-2 py-1 rounded bg-gray-700 text-white text-sm font-mono">
+                                    <button onclick="setTrimEnd()" class="px-2 py-1 rounded bg-gray-600 hover:bg-gray-500 text-xs">
+                                        Set Current
+                                    </button>
+                                </div>
+                                <button onclick="previewTrim()" class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-sm">
+                                    Preview
+                                </button>
+                                <button onclick="trimVideo()" id="trimBtn" class="px-3 py-1 rounded bg-orange-600 hover:bg-orange-700 text-sm font-medium">
+                                    Trim & Save
+                                </button>
+                                <span id="trimStatus" class="text-xs text-gray-500"></span>
+                            </div>
+                        </div>
+                        <p class="text-gray-500 text-xs mt-2">Trimming will permanently remove footage outside the selected range to save storage space.</p>
+                    </div>
+                    {% endif %}
+
                     <!-- Scoring Timeline -->
                     <div class="mt-4 pt-4 border-t border-gray-700">
                         <div class="flex items-center justify-between mb-3">
@@ -534,110 +580,405 @@
                             </div>
                         </div>
 
-                        <!-- Artistic Events Multi-Judge Panel -->
+                        <!-- USPA Artistic Events Multi-Judge Panel -->
                         <div id="artisticMultiJudgePanel" class="hidden">
-                            <p class="text-xs text-gray-500 mb-3">Score Presentation (0-10), Technical (0-10), and Difficulty (0-2.5).</p>
-
-                            <!-- Presentation Scores -->
-                            <div class="mb-4">
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-gray-300 text-sm font-medium">Presentation</span>
-                                    <span class="text-xs text-gray-500">Execution, form, control</span>
-                                </div>
-                                <div class="grid grid-cols-5 gap-2 mb-2" id="artPresInputs">
-                                    <div class="text-center">
-                                        <label class="text-xs text-gray-500">J1</label>
-                                        <input type="number" id="artPresJ1" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                            <!-- Routine Type & Discipline Selector -->
+                            <div class="mb-4 pb-4 border-b border-gray-700">
+                                <div class="flex flex-wrap gap-4 items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-gray-400 text-sm">Routine:</span>
+                                        <div class="flex rounded overflow-hidden">
+                                            <button type="button" id="btnFreeRoutine" onclick="setArtisticRoutineType('free')"
+                                                class="px-3 py-1 text-sm bg-blue-600 text-white">Free</button>
+                                            <button type="button" id="btnCompulsoryRoutine" onclick="setArtisticRoutineType('compulsory')"
+                                                class="px-3 py-1 text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">Compulsory</button>
+                                        </div>
                                     </div>
-                                    <div class="text-center">
-                                        <label class="text-xs text-gray-500">J2</label>
-                                        <input type="number" id="artPresJ2" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-gray-400 text-sm">Discipline:</span>
+                                        <div class="flex rounded overflow-hidden">
+                                            <button type="button" id="btnFreestyle" onclick="setArtisticDiscipline('freestyle')"
+                                                class="px-3 py-1 text-sm bg-purple-600 text-white">Freestyle (1+1)</button>
+                                            <button type="button" id="btnFreefly" onclick="setArtisticDiscipline('freefly')"
+                                                class="px-3 py-1 text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">Freefly (2+1)</button>
+                                        </div>
                                     </div>
-                                    <div class="text-center">
-                                        <label class="text-xs text-gray-500">J3</label>
-                                        <input type="number" id="artPresJ3" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
-                                    </div>
-                                    <div class="text-center">
-                                        <label class="text-xs text-gray-500">J4</label>
-                                        <input type="number" id="artPresJ4" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
-                                    </div>
-                                    <div class="text-center">
-                                        <label class="text-xs text-gray-500">J5</label>
-                                        <input type="number" id="artPresJ5" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
-                                    </div>
-                                </div>
-                                <div class="text-right text-sm">
-                                    Avg: <span id="artPresAvg" class="text-cyan-400 font-mono font-bold">0.00</span>
                                 </div>
                             </div>
 
-                            <!-- Technical Scores -->
-                            <div class="mb-4">
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-gray-300 text-sm font-medium">Technical</span>
-                                    <span class="text-xs text-gray-500">Variety, creativity, choreography</span>
-                                </div>
-                                <div class="grid grid-cols-5 gap-2 mb-2" id="artTechInputs">
-                                    <div class="text-center">
-                                        <label class="text-xs text-gray-500">J1</label>
-                                        <input type="number" id="artTechJ1" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                            <!-- FREE ROUTINE PANEL -->
+                            <div id="artFreeRoutinePanel">
+                                <!-- Difficulty Score -->
+                                <div class="mb-4 p-3 bg-gray-800 rounded">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-gray-300 text-sm font-medium">Difficulty Score</span>
+                                            <span id="artDifficultyPresetBadge" class="hidden px-2 py-0.5 text-xs bg-green-600 rounded">PRE-SET</span>
+                                        </div>
+                                        <span class="text-xs text-gray-500">0.0 - 10.0</span>
                                     </div>
-                                    <div class="text-center">
-                                        <label class="text-xs text-gray-500">J2</label>
-                                        <input type="number" id="artTechJ2" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
-                                    </div>
-                                    <div class="text-center">
-                                        <label class="text-xs text-gray-500">J3</label>
-                                        <input type="number" id="artTechJ3" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
-                                    </div>
-                                    <div class="text-center">
-                                        <label class="text-xs text-gray-500">J4</label>
-                                        <input type="number" id="artTechJ4" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
-                                    </div>
-                                    <div class="text-center">
-                                        <label class="text-xs text-gray-500">J5</label>
-                                        <input type="number" id="artTechJ5" min="0" max="10" step="0.1" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
+                                    <div class="flex items-center gap-3">
+                                        <input type="number" id="artDifficulty" min="0" max="10" step="0.1" placeholder="0.0"
+                                            class="w-24 px-3 py-2 rounded bg-gray-700 text-white text-center font-mono text-lg" onchange="calculateUSPAArtisticScores()">
+                                        {% if is_chief_judge or is_admin %}
+                                        <button type="button" onclick="presetDifficultyForAllJudges()" class="px-3 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 rounded">
+                                            Pre-Set for All Judges
+                                        </button>
+                                        {% endif %}
                                     </div>
                                 </div>
-                                <div class="text-right text-sm">
-                                    Avg: <span id="artTechAvg" class="text-cyan-400 font-mono font-bold">0.00</span>
+
+                                <!-- Execution Deductions -->
+                                <div class="mb-4 p-3 bg-gray-800 rounded">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-gray-300 text-sm font-medium">Execution Deductions</span>
+                                        <span class="text-xs text-gray-500">3 Judges</span>
+                                    </div>
+
+                                    <!-- Deduction types vary by discipline -->
+                                    <div id="execDeductionTypes" class="mb-3">
+                                        <div class="grid grid-cols-2 gap-2 text-xs mb-2">
+                                            <div class="text-gray-400">Missing element: <span class="text-red-400">-0.2 to -1.0</span></div>
+                                            <div class="text-gray-400">Off heading/wobble: <span class="text-red-400">-0.1 to -0.3</span></div>
+                                            <div id="freeflyCriteria" class="hidden contents">
+                                                <div class="text-gray-400">Teamwork issues: <span class="text-red-400">-0.5</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Judge inputs for execution -->
+                                    <div class="grid grid-cols-3 gap-3">
+                                        <div class="text-center">
+                                            <label class="text-xs text-gray-500 block mb-1">Judge 1</label>
+                                            <input type="number" id="artExecJ1" min="-10" max="0" step="0.1" value="0" placeholder="0.0"
+                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                            <div class="mt-1 flex gap-1 justify-center flex-wrap">
+                                                <button type="button" onclick="addExecDeduction(1, -0.2)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.2</button>
+                                                <button type="button" onclick="addExecDeduction(1, -0.5)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.5</button>
+                                                <button type="button" onclick="addExecDeduction(1, -1.0)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-1.0</button>
+                                            </div>
+                                        </div>
+                                        <div class="text-center">
+                                            <label class="text-xs text-gray-500 block mb-1">Judge 2</label>
+                                            <input type="number" id="artExecJ2" min="-10" max="0" step="0.1" value="0" placeholder="0.0"
+                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                            <div class="mt-1 flex gap-1 justify-center flex-wrap">
+                                                <button type="button" onclick="addExecDeduction(2, -0.2)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.2</button>
+                                                <button type="button" onclick="addExecDeduction(2, -0.5)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.5</button>
+                                                <button type="button" onclick="addExecDeduction(2, -1.0)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-1.0</button>
+                                            </div>
+                                        </div>
+                                        <div class="text-center">
+                                            <label class="text-xs text-gray-500 block mb-1">Judge 3</label>
+                                            <input type="number" id="artExecJ3" min="-10" max="0" step="0.1" value="0" placeholder="0.0"
+                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                            <div class="mt-1 flex gap-1 justify-center flex-wrap">
+                                                <button type="button" onclick="addExecDeduction(3, -0.2)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.2</button>
+                                                <button type="button" onclick="addExecDeduction(3, -0.5)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-0.5</button>
+                                                <button type="button" onclick="addExecDeduction(3, -1.0)" class="px-1 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded">-1.0</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="text-right mt-2 text-sm">
+                                        Avg Deduction: <span id="artExecAvg" class="text-red-400 font-mono font-bold">0.00</span>
+                                    </div>
+                                </div>
+
+                                <!-- Presentation Score -->
+                                <div class="mb-4 p-3 bg-gray-800 rounded">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-gray-300 text-sm font-medium">Presentation</span>
+                                        <span class="text-xs text-gray-500">Creativity, flow, choreography (0-10)</span>
+                                    </div>
+                                    <div class="grid grid-cols-3 gap-3">
+                                        <div class="text-center">
+                                            <label class="text-xs text-gray-500 block mb-1">Judge 1</label>
+                                            <input type="number" id="artPresJ1" min="0" max="10" step="0.1" placeholder="0.0"
+                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                        </div>
+                                        <div class="text-center">
+                                            <label class="text-xs text-gray-500 block mb-1">Judge 2</label>
+                                            <input type="number" id="artPresJ2" min="0" max="10" step="0.1" placeholder="0.0"
+                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                        </div>
+                                        <div class="text-center">
+                                            <label class="text-xs text-gray-500 block mb-1">Judge 3</label>
+                                            <input type="number" id="artPresJ3" min="0" max="10" step="0.1" placeholder="0.0"
+                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateUSPAArtisticScores()">
+                                        </div>
+                                    </div>
+                                    <div class="text-right mt-2 text-sm">
+                                        Avg: <span id="artPresAvg" class="text-cyan-400 font-mono font-bold">0.00</span>
+                                    </div>
+                                </div>
+
+                                <!-- Camera Deductions -->
+                                <div class="mb-4 p-3 bg-gray-800 rounded">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-gray-300 text-sm font-medium">Camera Deductions</span>
+                                        <span id="artCameraTotal" class="text-red-400 font-mono font-bold">0.00</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
+                                            <input type="checkbox" id="camOutOfFrame" onchange="calculateUSPAArtisticScores()" class="rounded">
+                                            <span>Out of frame <span class="text-red-400 text-xs">(-1.0 to -2.0)</span></span>
+                                        </label>
+                                        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
+                                            <input type="checkbox" id="camOffCenter" onchange="calculateUSPAArtisticScores()" class="rounded">
+                                            <span>Off-center <span class="text-red-400 text-xs">(-0.1 to -0.5)</span></span>
+                                        </label>
+                                        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
+                                            <input type="checkbox" id="camProximity" onchange="calculateUSPAArtisticScores()" class="rounded">
+                                            <span>Proximity issues <span class="text-red-400 text-xs">(-2.0)</span></span>
+                                        </label>
+                                        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
+                                            <input type="checkbox" id="camCropping" onchange="calculateUSPAArtisticScores()" class="rounded">
+                                            <span>Cropping <span class="text-red-400 text-xs">(-0.1 to -0.5)</span></span>
+                                        </label>
+                                        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
+                                            <input type="checkbox" id="camEquipment" onchange="calculateUSPAArtisticScores()" class="rounded">
+                                            <span>Equipment in frame <span class="text-red-400 text-xs">(-0.1)</span></span>
+                                        </label>
+                                    </div>
+                                    <div class="mt-2">
+                                        <label class="text-xs text-gray-500">Custom camera deduction:</label>
+                                        <input type="number" id="camCustomDeduction" min="-10" max="0" step="0.1" value="0"
+                                            class="w-20 px-2 py-1 ml-2 rounded bg-gray-700 text-white text-center font-mono text-sm" onchange="calculateUSPAArtisticScores()">
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Difficulty -->
-                            <div class="mb-4">
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-gray-300 text-sm font-medium">Difficulty</span>
-                                    <span class="text-xs text-gray-500">0.0 - 2.5 (from difficulty sheet)</span>
+                            <!-- COMPULSORY ROUTINE PANEL -->
+                            <div id="artCompulsoryPanel" class="hidden">
+                                <!-- 4 Sequence Cards -->
+                                <div class="mb-4">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-gray-300 text-sm font-medium">Sequence Scores</span>
+                                        <span class="text-xs text-gray-500">4 sequences, 0-10 each</span>
+                                    </div>
+
+                                    <div class="space-y-3" id="sequenceCards">
+                                        <!-- Sequence 1 -->
+                                        <div class="p-3 bg-gray-800 rounded" data-seq="1">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-cyan-400 font-medium">Sequence 1</span>
+                                                <span class="text-xs text-gray-500">Score: <span class="seqFinalScore text-yellow-400 font-mono">0.00</span></span>
+                                            </div>
+                                            <div class="grid grid-cols-3 gap-2 mb-2">
+                                                <input type="number" class="seqJudge1 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J1" onchange="calculateCompulsoryScores()">
+                                                <input type="number" class="seqJudge2 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J2" onchange="calculateCompulsoryScores()">
+                                                <input type="number" class="seqJudge3 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J3" onchange="calculateCompulsoryScores()">
+                                            </div>
+                                            <div class="flex flex-wrap gap-2 text-xs">
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductSetup rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Setup <span class="text-red-400">(-10%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductMajor rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Major part <span class="text-red-400">(-50%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductCamera rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Camera <span class="text-red-400">(-50%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductBody rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Body pos <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductGrips rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Grips <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductExec rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Execution <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Sequence 2 -->
+                                        <div class="p-3 bg-gray-800 rounded" data-seq="2">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-cyan-400 font-medium">Sequence 2</span>
+                                                <span class="text-xs text-gray-500">Score: <span class="seqFinalScore text-yellow-400 font-mono">0.00</span></span>
+                                            </div>
+                                            <div class="grid grid-cols-3 gap-2 mb-2">
+                                                <input type="number" class="seqJudge1 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J1" onchange="calculateCompulsoryScores()">
+                                                <input type="number" class="seqJudge2 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J2" onchange="calculateCompulsoryScores()">
+                                                <input type="number" class="seqJudge3 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J3" onchange="calculateCompulsoryScores()">
+                                            </div>
+                                            <div class="flex flex-wrap gap-2 text-xs">
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductSetup rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Setup <span class="text-red-400">(-10%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductMajor rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Major part <span class="text-red-400">(-50%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductCamera rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Camera <span class="text-red-400">(-50%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductBody rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Body pos <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductGrips rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Grips <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductExec rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Execution <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Sequence 3 -->
+                                        <div class="p-3 bg-gray-800 rounded" data-seq="3">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-cyan-400 font-medium">Sequence 3</span>
+                                                <span class="text-xs text-gray-500">Score: <span class="seqFinalScore text-yellow-400 font-mono">0.00</span></span>
+                                            </div>
+                                            <div class="grid grid-cols-3 gap-2 mb-2">
+                                                <input type="number" class="seqJudge1 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J1" onchange="calculateCompulsoryScores()">
+                                                <input type="number" class="seqJudge2 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J2" onchange="calculateCompulsoryScores()">
+                                                <input type="number" class="seqJudge3 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J3" onchange="calculateCompulsoryScores()">
+                                            </div>
+                                            <div class="flex flex-wrap gap-2 text-xs">
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductSetup rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Setup <span class="text-red-400">(-10%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductMajor rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Major part <span class="text-red-400">(-50%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductCamera rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Camera <span class="text-red-400">(-50%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductBody rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Body pos <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductGrips rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Grips <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductExec rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Execution <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Sequence 4 -->
+                                        <div class="p-3 bg-gray-800 rounded" data-seq="4">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-cyan-400 font-medium">Sequence 4</span>
+                                                <span class="text-xs text-gray-500">Score: <span class="seqFinalScore text-yellow-400 font-mono">0.00</span></span>
+                                            </div>
+                                            <div class="grid grid-cols-3 gap-2 mb-2">
+                                                <input type="number" class="seqJudge1 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J1" onchange="calculateCompulsoryScores()">
+                                                <input type="number" class="seqJudge2 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J2" onchange="calculateCompulsoryScores()">
+                                                <input type="number" class="seqJudge3 w-full px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" min="0" max="10" step="0.1" placeholder="J3" onchange="calculateCompulsoryScores()">
+                                            </div>
+                                            <div class="flex flex-wrap gap-2 text-xs">
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductSetup rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Setup <span class="text-red-400">(-10%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductMajor rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Major part <span class="text-red-400">(-50%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductCamera rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Camera <span class="text-red-400">(-50%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductBody rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Body pos <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductGrips rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Grips <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                                <label class="flex items-center gap-1 text-gray-400 cursor-pointer">
+                                                    <input type="checkbox" class="deductExec rounded" onchange="calculateCompulsoryScores()">
+                                                    <span>Execution <span class="text-red-400">(-30%)</span></span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="flex items-center gap-4">
-                                    <input type="number" id="artDifficulty" min="0" max="2.5" step="0.1" placeholder="0.0"
-                                        class="w-24 px-3 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateArtisticScores()">
-                                    <span class="text-gray-500 text-sm">Based on declared difficulty</span>
+
+                                <!-- Compulsory Presentation -->
+                                <div class="mb-4 p-3 bg-gray-800 rounded">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-gray-300 text-sm font-medium">Presentation</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="text-xs text-gray-500 block mb-1">Beginning/End (0-10)</label>
+                                            <input type="number" id="compPresBeginEnd" min="0" max="10" step="0.1" placeholder="0.0"
+                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCompulsoryScores()">
+                                        </div>
+                                        <div>
+                                            <label class="text-xs text-gray-500 block mb-1">Transitions (0-10)</label>
+                                            <input type="number" id="compPresTransitions" min="0" max="10" step="0.1" placeholder="0.0"
+                                                class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCompulsoryScores()">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Wrong Order Penalty -->
+                                <div class="mb-4 p-3 bg-red-900/30 border border-red-800 rounded">
+                                    <label class="flex items-center gap-3 cursor-pointer">
+                                        <input type="checkbox" id="compWrongOrder" onchange="calculateCompulsoryScores()" class="w-5 h-5 rounded">
+                                        <div>
+                                            <span class="text-red-400 font-medium">Wrong Order Penalty</span>
+                                            <p class="text-xs text-gray-400">Affected sequences will be scored as 0</p>
+                                        </div>
+                                    </label>
                                 </div>
                             </div>
 
-                            <!-- Total Score -->
+                            <!-- Score Summary Display -->
                             <div class="bg-gray-900 rounded p-4 mt-4">
-                                <div class="grid grid-cols-4 gap-4 text-center">
-                                    <div>
-                                        <div class="text-xs text-gray-500 mb-1">Presentation</div>
-                                        <div id="artPresFinal" class="text-lg font-mono font-bold text-cyan-400">0.00</div>
-                                    </div>
-                                    <div>
-                                        <div class="text-xs text-gray-500 mb-1">Technical</div>
-                                        <div id="artTechFinal" class="text-lg font-mono font-bold text-cyan-400">0.00</div>
-                                    </div>
-                                    <div>
-                                        <div class="text-xs text-gray-500 mb-1">Difficulty</div>
-                                        <div id="artDiffFinal" class="text-lg font-mono font-bold text-cyan-400">0.00</div>
-                                    </div>
-                                    <div>
-                                        <div class="text-xs text-gray-500 mb-1">TOTAL</div>
-                                        <div id="artTotalScore" class="text-2xl font-mono font-bold text-yellow-400">0.00</div>
-                                    </div>
-                                </div>
+                                <table class="w-full text-center">
+                                    <thead>
+                                        <tr class="text-xs text-gray-500">
+                                            <th class="pb-2">Difficulty</th>
+                                            <th class="pb-2">Execution</th>
+                                            <th class="pb-2">Presentation</th>
+                                            <th class="pb-2">Camera</th>
+                                            <th class="pb-2">TOTAL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><span id="artSummaryDiff" class="text-lg font-mono font-bold text-cyan-400">0.00</span></td>
+                                            <td><span id="artSummaryExec" class="text-lg font-mono font-bold text-cyan-400">0.00</span></td>
+                                            <td><span id="artSummaryPres" class="text-lg font-mono font-bold text-cyan-400">0.00</span></td>
+                                            <td><span id="artSummaryCam" class="text-lg font-mono font-bold text-red-400">0.00</span></td>
+                                            <td><span id="artTotalScore" class="text-2xl font-mono font-bold text-yellow-400">0.00</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
+
+                            <!-- Save Artistic Score Button -->
+                            {% if competition_context %}
+                            <div class="mt-4 pt-4 border-t border-gray-700">
+                                <button type="button" onclick="saveUSPAArtisticScore()" class="w-full px-4 py-3 rounded bg-green-600 hover:bg-green-700 text-white font-medium">
+                                    Save Artistic Score
+                                </button>
+                            </div>
+                            {% endif %}
                         </div>
 
                         <!-- Save Multi-Judge Score -->
@@ -1320,6 +1661,90 @@
             .catch(err => {
                 statusEl.textContent = 'Error saving';
                 statusEl.classList.remove('text-gray-500');
+                statusEl.classList.add('text-red-400');
+            });
+        }
+
+        // Video trimming functions (Chief Judge only)
+        function setTrimStart() {
+            const currentTime = video ? video.currentTime : 0;
+            document.getElementById('trimStart').value = currentTime.toFixed(1);
+        }
+
+        function setTrimEnd() {
+            const currentTime = video ? video.currentTime : 0;
+            document.getElementById('trimEnd').value = currentTime.toFixed(1);
+        }
+
+        function previewTrim() {
+            if (!video) return;
+            const start = parseFloat(document.getElementById('trimStart').value) || 0;
+            const end = parseFloat(document.getElementById('trimEnd').value) || video.duration;
+
+            if (start >= end) {
+                alert('Start time must be less than end time');
+                return;
+            }
+
+            video.currentTime = start;
+            video.play();
+
+            // Stop at end time
+            const checkEnd = setInterval(() => {
+                if (video.currentTime >= end) {
+                    video.pause();
+                    clearInterval(checkEnd);
+                }
+            }, 100);
+        }
+
+        function trimVideo() {
+            const start = parseFloat(document.getElementById('trimStart').value) || 0;
+            const end = parseFloat(document.getElementById('trimEnd').value) || 0;
+            const statusEl = document.getElementById('trimStatus');
+            const trimBtn = document.getElementById('trimBtn');
+
+            if (end <= start) {
+                alert('End time must be greater than start time');
+                return;
+            }
+
+            if (!confirm(`This will permanently trim the video from ${start}s to ${end}s. The original footage outside this range will be deleted to save storage. Continue?`)) {
+                return;
+            }
+
+            statusEl.textContent = 'Trimming...';
+            statusEl.classList.remove('text-green-400', 'text-red-400');
+            statusEl.classList.add('text-yellow-400');
+            trimBtn.disabled = true;
+            trimBtn.classList.add('opacity-50');
+
+            fetch(`/api/video/${videoId}/trim`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start: start, end: end })
+            })
+            .then(response => response.json())
+            .then(data => {
+                trimBtn.disabled = false;
+                trimBtn.classList.remove('opacity-50');
+
+                if (data.success) {
+                    statusEl.textContent = 'Trimmed! Reloading...';
+                    statusEl.classList.remove('text-yellow-400');
+                    statusEl.classList.add('text-green-400');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    statusEl.textContent = 'Error: ' + (data.error || 'Failed to trim');
+                    statusEl.classList.remove('text-yellow-400');
+                    statusEl.classList.add('text-red-400');
+                }
+            })
+            .catch(err => {
+                trimBtn.disabled = false;
+                trimBtn.classList.remove('opacity-50');
+                statusEl.textContent = 'Error: ' + err.message;
+                statusEl.classList.remove('text-yellow-400');
                 statusEl.classList.add('text-red-400');
             });
         }
@@ -3188,6 +3613,10 @@
         // Initialize event type on page load (after all functions and constants are declared)
         autoSelectEventType();
         updateEventType();
+        // Ensure correct scoring panel is shown based on category
+        setTimeout(function() {
+            updateMultiJudgePanelVisibility();
+        }, 100);
 
         function getEventDuration() {
             const select = document.getElementById('eventType');
@@ -3579,7 +4008,7 @@
                             class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded text-white">
                             Cancel
                         </button>
-                        <button onclick="document.getElementById('resetConfirmModal').remove(); resetTimer(); clearScoring();"
+                        <button onclick="document.getElementById('resetConfirmModal').remove(); resetTimer(); clearScoring(); hideConfirmScoreRow();"
                             class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-white font-bold">
                             Yes, Reset All
                         </button>
@@ -3606,6 +4035,9 @@
             // Hide freeze overlay
             const overlay = document.getElementById('freezeOverlay');
             if (overlay) overlay.classList.add('hidden');
+
+            // Hide confirm score row during replay
+            hideConfirmScoreRow();
 
             // Hide confirm modal if open
             const confirmModal = document.getElementById('confirmScoreModal');
@@ -3694,18 +4126,15 @@
                 if (video) video.pause();
                 if (vimeoPlayer) vimeoPlayer.pause();
                 stopTimer();
-                document.getElementById('timerStatus').textContent = 'Freeze Frame!';
+                document.getElementById('timerStatus').textContent = 'Freeze Frame - Ready to Confirm';
                 document.getElementById('timerStatus').classList.remove('text-green-400', 'text-gray-500');
                 document.getElementById('timerStatus').classList.add('text-yellow-400');
                 document.getElementById('timerDisplay').classList.add('text-yellow-400');
                 const overlayEl = document.getElementById('freezeOverlay');
                 if (overlayEl) overlayEl.classList.remove('hidden');
-                // Show confirm score modal if assigned
-                if (currentAssignmentId) {
-                    showConfirmScoreModal();
-                } else {
-                    showSaveScoreSection();
-                }
+
+                // Show the large confirm score button
+                showConfirmScoreRow();
             }
         }
 
@@ -4538,6 +4967,7 @@
 
         function updateMultiJudgePanelVisibility() {
             const eventType = document.getElementById('eventType').value;
+            const category = '{{ video.category }}';
 
             // Hide all panels first
             document.getElementById('fsMultiJudgePanel').classList.add('hidden');
@@ -4546,24 +4976,38 @@
 
             if (!multiJudgeModeEnabled) return;
 
-            // Determine which panel to show based on event type
-            // FS/VFS events: 4way, 8way, 4way-vfs, vfs
-            // CF events: 2way-cf, 4way-cf, 4way-cf-rotation, 8way-cf
-            // Artistic events: freefly, freestyle, artistic-freefly, artistic-freestyle
+            // Determine which panel to show based on category first, then event type
+            // Category-based detection (most reliable)
+            const artisticCategories = ['ae', 'artistic', 'artistic_events'];
+            const cfCategories = ['cf', 'canopy_formation', 'canopy'];
+            const cpCategories = ['cp', 'canopy_piloting'];
 
-            const fsEvents = ['4way', '8way', '4way-vfs', 'vfs', '4way-inter', '8way-inter', '10way'];
-            const cfEvents = ['2way-cf', '4way-cf', '4way-cf-rotation', '8way-cf', 'cf-2way', 'cf-4way', 'cf-8way'];
+            // Event type lists for fallback
+            const fsEvents = ['4way', '8way', '4way-vfs', 'vfs', '4way-inter', '8way-inter', '10way', '4way-fs', '2way-mfs', '16way'];
+            const cfEvents = ['2way-cf', '4way-cf', '4way-cf-rotation', '8way-cf', 'cf-2way', 'cf-4way', 'cf-8way', '4way-cf-seq', '4way-cf-rot', '2way-cf-seq'];
             const artisticEvents = ['freefly', 'freestyle', 'artistic-freefly', 'artistic-freestyle',
                                     'fs-artistic', 'artistic', 'freefly-ae', 'freestyle-ae'];
 
-            if (fsEvents.includes(eventType)) {
+            // Check category first (most reliable)
+            if (artisticCategories.includes(category.toLowerCase())) {
+                document.getElementById('artisticMultiJudgePanel').classList.remove('hidden');
+                // Auto-select discipline based on subcategory
+                const subcategory = '{{ video.subcategory|default("", true) }}'.toLowerCase();
+                if (subcategory.includes('freefly') || subcategory.includes('ff')) {
+                    setArtisticDiscipline('freefly');
+                } else {
+                    setArtisticDiscipline('freestyle');
+                }
+            } else if (cfCategories.includes(category.toLowerCase())) {
+                document.getElementById('cfMultiJudgePanel').classList.remove('hidden');
+            } else if (fsEvents.includes(eventType)) {
                 document.getElementById('fsMultiJudgePanel').classList.remove('hidden');
             } else if (cfEvents.includes(eventType)) {
                 document.getElementById('cfMultiJudgePanel').classList.remove('hidden');
             } else if (artisticEvents.includes(eventType)) {
                 document.getElementById('artisticMultiJudgePanel').classList.remove('hidden');
             } else {
-                // Default to FS panel for unlisted events
+                // Default to FS panel for unlisted events/categories
                 document.getElementById('fsMultiJudgePanel').classList.remove('hidden');
             }
         }
@@ -4575,8 +5019,6 @@
             for (let i = 1; i <= 5; i++) {
                 const input = document.getElementById('fsJ' + i);
                 const cfInput = document.getElementById('cfJ' + i);
-                const artPresInput = document.getElementById('artPresJ' + i);
-                const artTechInput = document.getElementById('artTechJ' + i);
 
                 if (input) {
                     const parent = input.closest('.text-center');
@@ -4597,32 +5039,14 @@
                         cfInput.value = '';
                     }
                 }
-
-                if (artPresInput) {
-                    const parent = artPresInput.closest('.text-center');
-                    if (i <= currentJudgeCount) {
-                        parent.classList.remove('hidden');
-                    } else {
-                        parent.classList.add('hidden');
-                        artPresInput.value = '';
-                    }
-                }
-
-                if (artTechInput) {
-                    const parent = artTechInput.closest('.text-center');
-                    if (i <= currentJudgeCount) {
-                        parent.classList.remove('hidden');
-                    } else {
-                        parent.classList.add('hidden');
-                        artTechInput.value = '';
-                    }
-                }
             }
+
+            // USPA Artistic uses fixed 3 judges - no need to hide/show
 
             // Recalculate averages
             calculateFsAverage();
             calculateCfAverage();
-            calculateArtisticScores();
+            calculateUSPAArtisticScores();
         }
 
         function calculateFsAverage() {
@@ -4714,43 +5138,335 @@
             document.getElementById('cfJudgeSpread').textContent = spread;
         }
 
-        function calculateArtisticScores() {
+        // USPA Artistic Events State
+        let artisticRoutineType = 'free'; // 'free' or 'compulsory'
+        let artisticDiscipline = 'freestyle'; // 'freestyle' or 'freefly'
+        let artisticDifficultyPreset = null; // Preset difficulty from chief judge
+
+        function setArtisticRoutineType(type) {
+            artisticRoutineType = type;
+            const btnFree = document.getElementById('btnFreeRoutine');
+            const btnComp = document.getElementById('btnCompulsoryRoutine');
+            const freePanel = document.getElementById('artFreeRoutinePanel');
+            const compPanel = document.getElementById('artCompulsoryPanel');
+
+            if (type === 'free') {
+                btnFree.classList.remove('bg-gray-700', 'text-gray-300');
+                btnFree.classList.add('bg-blue-600', 'text-white');
+                btnComp.classList.remove('bg-blue-600', 'text-white');
+                btnComp.classList.add('bg-gray-700', 'text-gray-300');
+                freePanel.classList.remove('hidden');
+                compPanel.classList.add('hidden');
+            } else {
+                btnComp.classList.remove('bg-gray-700', 'text-gray-300');
+                btnComp.classList.add('bg-blue-600', 'text-white');
+                btnFree.classList.remove('bg-blue-600', 'text-white');
+                btnFree.classList.add('bg-gray-700', 'text-gray-300');
+                compPanel.classList.remove('hidden');
+                freePanel.classList.add('hidden');
+            }
+            calculateUSPAArtisticScores();
+        }
+
+        function setArtisticDiscipline(discipline) {
+            artisticDiscipline = discipline;
+            const btnFreestyle = document.getElementById('btnFreestyle');
+            const btnFreefly = document.getElementById('btnFreefly');
+            const freeflyCriteria = document.getElementById('freeflyCriteria');
+
+            if (discipline === 'freestyle') {
+                btnFreestyle.classList.remove('bg-gray-700', 'text-gray-300');
+                btnFreestyle.classList.add('bg-purple-600', 'text-white');
+                btnFreefly.classList.remove('bg-purple-600', 'text-white');
+                btnFreefly.classList.add('bg-gray-700', 'text-gray-300');
+                if (freeflyCriteria) freeflyCriteria.classList.add('hidden');
+            } else {
+                btnFreefly.classList.remove('bg-gray-700', 'text-gray-300');
+                btnFreefly.classList.add('bg-purple-600', 'text-white');
+                btnFreestyle.classList.remove('bg-purple-600', 'text-white');
+                btnFreestyle.classList.add('bg-gray-700', 'text-gray-300');
+                if (freeflyCriteria) freeflyCriteria.classList.remove('hidden');
+            }
+        }
+
+        function addExecDeduction(judgeNum, amount) {
+            const input = document.getElementById('artExecJ' + judgeNum);
+            if (input) {
+                const current = parseFloat(input.value) || 0;
+                input.value = Math.max(-10, current + amount).toFixed(1);
+                calculateUSPAArtisticScores();
+            }
+        }
+
+        function calculateUSPAArtisticScores() {
+            if (artisticRoutineType === 'free') {
+                calculateFreeRoutineScores();
+            } else {
+                calculateCompulsoryScores();
+            }
+        }
+
+        function calculateFreeRoutineScores() {
+            // Get Difficulty score
+            const difficulty = parseFloat(document.getElementById('artDifficulty').value) || 0;
+
+            // Calculate Execution deductions average (negative values)
+            const execDeductions = [];
+            for (let i = 1; i <= 3; i++) {
+                const input = document.getElementById('artExecJ' + i);
+                if (input && input.value !== '') {
+                    execDeductions.push(parseFloat(input.value) || 0);
+                }
+            }
+            const execAvg = execDeductions.length > 0 ?
+                execDeductions.reduce((a, b) => a + b, 0) / execDeductions.length : 0;
+            document.getElementById('artExecAvg').textContent = execAvg.toFixed(2);
+
+            // Execution score = 10 - avg deductions (deductions are negative, so this adds them)
+            const execScore = 10 + execAvg; // execAvg is negative
+
             // Calculate Presentation average
             const presScores = [];
-            for (let i = 1; i <= currentJudgeCount; i++) {
+            for (let i = 1; i <= 3; i++) {
                 const input = document.getElementById('artPresJ' + i);
                 if (input && input.value !== '') {
                     presScores.push(parseFloat(input.value) || 0);
                 }
             }
-
             const presAvg = presScores.length > 0 ?
                 presScores.reduce((a, b) => a + b, 0) / presScores.length : 0;
             document.getElementById('artPresAvg').textContent = presAvg.toFixed(2);
-            document.getElementById('artPresFinal').textContent = presAvg.toFixed(2);
 
-            // Calculate Technical average
-            const techScores = [];
-            for (let i = 1; i <= currentJudgeCount; i++) {
-                const input = document.getElementById('artTechJ' + i);
-                if (input && input.value !== '') {
-                    techScores.push(parseFloat(input.value) || 0);
-                }
-            }
+            // Calculate Camera deductions
+            let cameraDeductions = 0;
+            if (document.getElementById('camOutOfFrame').checked) cameraDeductions -= 1.5;
+            if (document.getElementById('camOffCenter').checked) cameraDeductions -= 0.3;
+            if (document.getElementById('camProximity').checked) cameraDeductions -= 2.0;
+            if (document.getElementById('camCropping').checked) cameraDeductions -= 0.3;
+            if (document.getElementById('camEquipment').checked) cameraDeductions -= 0.1;
+            cameraDeductions += parseFloat(document.getElementById('camCustomDeduction').value) || 0;
+            document.getElementById('artCameraTotal').textContent = cameraDeductions.toFixed(2);
 
-            const techAvg = techScores.length > 0 ?
-                techScores.reduce((a, b) => a + b, 0) / techScores.length : 0;
-            document.getElementById('artTechAvg').textContent = techAvg.toFixed(2);
-            document.getElementById('artTechFinal').textContent = techAvg.toFixed(2);
+            // Update summary display
+            document.getElementById('artSummaryDiff').textContent = difficulty.toFixed(2);
+            document.getElementById('artSummaryExec').textContent = execScore.toFixed(2);
+            document.getElementById('artSummaryPres').textContent = presAvg.toFixed(2);
+            document.getElementById('artSummaryCam').textContent = cameraDeductions.toFixed(2);
 
-            // Get Difficulty score
-            const difficulty = parseFloat(document.getElementById('artDifficulty').value) || 0;
-            document.getElementById('artDiffFinal').textContent = difficulty.toFixed(2);
-
-            // Calculate total (Presentation + Technical + Difficulty)
-            const total = presAvg + techAvg + difficulty;
+            // Free Routine Formula: Difficulty + Execution + Presentation + Camera
+            const total = difficulty + execScore + presAvg + cameraDeductions;
             document.getElementById('artTotalScore').textContent = total.toFixed(2);
         }
+
+        function calculateCompulsoryScores() {
+            const wrongOrder = document.getElementById('compWrongOrder').checked;
+            let sequenceTotal = 0;
+
+            // Calculate each sequence score
+            document.querySelectorAll('#sequenceCards > div').forEach((card, idx) => {
+                const seqNum = idx + 1;
+                const j1 = parseFloat(card.querySelector('.seqJudge1').value) || 0;
+                const j2 = parseFloat(card.querySelector('.seqJudge2').value) || 0;
+                const j3 = parseFloat(card.querySelector('.seqJudge3').value) || 0;
+
+                // Calculate average of non-zero scores
+                const scores = [j1, j2, j3].filter(s => s > 0);
+                let baseScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+
+                // Apply deductions (cumulative percentage)
+                let deductionPct = 0;
+                if (card.querySelector('.deductSetup').checked) deductionPct += 0.10;
+                if (card.querySelector('.deductMajor').checked) deductionPct += 0.50;
+                if (card.querySelector('.deductCamera').checked) deductionPct += 0.50;
+                if (card.querySelector('.deductBody').checked) deductionPct += 0.30;
+                if (card.querySelector('.deductGrips').checked) deductionPct += 0.30;
+                if (card.querySelector('.deductExec').checked) deductionPct += 0.30;
+
+                // Deduction cannot exceed 100%
+                deductionPct = Math.min(deductionPct, 1.0);
+
+                let finalScore = baseScore * (1 - deductionPct);
+
+                // If wrong order, this sequence is 0
+                if (wrongOrder) finalScore = 0;
+
+                card.querySelector('.seqFinalScore').textContent = finalScore.toFixed(2);
+                sequenceTotal += finalScore;
+            });
+
+            // Get presentation scores
+            const presBeginEnd = parseFloat(document.getElementById('compPresBeginEnd').value) || 0;
+            const presTransitions = parseFloat(document.getElementById('compPresTransitions').value) || 0;
+            const presAvg = (presBeginEnd + presTransitions) / 2;
+
+            // Update summary display (for compulsory, show differently)
+            document.getElementById('artSummaryDiff').textContent = '-';
+            document.getElementById('artSummaryExec').textContent = sequenceTotal.toFixed(2);
+            document.getElementById('artSummaryPres').textContent = presAvg.toFixed(2);
+            document.getElementById('artSummaryCam').textContent = '-';
+
+            // Compulsory Formula: Sum of sequences + Presentation avg
+            const total = sequenceTotal + presAvg;
+            document.getElementById('artTotalScore').textContent = total.toFixed(2);
+        }
+
+        async function loadPresetDifficulty() {
+            {% if competition_context %}
+            try {
+                const response = await fetch('/artistic/difficulty/{{ competition_context.team_id }}/{{ competition_context.round_num }}');
+                const data = await response.json();
+                if (data.success && data.preset) {
+                    artisticDifficultyPreset = data;
+                    document.getElementById('artDifficulty').value = data.score;
+                    document.getElementById('artDifficulty').readOnly = true;
+                    document.getElementById('artDifficultyPresetBadge').classList.remove('hidden');
+                    document.getElementById('artDifficultyPresetBadge').title = `Set by ${data.set_by} at ${data.set_at}`;
+                    calculateUSPAArtisticScores();
+                }
+            } catch (err) {
+                console.error('Error loading preset difficulty:', err);
+            }
+            {% endif %}
+        }
+
+        async function presetDifficultyForAllJudges() {
+            {% if competition_context %}
+            const difficulty = parseFloat(document.getElementById('artDifficulty').value);
+            if (isNaN(difficulty) || difficulty < 0 || difficulty > 10) {
+                alert('Please enter a valid difficulty score (0-10)');
+                return;
+            }
+
+            try {
+                const response = await fetch('/artistic/difficulty/{{ competition_context.team_id }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        round_num: {{ competition_context.round_num }},
+                        score: difficulty
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('artDifficultyPresetBadge').classList.remove('hidden');
+                    alert('Difficulty preset for all judges!');
+                } else {
+                    alert(data.error || 'Failed to preset difficulty');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+            {% endif %}
+        }
+
+        async function saveUSPAArtisticScore() {
+            {% if competition_context %}
+            const total = parseFloat(document.getElementById('artTotalScore').textContent) || 0;
+
+            let scorePayload = {
+                team_id: '{{ competition_context.team_id }}',
+                round_num: {{ competition_context.round_num }},
+                video_id: '{{ video.id }}',
+                discipline: artisticDiscipline,
+                final_score: total
+            };
+
+            let endpoint = '';
+            if (artisticRoutineType === 'free') {
+                endpoint = '/artistic/free-routine/score';
+                scorePayload.difficulty = {
+                    score: parseFloat(document.getElementById('artDifficulty').value) || 0,
+                    preset: artisticDifficultyPreset !== null
+                };
+                scorePayload.execution = {
+                    judges: [
+                        { deductions: parseFloat(document.getElementById('artExecJ1').value) || 0 },
+                        { deductions: parseFloat(document.getElementById('artExecJ2').value) || 0 },
+                        { deductions: parseFloat(document.getElementById('artExecJ3').value) || 0 }
+                    ],
+                    average: parseFloat(document.getElementById('artExecAvg').textContent) || 0
+                };
+                scorePayload.presentation = {
+                    judges: [
+                        { score: parseFloat(document.getElementById('artPresJ1').value) || 0 },
+                        { score: parseFloat(document.getElementById('artPresJ2').value) || 0 },
+                        { score: parseFloat(document.getElementById('artPresJ3').value) || 0 }
+                    ],
+                    average: parseFloat(document.getElementById('artPresAvg').textContent) || 0
+                };
+                scorePayload.camera = {
+                    deductions: {
+                        outOfFrame: document.getElementById('camOutOfFrame').checked,
+                        offCenter: document.getElementById('camOffCenter').checked,
+                        proximity: document.getElementById('camProximity').checked,
+                        cropping: document.getElementById('camCropping').checked,
+                        equipment: document.getElementById('camEquipment').checked,
+                        custom: parseFloat(document.getElementById('camCustomDeduction').value) || 0
+                    },
+                    total: parseFloat(document.getElementById('artCameraTotal').textContent) || 0
+                };
+            } else {
+                endpoint = '/artistic/compulsory/score';
+                scorePayload.sequences = [];
+                document.querySelectorAll('#sequenceCards > div').forEach((card, idx) => {
+                    scorePayload.sequences.push({
+                        seq: idx + 1,
+                        judge_scores: [
+                            parseFloat(card.querySelector('.seqJudge1').value) || 0,
+                            parseFloat(card.querySelector('.seqJudge2').value) || 0,
+                            parseFloat(card.querySelector('.seqJudge3').value) || 0
+                        ],
+                        deductions: {
+                            setup: card.querySelector('.deductSetup').checked,
+                            major: card.querySelector('.deductMajor').checked,
+                            camera: card.querySelector('.deductCamera').checked,
+                            body: card.querySelector('.deductBody').checked,
+                            grips: card.querySelector('.deductGrips').checked,
+                            exec: card.querySelector('.deductExec').checked
+                        },
+                        final_score: parseFloat(card.querySelector('.seqFinalScore').textContent) || 0
+                    });
+                });
+                scorePayload.presentation = {
+                    beginning_end: parseFloat(document.getElementById('compPresBeginEnd').value) || 0,
+                    transitions: parseFloat(document.getElementById('compPresTransitions').value) || 0
+                };
+                scorePayload.wrong_order = document.getElementById('compWrongOrder').checked;
+            }
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(scorePayload)
+                });
+                const data = await response.json();
+                if (data.success) {
+                    const notification = document.createElement('div');
+                    notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                    notification.textContent = `Score saved: ${total.toFixed(2)}`;
+                    document.body.appendChild(notification);
+                    setTimeout(() => notification.remove(), 3000);
+                } else {
+                    alert(data.error || 'Failed to save score');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+            {% else %}
+            alert('Competition context required to save scores');
+            {% endif %}
+        }
+
+        // Legacy function for backwards compatibility
+        function calculateArtisticScores() {
+            calculateUSPAArtisticScores();
+        }
+
+        // Initialize artistic panel on load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadPresetDifficulty();
+        });
 
         function saveMultiJudgeScore() {
             const eventType = document.getElementById('eventType').value;
@@ -4792,23 +5508,45 @@
                 scoreData.spread = parseInt(document.getElementById('cfJudgeSpread').textContent);
                 scoreData.round = 'CF Round ' + (savedScores.filter(s => s.type === 'cf-multijudge').length + 1);
             } else if (!artisticPanel.classList.contains('hidden')) {
-                // Save Artistic score
-                const presJudges = [];
-                const techJudges = [];
-                for (let i = 1; i <= currentJudgeCount; i++) {
-                    const presInput = document.getElementById('artPresJ' + i);
-                    const techInput = document.getElementById('artTechJ' + i);
-                    if (presInput) presJudges.push(parseFloat(presInput.value) || 0);
-                    if (techInput) techJudges.push(parseFloat(techInput.value) || 0);
-                }
-                scoreData.type = 'artistic-multijudge';
-                scoreData.presentationJudges = presJudges;
-                scoreData.technicalJudges = techJudges;
-                scoreData.presentation = parseFloat(document.getElementById('artPresFinal').textContent);
-                scoreData.technical = parseFloat(document.getElementById('artTechFinal').textContent);
-                scoreData.difficulty = parseFloat(document.getElementById('artDiffFinal').textContent);
+                // Save USPA Artistic score
+                scoreData.type = 'artistic-uspa';
+                scoreData.routineType = artisticRoutineType;
+                scoreData.discipline = artisticDiscipline;
                 scoreData.total = parseFloat(document.getElementById('artTotalScore').textContent);
-                scoreData.round = 'Artistic Round ' + (savedScores.filter(s => s.type === 'artistic-multijudge').length + 1);
+
+                if (artisticRoutineType === 'free') {
+                    scoreData.difficulty = parseFloat(document.getElementById('artDifficulty').value) || 0;
+                    scoreData.execution = {
+                        judges: [
+                            parseFloat(document.getElementById('artExecJ1').value) || 0,
+                            parseFloat(document.getElementById('artExecJ2').value) || 0,
+                            parseFloat(document.getElementById('artExecJ3').value) || 0
+                        ],
+                        average: parseFloat(document.getElementById('artExecAvg').textContent) || 0
+                    };
+                    scoreData.presentation = {
+                        judges: [
+                            parseFloat(document.getElementById('artPresJ1').value) || 0,
+                            parseFloat(document.getElementById('artPresJ2').value) || 0,
+                            parseFloat(document.getElementById('artPresJ3').value) || 0
+                        ],
+                        average: parseFloat(document.getElementById('artPresAvg').textContent) || 0
+                    };
+                    scoreData.camera = parseFloat(document.getElementById('artCameraTotal').textContent) || 0;
+                } else {
+                    // Compulsory
+                    scoreData.sequences = [];
+                    document.querySelectorAll('#sequenceCards > div').forEach((card, idx) => {
+                        scoreData.sequences.push({
+                            seq: idx + 1,
+                            score: parseFloat(card.querySelector('.seqFinalScore').textContent) || 0
+                        });
+                    });
+                    scoreData.presentationBeginEnd = parseFloat(document.getElementById('compPresBeginEnd').value) || 0;
+                    scoreData.presentationTransitions = parseFloat(document.getElementById('compPresTransitions').value) || 0;
+                    scoreData.wrongOrder = document.getElementById('compWrongOrder').checked;
+                }
+                scoreData.round = 'Artistic Round ' + (savedScores.filter(s => s.type === 'artistic-uspa' || s.type === 'artistic-multijudge').length + 1);
             }
 
             savedScores.push(scoreData);
@@ -4840,20 +5578,50 @@
             for (let i = 1; i <= 5; i++) {
                 const fsInput = document.getElementById('fsJ' + i);
                 const cfInput = document.getElementById('cfJ' + i);
-                const presInput = document.getElementById('artPresJ' + i);
-                const techInput = document.getElementById('artTechJ' + i);
 
                 if (fsInput) fsInput.value = '';
                 if (cfInput) cfInput.value = '';
-                if (presInput) presInput.value = '';
-                if (techInput) techInput.value = '';
             }
-            document.getElementById('artDifficulty').value = '';
+
+            // Clear USPA Artistic inputs
+            // Free routine
+            if (!artisticDifficultyPreset) {
+                document.getElementById('artDifficulty').value = '';
+            }
+            for (let i = 1; i <= 3; i++) {
+                const execInput = document.getElementById('artExecJ' + i);
+                const presInput = document.getElementById('artPresJ' + i);
+                if (execInput) execInput.value = '0';
+                if (presInput) presInput.value = '';
+            }
+            // Camera deductions
+            document.getElementById('camOutOfFrame').checked = false;
+            document.getElementById('camOffCenter').checked = false;
+            document.getElementById('camProximity').checked = false;
+            document.getElementById('camCropping').checked = false;
+            document.getElementById('camEquipment').checked = false;
+            document.getElementById('camCustomDeduction').value = '0';
+
+            // Compulsory inputs
+            document.querySelectorAll('#sequenceCards > div').forEach(card => {
+                card.querySelector('.seqJudge1').value = '';
+                card.querySelector('.seqJudge2').value = '';
+                card.querySelector('.seqJudge3').value = '';
+                card.querySelector('.deductSetup').checked = false;
+                card.querySelector('.deductMajor').checked = false;
+                card.querySelector('.deductCamera').checked = false;
+                card.querySelector('.deductBody').checked = false;
+                card.querySelector('.deductGrips').checked = false;
+                card.querySelector('.deductExec').checked = false;
+            });
+            document.getElementById('compPresBeginEnd').value = '';
+            document.getElementById('compPresTransitions').value = '';
+            document.getElementById('compWrongOrder').checked = false;
 
             // Reset displays
             calculateFsAverage();
             calculateCfAverage();
-            calculateArtisticScores();
+            calculateUSPAArtisticScores();
         }
 
         // Update multi-judge panel when event type changes
@@ -4948,7 +5716,49 @@
 
             document.getElementById('confirmScoreValue').textContent = score + ' pts';
             document.getElementById('confirmWorkingTimeValue').textContent = workingTime;
+
+            // Populate bust explanations
+            populateBustExplanations();
+
             document.getElementById('confirmScoreModal').classList.remove('hidden');
+        }
+
+        function populateBustExplanations() {
+            const bustList = document.getElementById('bustExplanationsList');
+            const busts = [];
+
+            // Collect all busts (C marks) from the scoring slots
+            document.querySelectorAll('.score-slot').forEach((slot, index) => {
+                const bustEl = slot.querySelector('[data-type="bust"]');
+                if (bustEl && !bustEl.classList.contains('hidden')) {
+                    busts.push({
+                        point: index + 1,
+                        time: bustEl.dataset.time || 'N/A'
+                    });
+                }
+            });
+
+            if (busts.length === 0) {
+                bustList.innerHTML = '<p class="text-gray-500 text-sm italic">No busts recorded</p>';
+                return;
+            }
+
+            let html = '';
+            busts.forEach((bust, i) => {
+                html += `
+                    <div class="bg-gray-700 rounded p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-red-400 font-medium">Bust #${i + 1} (Point ${bust.point})</span>
+                            <span class="text-gray-500 text-xs">${bust.time}s</span>
+                        </div>
+                        <input type="text"
+                            class="bust-explanation w-full px-2 py-1 rounded bg-gray-600 text-white text-sm"
+                            placeholder="Explain why this was a bust..."
+                            data-point="${bust.point}">
+                    </div>
+                `;
+            });
+            bustList.innerHTML = html;
         }
 
         function hideConfirmScoreModal() {
@@ -4956,6 +5766,21 @@
         }
 
         function confirmAndSubmitScore() {
+            // Collect bust explanations
+            const bustExplanations = [];
+            document.querySelectorAll('.bust-explanation').forEach(input => {
+                if (input.value.trim()) {
+                    bustExplanations.push({
+                        point: input.dataset.point,
+                        explanation: input.value.trim()
+                    });
+                }
+            });
+
+            // Store explanations for submission
+            window.bustExplanations = bustExplanations;
+            window.scoreNotes = document.getElementById('scoreNotes').value.trim();
+
             hideConfirmScoreModal();
             submitAssignmentScore();
         }
@@ -4964,27 +5789,59 @@
             hideConfirmScoreModal();
             replayVideo();
         }
+
+        // Function called by the large Confirm Score button after replay
+        function confirmScore() {
+            showConfirmScoreModal();
+        }
+
+        // Show confirm score row after replay completes
+        function showConfirmScoreRow() {
+            const row = document.getElementById('confirmScoreRow');
+            if (row) row.classList.remove('hidden');
+        }
+
+        function hideConfirmScoreRow() {
+            const row = document.getElementById('confirmScoreRow');
+            if (row) row.classList.add('hidden');
+        }
     </script>
 
     <!-- Confirm Score Modal -->
-    <div id="confirmScoreModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 text-center">
-            <h2 class="text-2xl font-bold mb-4 text-yellow-400">⏱️ Working Time Ended</h2>
+    <div id="confirmScoreModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50 overflow-y-auto">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 my-8">
+            <h2 class="text-2xl font-bold mb-4 text-yellow-400 text-center">⏱️ Confirm Score</h2>
 
             <div class="bg-gray-900 rounded-lg p-4 mb-6">
                 <div class="grid grid-cols-2 gap-4">
-                    <div>
+                    <div class="text-center">
                         <div class="text-gray-500 text-sm mb-1">Score</div>
                         <div id="confirmScoreValue" class="text-3xl font-bold text-green-400">0 pts</div>
                     </div>
-                    <div>
+                    <div class="text-center">
                         <div class="text-gray-500 text-sm mb-1">Working Time</div>
                         <div id="confirmWorkingTimeValue" class="text-3xl font-bold text-yellow-400">0:00</div>
                     </div>
                 </div>
             </div>
 
-            <div class="text-gray-400 text-sm mb-6">
+            <!-- Bust Explanations Section -->
+            <div id="bustExplanationsSection" class="mb-6">
+                <h3 class="text-lg font-bold text-red-400 mb-3">Bust Explanations</h3>
+                <div id="bustExplanationsList" class="space-y-3 max-h-64 overflow-y-auto">
+                    <!-- Bust items will be populated here -->
+                    <p class="text-gray-500 text-sm italic">No busts recorded</p>
+                </div>
+            </div>
+
+            <!-- General Notes -->
+            <div class="mb-6">
+                <label class="text-gray-400 text-sm block mb-2">Additional Notes (optional)</label>
+                <textarea id="scoreNotes" rows="2" placeholder="Any additional comments about this score..."
+                    class="w-full px-3 py-2 rounded bg-gray-700 text-white text-sm resize-none"></textarea>
+            </div>
+
+            <div class="text-gray-400 text-sm mb-6 text-center">
                 Submit this score or replay the video to re-evaluate?
             </div>
 
