@@ -548,15 +548,15 @@ def send_reset_email(email, username, reset_token):
 
     reset_link = f"{APP_URL}/reset-password/{reset_token}"
 
-    msg = MIMEMultipart()
+    msg = MIMEMultipart('alternative')
     msg['From'] = SMTP_FROM_EMAIL or SMTP_USERNAME
     msg['To'] = email
-    msg['Subject'] = 'Video Library - Password Reset'
+    msg['Subject'] = 'Judging Suite - Password Reset'
 
-    body = f"""
-Hello,
+    # Plain text fallback
+    plain_body = f"""Hello,
 
-You requested a password reset for your Video Library account ({username}).
+You requested a password reset for your Judging Suite account ({username}).
 
 Click the link below to reset your password:
 {reset_link}
@@ -564,10 +564,87 @@ Click the link below to reset your password:
 This link will expire in 1 hour.
 
 If you did not request this reset, please ignore this email.
-
-- Video Library
 """
-    msg.attach(MIMEText(body, 'plain'))
+
+    # HTML email
+    html_body = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #1a1a2e;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1a1a2e; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #16213e; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px;">📹 Judging Suite</h1>
+                            <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 14px;">Password Reset Request</p>
+                        </td>
+                    </tr>
+
+                    <!-- Body -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <h2 style="color: #ffffff; margin: 0 0 20px 0; font-size: 22px;">Hello!</h2>
+
+                            <p style="color: #b0b0b0; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+                                You requested a password reset for your account.
+                            </p>
+
+                            <!-- Username Box -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+                                <tr>
+                                    <td style="background-color: #1a1a2e; border-radius: 8px; padding: 20px; text-align: center; border: 1px solid #333;">
+                                        <p style="color: #b0b0b0; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px;">Your Username</p>
+                                        <p style="color: #667eea; font-size: 24px; font-weight: bold; margin: 0; font-family: monospace;">{username}</p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- CTA Button -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{reset_link}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                                            Reset Password
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #888888; font-size: 14px; line-height: 1.6; margin: 0 0 15px 0; text-align: center;">
+                                This link will expire in <strong style="color: #ffffff;">1 hour</strong>.
+                            </p>
+
+                            <p style="color: #666666; font-size: 12px; line-height: 1.6; margin: 0; text-align: center;">
+                                If you did not request this reset, please ignore this email.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #0f0f1a; padding: 20px 30px; text-align: center;">
+                            <p style="color: #666666; font-size: 12px; margin: 0;">
+                                USPA Judging Suite
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
+
+    msg.attach(MIMEText(plain_body, 'plain'))
+    msg.attach(MIMEText(html_body, 'html'))
 
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
@@ -590,15 +667,15 @@ def send_welcome_email(email, username, password, name):
         print(f"No email provided for user {username}")
         return False
 
-    msg = MIMEMultipart()
+    msg = MIMEMultipart('alternative')
     msg['From'] = SMTP_FROM_EMAIL or SMTP_USERNAME
     msg['To'] = email
-    msg['Subject'] = 'Welcome to Video Library - Your Account Details'
+    msg['Subject'] = 'Welcome to Judging Suite - Your Account Details'
 
-    body = f"""
-Hello {name},
+    # Plain text fallback
+    plain_body = f"""Hello {name},
 
-Your Video Library account has been created.
+Your Judging Suite account has been created.
 
 Here are your login credentials:
 
@@ -610,12 +687,100 @@ Login at: {APP_URL}
 You will be asked to change your password when you first log in.
 
 If you have any questions, please contact your administrator.
-
-Best regards,
-Video Library Team
 """
 
-    msg.attach(MIMEText(body, 'plain'))
+    # HTML email
+    html_body = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #1a1a2e;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #1a1a2e; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #16213e; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px;">📹 Judging Suite</h1>
+                            <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 14px;">Welcome to the Team!</p>
+                        </td>
+                    </tr>
+
+                    <!-- Body -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <h2 style="color: #ffffff; margin: 0 0 20px 0; font-size: 22px;">Hello {name}!</h2>
+
+                            <p style="color: #b0b0b0; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+                                Your account has been created. Here are your login credentials:
+                            </p>
+
+                            <!-- Credentials Box -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+                                <tr>
+                                    <td style="background-color: #1a1a2e; border-radius: 8px; padding: 25px; border: 1px solid #333;">
+                                        <table width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="padding-bottom: 15px;">
+                                                    <p style="color: #b0b0b0; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px;">Username</p>
+                                                    <p style="color: #667eea; font-size: 20px; font-weight: bold; margin: 0; font-family: monospace;">{username}</p>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="border-top: 1px solid #333; padding-top: 15px;">
+                                                    <p style="color: #b0b0b0; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px;">Temporary Password</p>
+                                                    <p style="color: #10b981; font-size: 20px; font-weight: bold; margin: 0; font-family: monospace;">{password}</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- CTA Button -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
+                                <tr>
+                                    <td align="center">
+                                        <a href="{APP_URL}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-weight: bold; font-size: 16px;">
+                                            Login Now
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #888888; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0; text-align: center;">
+                                You will be asked to change your password when you first log in.
+                            </p>
+
+                            <!-- Thank You Message -->
+                            <p style="color: #ffffff; font-size: 28px; font-weight: bold; margin: 0; text-align: center;">
+                                Thank you for joining as a judge!
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #0f0f1a; padding: 20px 30px; text-align: center;">
+                            <p style="color: #666666; font-size: 12px; margin: 0;">
+                                USPA Judging Suite
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
+
+    msg.attach(MIMEText(plain_body, 'plain'))
+    msg.attach(MIMEText(html_body, 'html'))
 
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
