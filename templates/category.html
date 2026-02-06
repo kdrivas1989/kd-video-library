@@ -460,8 +460,15 @@
             }
         }
 
+        // Team separator colors (cycle through these)
+        const teamColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
+        let teamColorIndex = 0;
+
         // Sort a single grid by team/round
         function sortGridByTeamRound(grid) {
+            // Remove existing team separators
+            grid.querySelectorAll('.team-separator').forEach(sep => sep.remove());
+
             // Get direct children that are video cards
             const videos = Array.from(grid.children).filter(el => el.classList.contains('video-card'));
             if (videos.length === 0) return;
@@ -487,8 +494,31 @@
                 return parsedA.round - parsedB.round;
             });
 
-            // Re-append in sorted order
-            videos.forEach(video => grid.appendChild(video));
+            // Re-append in sorted order with team separators
+            let lastTeam = null;
+            teamColorIndex = 0;
+
+            videos.forEach(video => {
+                const title = video.querySelector('h3')?.textContent?.trim() || '';
+                const parsed = parseTeamRound(title);
+
+                // Add separator when team changes
+                if (lastTeam !== null && parsed.team !== lastTeam) {
+                    const separator = document.createElement('div');
+                    separator.className = 'team-separator col-span-full flex items-center gap-3 my-2';
+                    const color = teamColors[teamColorIndex % teamColors.length];
+                    teamColorIndex++;
+                    separator.innerHTML = `
+                        <div class="flex-1 h-0.5" style="background: ${color}"></div>
+                        <span class="text-sm font-bold px-3 py-1 rounded" style="background: ${color}; color: white;">Team ${parsed.team}</span>
+                        <div class="flex-1 h-0.5" style="background: ${color}"></div>
+                    `;
+                    grid.appendChild(separator);
+                }
+
+                grid.appendChild(video);
+                lastTeam = parsed.team;
+            });
         }
 
         // Auto-sort on page load (with small delay to ensure DOM is ready)
