@@ -176,6 +176,7 @@
                                 <input type="checkbox" id="selectAllAssignments" onchange="toggleAllAssignments(this)" class="w-4 h-4 accent-blue-500">
                             </th>
                             <th class="px-4 py-3 text-left text-sm">Video</th>
+                            <th class="px-4 py-3 text-left text-sm">Duration</th>
                             <th class="px-4 py-3 text-left text-sm">Category</th>
                             <th class="px-4 py-3 text-left text-sm">Assigned To</th>
                             <th class="px-4 py-3 text-left text-sm">Status</th>
@@ -191,6 +192,9 @@
                             </td>
                             <td class="px-4 py-3">
                                 <a href="/video/{{ a.video_id }}" class="text-blue-400 hover:underline">{{ a.video.title|default('Unknown', true) }}</a>
+                            </td>
+                            <td class="px-4 py-3 text-gray-400 text-sm">
+                                {{ a.video.duration|default('-', true) }}
                             </td>
                             <td class="px-4 py-3 text-gray-400 text-sm">
                                 {{ categories.get(a.video.category, {}).get('abbrev', a.video.category)|default('-', true) }}
