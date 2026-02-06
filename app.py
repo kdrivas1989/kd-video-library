@@ -3395,6 +3395,13 @@ def my_assignments():
         assignments = []
         error_message = f"Error loading assignments: {str(e)[:100]}"
 
+    # Limit assignments displayed for performance (can add pagination later)
+    MAX_DISPLAY = 100
+    total_assignments = len(assignments)
+    if total_assignments > MAX_DISPLAY:
+        print(f"DEBUG my_assignments: Limiting {total_assignments} assignments to {MAX_DISPLAY}")
+        assignments = assignments[:MAX_DISPLAY]
+
     # Batch load video details to avoid N+1 queries
     if assignments:
         try:
@@ -3405,9 +3412,9 @@ def my_assignments():
             videos_lookup = {}
             assigners_lookup = {}
 
-            # Batch fetch videos (limit to avoid timeout)
+            # Batch fetch ALL videos for displayed assignments
             print(f"DEBUG my_assignments: Fetching {len(video_ids)} video IDs: {video_ids[:5]}...")
-            for vid in video_ids[:50]:  # Limit to prevent timeout
+            for vid in video_ids:
                 try:
                     video = get_video(vid)
                     if video:
