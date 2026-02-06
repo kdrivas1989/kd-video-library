@@ -629,6 +629,59 @@ Video Library Team
         print(f"Failed to send welcome email: {e}")
         return False
 
+
+def send_assignment_email(email, judge_name, video_count, assigner_name, video_titles=None):
+    """Send email notification when videos are assigned to a judge."""
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        print(f"Email not configured. Assignment notification for {judge_name}: {video_count} videos")
+        return False
+
+    if not email:
+        print(f"No email provided for judge {judge_name}")
+        return False
+
+    msg = MIMEMultipart()
+    msg['From'] = SMTP_FROM_EMAIL or SMTP_USERNAME
+    msg['To'] = email
+    msg['Subject'] = f'Video Library - You Have Been Assigned {video_count} Video(s) to Judge'
+
+    # Build video list if provided
+    video_list = ""
+    if video_titles and len(video_titles) > 0:
+        video_list = "\n\nVideos assigned:\n"
+        for i, title in enumerate(video_titles[:20], 1):  # Limit to 20 titles
+            video_list += f"  {i}. {title}\n"
+        if len(video_titles) > 20:
+            video_list += f"  ... and {len(video_titles) - 20} more\n"
+
+    body = f"""Hello {judge_name},
+
+You have been assigned {video_count} video(s) to judge by {assigner_name}.
+
+Please complete your judging assignments as soon as possible.
+{video_list}
+To view and score your assignments, log in at:
+{APP_URL}/my-assignments
+
+Thank you for your service as a judge!
+
+- USPA Video Library
+"""
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        server.sendmail(SMTP_FROM_EMAIL or SMTP_USERNAME, email, msg.as_string())
+        server.quit()
+        print(f"Assignment notification email sent to {email}")
+        return True
+    except Exception as e:
+        print(f"Failed to send assignment email: {e}")
+        return False
+
+
 # Global error handler to show actual errors
 def _is_api_request_check():
     """Check if the current request is an API/AJAX request expecting JSON."""
@@ -3100,6 +3153,24 @@ def admin_send_credentials(username):
         return jsonify({'error': 'Failed to send email'}), 500
 
 
+@app.route('/admin/test-assignment-email', methods=['POST'])
+@admin_required
+def admin_test_assignment_email():
+    """Send a test assignment notification email."""
+    data = request.json
+    test_email = data.get('email', '')
+
+    if not test_email:
+        return jsonify({'error': 'Email address required'}), 400
+
+    sample_videos = ['Team 201 Round 1', 'Team 202 Round 1', 'Team 203 Round 1', 'Team 201 Round 2', 'Team 202 Round 2']
+
+    if send_assignment_email(test_email, 'Test Judge', 5, 'Chief Judge', sample_videos):
+        return jsonify({'success': True, 'message': f'Test email sent to {test_email}'})
+    else:
+        return jsonify({'error': 'Failed to send test email'}), 500
+
+
 @app.route('/admin/user/<username>/update', methods=['POST'])
 @admin_required
 def admin_update_user(username):
@@ -3344,6 +3415,7 @@ def assign_videos():
     video_ids = data.get('video_ids', [])
     assigned_to = data.get('assigned_to', [])
     notes = data.get('notes', '')
+    send_notification = data.get('send_email', True)  # Default to sending email
 
     # Handle both single string and array of judges (backwards compatible)
     if isinstance(assigned_to, str):
@@ -3352,15 +3424,24 @@ def assign_videos():
     if not video_ids or not assigned_to:
         return jsonify({'error': 'Video IDs and at least one assignee are required'}), 400
 
-    # Verify all judges exist
-    judge_names = []
+    # Get video titles for email
+    video_titles = []
+    for vid in video_ids:
+        video = get_video(vid)
+        if video:
+            video_titles.append(video.get('title', 'Unknown'))
+
+    # Verify all judges exist and collect their info
+    judges_info = []
     for judge_username in assigned_to:
         judge = get_user(judge_username)
         if not judge:
             return jsonify({'error': f'Judge not found: {judge_username}'}), 404
-        judge_names.append(judge['name'])
+        judges_info.append(judge)
 
     assigned_by = session.get('username')
+    assigner = get_user(assigned_by)
+    assigner_name = assigner.get('name', assigned_by) if assigner else assigned_by
     count = 0
 
     # Create assignments for each video and each judge
@@ -3369,8 +3450,24 @@ def assign_videos():
             create_video_assignment(video_id, judge_username, assigned_by, notes)
             count += 1
 
+    # Send email notifications to each judge
+    emails_sent = 0
+    if send_notification:
+        for judge in judges_info:
+            judge_email = judge.get('email')
+            judge_name = judge.get('name', judge['username'])
+            if judge_email:
+                if send_assignment_email(judge_email, judge_name, len(video_ids), assigner_name, video_titles):
+                    emails_sent += 1
+
+    judge_names = [j['name'] for j in judges_info]
     judge_list = ', '.join(judge_names)
-    return jsonify({'success': True, 'message': f'Created {count} assignment(s) for {len(judge_names)} judge(s): {judge_list}'})
+
+    message = f'Created {count} assignment(s) for {len(judge_names)} judge(s): {judge_list}'
+    if send_notification:
+        message += f' - {emails_sent} email notification(s) sent'
+
+    return jsonify({'success': True, 'message': message})
 
 
 @app.route('/assignment/<assignment_id>/delete', methods=['POST'])
