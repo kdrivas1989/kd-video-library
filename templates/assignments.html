@@ -65,13 +65,47 @@
                 </div>
             </div>
 
+            <!-- Team and Round Selection -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4 p-4 bg-gray-700/50 rounded-lg">
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Select by Team</label>
+                    <select id="teamFilter" multiple class="w-full px-4 py-2 rounded bg-gray-700 text-white h-24">
+                        <!-- Populated by JavaScript -->
+                    </select>
+                    <p class="text-gray-500 text-xs mt-1">Ctrl/Cmd+click for multiple</p>
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Select by Round</label>
+                    <select id="roundFilter" multiple class="w-full px-4 py-2 rounded bg-gray-700 text-white h-24">
+                        <!-- Populated by JavaScript -->
+                    </select>
+                    <p class="text-gray-500 text-xs mt-1">Ctrl/Cmd+click for multiple</p>
+                </div>
+                <div class="flex flex-col justify-end gap-2">
+                    <button onclick="selectByTeamRound()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm font-medium">
+                        Select Matching
+                    </button>
+                    <button onclick="selectAllTeams()" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded text-sm">
+                        All Teams
+                    </button>
+                </div>
+                <div class="flex flex-col justify-end gap-2">
+                    <button onclick="filterByTeamRound()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm font-medium">
+                        Filter View
+                    </button>
+                    <button onclick="selectAllRounds()" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded text-sm">
+                        All Rounds
+                    </button>
+                </div>
+            </div>
+
             <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-4">
-                    <button onclick="selectAll()" class="text-blue-400 hover:text-blue-300 text-sm">Select All</button>
+                    <button onclick="selectAll()" class="text-blue-400 hover:text-blue-300 text-sm">Select All Visible</button>
                     <button onclick="selectNone()" class="text-gray-400 hover:text-gray-300 text-sm">Clear Selection</button>
                     <span id="selectedCount" class="text-gray-500 text-sm">0 selected</span>
                     <span class="text-gray-600">|</span>
-                    <button onclick="sortByTeamRound()" class="text-purple-400 hover:text-purple-300 text-sm">Sort by Team/Round</button>
+                    <button onclick="clearFilters()" class="text-yellow-400 hover:text-yellow-300 text-sm">Clear Filters</button>
                 </div>
                 <button onclick="assignSelected()" class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-medium">
                     Assign Selected Videos
@@ -349,8 +383,141 @@
             items.forEach(item => grid.appendChild(item));
         }
 
-        // Auto-sort on page load
-        document.addEventListener('DOMContentLoaded', sortByTeamRound);
+        // Parse team and round from video item
+        function parseVideoTeamRound(item) {
+            const title = item.querySelector('.text-white.truncate')?.textContent || '';
+            const nums = title.match(/\d+/g) || [];
+            return {
+                team: nums.length > 0 ? parseInt(nums[0]) : null,
+                round: nums.length > 1 ? parseInt(nums[1]) : null
+            };
+        }
+
+        // Populate team and round dropdowns
+        function populateTeamRoundDropdowns() {
+            const items = document.querySelectorAll('.video-item');
+            const teams = new Set();
+            const rounds = new Set();
+
+            items.forEach(item => {
+                const parsed = parseVideoTeamRound(item);
+                if (parsed.team !== null) teams.add(parsed.team);
+                if (parsed.round !== null) rounds.add(parsed.round);
+            });
+
+            const teamSelect = document.getElementById('teamFilter');
+            teamSelect.innerHTML = '';
+            Array.from(teams).sort((a, b) => a - b).forEach(team => {
+                const opt = document.createElement('option');
+                opt.value = team;
+                opt.textContent = 'Team ' + team;
+                teamSelect.appendChild(opt);
+            });
+
+            const roundSelect = document.getElementById('roundFilter');
+            roundSelect.innerHTML = '';
+            Array.from(rounds).sort((a, b) => a - b).forEach(round => {
+                const opt = document.createElement('option');
+                opt.value = round;
+                opt.textContent = 'Round ' + round;
+                roundSelect.appendChild(opt);
+            });
+        }
+
+        // Select all teams in dropdown
+        function selectAllTeams() {
+            const teamSelect = document.getElementById('teamFilter');
+            Array.from(teamSelect.options).forEach(opt => opt.selected = true);
+        }
+
+        // Select all rounds in dropdown
+        function selectAllRounds() {
+            const roundSelect = document.getElementById('roundFilter');
+            Array.from(roundSelect.options).forEach(opt => opt.selected = true);
+        }
+
+        // Get selected values from multi-select
+        function getSelectedValues(selectId) {
+            const select = document.getElementById(selectId);
+            return Array.from(select.selectedOptions).map(opt => parseInt(opt.value));
+        }
+
+        // Select videos matching selected teams and rounds
+        function selectByTeamRound() {
+            const selectedTeams = getSelectedValues('teamFilter');
+            const selectedRounds = getSelectedValues('roundFilter');
+
+            if (selectedTeams.length === 0 && selectedRounds.length === 0) {
+                alert('Please select at least one team or round');
+                return;
+            }
+
+            document.querySelectorAll('.video-item').forEach(item => {
+                const parsed = parseVideoTeamRound(item);
+                const checkbox = item.querySelector('.video-checkbox');
+                if (!checkbox) return;
+
+                let matches = true;
+
+                // Check team match (if teams selected)
+                if (selectedTeams.length > 0 && !selectedTeams.includes(parsed.team)) {
+                    matches = false;
+                }
+
+                // Check round match (if rounds selected)
+                if (selectedRounds.length > 0 && !selectedRounds.includes(parsed.round)) {
+                    matches = false;
+                }
+
+                if (matches) {
+                    checkbox.checked = true;
+                }
+            });
+
+            updateSelectedCount();
+        }
+
+        // Filter view to only show matching teams/rounds
+        function filterByTeamRound() {
+            const selectedTeams = getSelectedValues('teamFilter');
+            const selectedRounds = getSelectedValues('roundFilter');
+
+            document.querySelectorAll('.video-item').forEach(item => {
+                const parsed = parseVideoTeamRound(item);
+                let show = true;
+
+                // Check team match (if teams selected)
+                if (selectedTeams.length > 0 && !selectedTeams.includes(parsed.team)) {
+                    show = false;
+                }
+
+                // Check round match (if rounds selected)
+                if (selectedRounds.length > 0 && !selectedRounds.includes(parsed.round)) {
+                    show = false;
+                }
+
+                item.style.display = show ? '' : 'none';
+            });
+        }
+
+        // Clear all filters
+        function clearFilters() {
+            document.getElementById('teamFilter').selectedIndex = -1;
+            document.getElementById('roundFilter').selectedIndex = -1;
+            document.getElementById('filterCategory').value = '';
+            document.getElementById('filterSubcategory').innerHTML = '<option value="">All Subcategories</option>';
+            document.getElementById('filterSubSubcategory').innerHTML = '<option value="">All</option>';
+
+            document.querySelectorAll('.video-item').forEach(item => {
+                item.style.display = '';
+            });
+        }
+
+        // Auto-sort and populate dropdowns on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            sortByTeamRound();
+            populateTeamRoundDropdowns();
+        });
     </script>
 </body>
 </html>
