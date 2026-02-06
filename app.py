@@ -27,9 +27,102 @@ import sqlite3
 from io import BytesIO
 
 # Background conversion job tracking
-conversion_jobs = {}
+conversion_jobs = {}  # In-memory cache for quick access
 conversion_lock = threading.Lock()
 MAX_CONCURRENT_CONVERSIONS = 1  # Limit to prevent server overload
+
+def save_conversion_job(job):
+    """Save conversion job to database for persistence."""
+    try:
+        db = get_db()
+        video_data_json = json.dumps(job.get('video_data', {})) if job.get('video_data') else None
+        db.execute('''
+            INSERT OR REPLACE INTO conversion_jobs
+            (job_id, video_id, filename, title, status, progress, session_id, created_at, completed_at, error, input_path, output_path, video_data, pid)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            job.get('job_id'),
+            job.get('video_id'),
+            job.get('filename'),
+            job.get('title'),
+            job.get('status', 'queued'),
+            job.get('progress', 0),
+            job.get('session_id'),
+            job.get('created_at'),
+            job.get('completed_at'),
+            job.get('error'),
+            job.get('input_path'),
+            job.get('output_path'),
+            video_data_json,
+            job.get('pid')
+        ))
+        db.commit()
+    except Exception as e:
+        print(f"Error saving conversion job: {e}")
+
+def update_conversion_job(job_id, **updates):
+    """Update conversion job in both memory and database."""
+    with conversion_lock:
+        if job_id in conversion_jobs:
+            conversion_jobs[job_id].update(updates)
+            save_conversion_job(conversion_jobs[job_id])
+        else:
+            # Job not in memory, update database directly
+            try:
+                db = get_db()
+                set_clauses = ', '.join([f'{k} = ?' for k in updates.keys()])
+                values = list(updates.values()) + [job_id]
+                db.execute(f'UPDATE conversion_jobs SET {set_clauses} WHERE job_id = ?', values)
+                db.commit()
+            except Exception as e:
+                print(f"Error updating conversion job: {e}")
+
+def get_conversion_job(job_id):
+    """Get conversion job from memory or database."""
+    with conversion_lock:
+        if job_id in conversion_jobs:
+            return conversion_jobs[job_id]
+    # Try database
+    try:
+        db = get_db()
+        cursor = db.execute('SELECT * FROM conversion_jobs WHERE job_id = ?', (job_id,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+    except Exception as e:
+        print(f"Error getting conversion job: {e}")
+    return None
+
+def load_active_conversions():
+    """Load incomplete conversions from database on startup."""
+    try:
+        db = get_db()
+        cursor = db.execute("SELECT * FROM conversion_jobs WHERE status NOT IN ('completed', 'failed')")
+        rows = cursor.fetchall()
+        for row in rows:
+            job = dict(row)
+            if job.get('video_data'):
+                job['video_data'] = json.loads(job['video_data'])
+            # Check if the process is still running
+            pid = job.get('pid')
+            if pid:
+                try:
+                    os.kill(pid, 0)  # Check if process exists
+                    # Process still running, add to memory
+                    with conversion_lock:
+                        conversion_jobs[job['job_id']] = job
+                except OSError:
+                    # Process not running, mark as failed
+                    job['status'] = 'failed'
+                    job['error'] = 'Process terminated unexpectedly (server restart)'
+                    save_conversion_job(job)
+            else:
+                # No PID recorded, mark as failed
+                job['status'] = 'failed'
+                job['error'] = 'Job state lost (server restart)'
+                save_conversion_job(job)
+    except Exception as e:
+        print(f"Error loading active conversions: {e}")
 
 # PDF generation
 try:
@@ -908,6 +1001,26 @@ def init_db():
             cursor.execute('ALTER TABLE users ADD COLUMN assigned_categories TEXT')
         except:
             pass
+
+        # Conversion jobs table (for persistent tracking of video conversions)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS conversion_jobs (
+                job_id TEXT PRIMARY KEY,
+                video_id TEXT,
+                filename TEXT,
+                title TEXT,
+                status TEXT DEFAULT 'queued',
+                progress INTEGER DEFAULT 0,
+                session_id TEXT,
+                created_at TEXT,
+                completed_at TEXT,
+                error TEXT,
+                input_path TEXT,
+                output_path TEXT,
+                video_data TEXT,
+                pid INTEGER
+            )
+        ''')
 
         # Video assignments table (for chief judge to assign videos to judges)
         cursor.execute('''
@@ -2123,6 +2236,10 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
         with conversion_lock:
             conversion_jobs[job_id]['status'] = 'queued'
             conversion_jobs[job_id]['progress'] = 0
+            conversion_jobs[job_id]['input_path'] = input_path
+            conversion_jobs[job_id]['output_path'] = output_path
+            conversion_jobs[job_id]['video_data'] = video_data
+            save_conversion_job(conversion_jobs[job_id])
 
         while True:
             with conversion_lock:
@@ -2130,6 +2247,7 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
                                    if j.get('status') == 'converting')
                 if active_count < MAX_CONCURRENT_CONVERSIONS:
                     conversion_jobs[job_id]['status'] = 'converting'
+                    save_conversion_job(conversion_jobs[job_id])
                     break
             time.sleep(2)  # Check every 2 seconds
 
@@ -2147,6 +2265,12 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
             output_path
         ], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
 
+        # Store PID for recovery after restart
+        with conversion_lock:
+            conversion_jobs[job_id]['pid'] = process.pid
+            save_conversion_job(conversion_jobs[job_id])
+
+        last_db_update = time.time()
         # Parse progress output in real-time
         for line in process.stdout:
             line = line.strip()
@@ -2160,6 +2284,10 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
                         progress = min(65, int((current_time / total_duration) * 65))
                         with conversion_lock:
                             conversion_jobs[job_id]['progress'] = progress
+                        # Save to database every 5 seconds
+                        if time.time() - last_db_update > 5:
+                            save_conversion_job(conversion_jobs[job_id])
+                            last_db_update = time.time()
                 except:
                     pass
             elif line.startswith('out_time=') and not line.startswith('out_time_us'):
@@ -2176,6 +2304,10 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
                             progress = min(65, int((current_time / total_duration) * 65))
                             with conversion_lock:
                                 conversion_jobs[job_id]['progress'] = progress
+                            # Save to database every 5 seconds
+                            if time.time() - last_db_update > 5:
+                                save_conversion_job(conversion_jobs[job_id])
+                                last_db_update = time.time()
                 except:
                     pass
             elif line.startswith('progress=end'):
@@ -2187,12 +2319,14 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
             with conversion_lock:
                 conversion_jobs[job_id]['status'] = 'failed'
                 conversion_jobs[job_id]['error'] = 'FFmpeg conversion failed'
+                save_conversion_job(conversion_jobs[job_id])
             if temp_file and os.path.exists(temp_file):
                 os.remove(temp_file)
             return
 
         with conversion_lock:
             conversion_jobs[job_id]['progress'] = 70
+            save_conversion_job(conversion_jobs[job_id])
 
         # Clean up temp file
         if temp_file and os.path.exists(temp_file):
@@ -2255,11 +2389,14 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
             conversion_jobs[job_id]['progress'] = 100
             conversion_jobs[job_id]['video_id'] = video_id
             conversion_jobs[job_id]['completed_at'] = datetime.now().isoformat()
+            save_conversion_job(conversion_jobs[job_id])
 
     except Exception as e:
         with conversion_lock:
-            conversion_jobs[job_id]['status'] = 'failed'
-            conversion_jobs[job_id]['error'] = str(e)
+            if job_id in conversion_jobs:
+                conversion_jobs[job_id]['status'] = 'failed'
+                conversion_jobs[job_id]['error'] = str(e)
+                save_conversion_job(conversion_jobs[job_id])
         if temp_file and os.path.exists(temp_file):
             os.remove(temp_file)
 
@@ -2267,8 +2404,7 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
 @app.route('/conversion/status/<job_id>')
 def conversion_status(job_id):
     """Get status of a background conversion job."""
-    with conversion_lock:
-        job = conversion_jobs.get(job_id)
+    job = get_conversion_job(job_id)
     if not job:
         return jsonify({'error': 'Job not found'}), 404
     return jsonify(job)
@@ -2278,11 +2414,27 @@ def conversion_status(job_id):
 def active_conversions():
     """Get list of active conversion jobs for current session."""
     session_id = session.get('_id', request.remote_addr)
+    active = {}
+    # Check in-memory jobs first
     with conversion_lock:
-        active = {
-            jid: job for jid, job in conversion_jobs.items()
-            if job.get('session_id') == session_id and job.get('status') not in ('completed', 'failed')
-        }
+        for jid, job in conversion_jobs.items():
+            if job.get('session_id') == session_id and job.get('status') not in ('completed', 'failed'):
+                active[jid] = job
+    # Also check database for any jobs not in memory
+    try:
+        db = get_db()
+        cursor = db.execute(
+            "SELECT * FROM conversion_jobs WHERE session_id = ? AND status NOT IN ('completed', 'failed')",
+            (session_id,)
+        )
+        for row in cursor.fetchall():
+            job = dict(row)
+            if job['job_id'] not in active:
+                if job.get('video_data'):
+                    job['video_data'] = json.loads(job['video_data'])
+                active[job['job_id']] = job
+    except Exception as e:
+        print(f"Error checking database for active conversions: {e}")
     return jsonify(active)
 
 
@@ -9748,6 +9900,13 @@ if __name__ == '__main__':
     print(f"SocketIO: {'Enabled' if SOCKETIO_ENABLED else 'Disabled'}")
     print(f"Open http://localhost:{port} in your browser")
     print("\nAdmin login: admin / admin123\n")
+    # Load any incomplete conversions from database
+    with app.app_context():
+        try:
+            load_active_conversions()
+            print(f"Loaded {len(conversion_jobs)} active conversion jobs")
+        except Exception as e:
+            print(f"Warning: Could not load active conversions: {e}")
     if SOCKETIO_ENABLED:
         socketio.run(app, debug=debug, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
     else:
