@@ -25,7 +25,6 @@
                 <a href="/videoupload" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg">Video Upload</a>
                 {% endif %}
                 {% if is_admin %}
-                <a href="/competitions" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg">Competitions</a>
                 <a href="/admin/users" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg">Admin</a>
                 {% endif %}
                 <button onclick="toggleNav()" class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded-lg text-sm" title="Hide navbar (H)">
@@ -947,6 +946,14 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
                         Sync View
+                    </button>
+                    {% endif %}
+                    {% if is_chief_judge or is_admin %}
+                    <button onclick="showAssignVideoModal()" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm flex items-center gap-1" title="Assign this video to a judge">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                        </svg>
+                        Assign
                     </button>
                     {% endif %}
                 </div>
@@ -5122,6 +5129,83 @@
                 hideEditTitleModal();
             }
         });
+    </script>
+
+    <!-- Assign Video Modal -->
+    <div id="assignVideoModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 class="text-xl font-bold mb-4">Assign Video to Judge</h2>
+            <p class="text-gray-400 mb-4">{{ video.title }}</p>
+
+            <div class="mb-4">
+                <label class="block text-gray-400 text-sm mb-2">Select Judge</label>
+                <select id="assignJudgeSelect" class="w-full px-4 py-2 rounded bg-gray-700 text-white">
+                    <option value="">Choose a judge...</option>
+                    {% for user in users %}
+                    {% if user.role in ['judge', 'event_judge', 'chief_judge'] %}
+                    <option value="{{ user.username }}">{{ user.name }} ({{ user.role }})</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-gray-400 text-sm mb-2">Notes (optional)</label>
+                <input type="text" id="assignNotesInput" placeholder="Instructions for judge..."
+                    class="w-full px-4 py-2 rounded bg-gray-700 text-white">
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button onclick="hideAssignVideoModal()" class="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500">
+                    Cancel
+                </button>
+                <button onclick="assignVideoToJudge()" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 font-medium">
+                    Assign
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showAssignVideoModal() {
+            document.getElementById('assignVideoModal').classList.remove('hidden');
+        }
+
+        function hideAssignVideoModal() {
+            document.getElementById('assignVideoModal').classList.add('hidden');
+        }
+
+        async function assignVideoToJudge() {
+            const judgeUsername = document.getElementById('assignJudgeSelect').value;
+            const notes = document.getElementById('assignNotesInput').value;
+
+            if (!judgeUsername) {
+                alert('Please select a judge');
+                return;
+            }
+
+            try {
+                const response = await fetch('/assign-videos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        video_ids: ['{{ video.id }}'],
+                        assigned_to: judgeUsername,
+                        notes: notes
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    hideAssignVideoModal();
+                    alert('Video assigned successfully!');
+                } else {
+                    alert(result.error || 'Failed to assign video');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
     </script>
     {% endif %}
 
