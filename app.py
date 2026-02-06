@@ -3406,13 +3406,16 @@ def my_assignments():
             assigners_lookup = {}
 
             # Batch fetch videos (limit to avoid timeout)
+            print(f"DEBUG my_assignments: Fetching {len(video_ids)} video IDs: {video_ids[:5]}...")
             for vid in video_ids[:50]:  # Limit to prevent timeout
                 try:
                     video = get_video(vid)
                     if video:
                         videos_lookup[vid] = video
-                except:
-                    pass
+                    else:
+                        print(f"DEBUG my_assignments: Video NOT FOUND for ID: {vid}")
+                except Exception as e:
+                    print(f"DEBUG my_assignments: Error fetching video {vid}: {e}")
 
             # Batch fetch assigners
             for uname in assigner_usernames[:20]:
