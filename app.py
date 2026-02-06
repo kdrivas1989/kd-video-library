@@ -643,7 +643,7 @@ def send_assignment_email(email, judge_name, judge_username, video_count, assign
     msg = MIMEMultipart('alternative')
     msg['From'] = SMTP_FROM_EMAIL or SMTP_USERNAME
     msg['To'] = email
-    msg['Subject'] = f'Video Library - You Have Been Assigned {video_count} Video(s) to Judge'
+    msg['Subject'] = f'Judging Suite - You Have Been Assigned {video_count} Video(s) to Judge'
 
     # Plain text fallback
     plain_body = f"""Hello {judge_name},
@@ -676,7 +676,7 @@ Thank you for your service as a judge!
                     <!-- Header -->
                     <tr>
                         <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-                            <h1 style="color: #ffffff; margin: 0; font-size: 28px;">📹 Video Library</h1>
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px;">📹 Judging Suite</h1>
                             <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 14px;">Judging Assignment Notification</p>
                         </td>
                     </tr>
