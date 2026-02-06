@@ -275,25 +275,28 @@
         function parseTeamRound(title) {
             // Parse team and round numbers from title
             // Format: "[Event] [Category] [TeamNumber] [TeamName] [Round]"
-            // Example: "2024USPAOpenNationalChampionships Freeflying Open 6001 ZJDescend 1"
-            // Team: 3-4 digit number (6001), Round: last small number (1)
+            // Examples:
+            //   "2024USPAOpenNationalChampionships Freeflying Open 6001 ZJDescend 1" = Team 6001, Round 1
+            //   "3 168 4005 10" = Team 4005, Round 10
+            // Team: 4-digit number (1000-9999), Round: last number
             const nums = (title || '').match(/\d+/g) || [];
 
-            // Find team number: look for 3-4 digit numbers (team IDs like 6001)
+            // Find team number: 4-digit number (team IDs like 4005, 6001)
             let team = 0;
             for (const num of nums) {
-                const n = parseInt(num);
-                if (n >= 100 && n <= 9999) {
-                    team = n;
-                    break;
+                if (num.length === 4) {
+                    const n = parseInt(num);
+                    if (n >= 1000 && n <= 9999) {
+                        team = n;
+                    }
                 }
             }
 
-            // Round is the last number in the title (usually 1-10)
+            // Round is the last number in the title
             let round = 0;
             if (nums.length > 0) {
                 const lastNum = parseInt(nums[nums.length - 1]);
-                // Round should be a small number (1-20 typically)
+                // Round should be 1-20 typically
                 if (lastNum >= 1 && lastNum <= 20) {
                     round = lastNum;
                 }
