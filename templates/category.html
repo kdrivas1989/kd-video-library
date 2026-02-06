@@ -612,7 +612,7 @@
             // Find and populate team dropdown
             const teamSelect = folderContent.parentElement.querySelector('select[onchange*="selectByTeam"]');
             if (teamSelect) {
-                teamSelect.innerHTML = '<option value="">Select...</option>';
+                teamSelect.innerHTML = '<option value="">Select...</option><option value="all">All Teams</option>';
                 Array.from(teams).sort((a, b) => a - b).forEach(team => {
                     const opt = document.createElement('option');
                     opt.value = team;
@@ -624,7 +624,7 @@
             // Find and populate round dropdown
             const roundSelect = folderContent.parentElement.querySelector('select[onchange*="selectByRound"]');
             if (roundSelect) {
-                roundSelect.innerHTML = '<option value="">Select...</option>';
+                roundSelect.innerHTML = '<option value="">Select...</option><option value="all">All Rounds</option>';
                 Array.from(rounds).sort((a, b) => a - b).forEach(round => {
                     const opt = document.createElement('option');
                     opt.value = round;
@@ -634,20 +634,25 @@
             }
         }
 
-        // Select all videos for a specific team
+        // Select all videos for a specific team (or all teams)
         function selectByTeam(folderId, teamNum) {
             if (!teamNum) return;
-            teamNum = parseInt(teamNum);
 
             const folderContent = document.getElementById('folder-content-' + folderId);
             const videoCards = folderContent.querySelectorAll('.video-card');
 
             const matchingCheckboxes = [];
             videoCards.forEach(card => {
-                const parsed = parseVideoTeamRound(card);
-                if (parsed.team === teamNum) {
-                    const cb = card.querySelector('input.video-checkbox');
-                    if (cb) matchingCheckboxes.push(cb);
+                const cb = card.querySelector('input.video-checkbox');
+                if (!cb) return;
+
+                if (teamNum === 'all') {
+                    matchingCheckboxes.push(cb);
+                } else {
+                    const parsed = parseVideoTeamRound(card);
+                    if (parsed.team === parseInt(teamNum)) {
+                        matchingCheckboxes.push(cb);
+                    }
                 }
             });
 
@@ -661,19 +666,25 @@
         }
 
         // Select all videos for a specific round
+        // Select all videos for a specific round (or all rounds)
         function selectByRound(folderId, roundNum) {
-            if (!roundNum && roundNum !== 0) return;
-            roundNum = parseInt(roundNum);
+            if (!roundNum && roundNum !== 0 && roundNum !== 'all') return;
 
             const folderContent = document.getElementById('folder-content-' + folderId);
             const videoCards = folderContent.querySelectorAll('.video-card');
 
             const matchingCheckboxes = [];
             videoCards.forEach(card => {
-                const parsed = parseVideoTeamRound(card);
-                if (parsed.round === roundNum) {
-                    const cb = card.querySelector('input.video-checkbox');
-                    if (cb) matchingCheckboxes.push(cb);
+                const cb = card.querySelector('input.video-checkbox');
+                if (!cb) return;
+
+                if (roundNum === 'all') {
+                    matchingCheckboxes.push(cb);
+                } else {
+                    const parsed = parseVideoTeamRound(card);
+                    if (parsed.round === parseInt(roundNum)) {
+                        matchingCheckboxes.push(cb);
+                    }
                 }
             });
 
