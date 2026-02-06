@@ -116,20 +116,30 @@
                         Move
                     </button>
                 </div>
-                <!-- Set Event Name -->
+                <!-- Change Event (dropdown) -->
                 <div class="flex items-center gap-2 border-l border-gray-600 pl-4">
-                    <label class="text-gray-400 text-sm">Set Event:</label>
-                    <input type="text" id="bulkEventName" placeholder="e.g., Nationals 2024"
-                        class="bg-gray-700 text-white px-3 py-2 rounded w-48" list="eventSuggestions">
-                    <datalist id="eventSuggestions">
+                    <label class="text-gray-400 text-sm">Move to Event:</label>
+                    <select id="bulkEventSelect" class="bg-gray-700 text-white px-3 py-2 rounded">
+                        <option value="">Select event...</option>
                         {% for event in events %}
-                        <option value="{{ event }}">
+                        <option value="{{ event }}">{{ event }}</option>
                         {% endfor %}
-                    </datalist>
-                    <button onclick="bulkSetEvent()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-medium">
-                        Set Event
+                    </select>
+                    <button onclick="bulkChangeEvent()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-medium">
+                        Move
                     </button>
                 </div>
+                {% if videos_no_event %}
+                <!-- Set New Event Name (only show if there are videos without events) -->
+                <div class="flex items-center gap-2 border-l border-gray-600 pl-4">
+                    <label class="text-gray-400 text-sm">New Event:</label>
+                    <input type="text" id="bulkEventName" placeholder="e.g., Nationals 2024"
+                        class="bg-gray-700 text-white px-3 py-2 rounded w-40">
+                    <button onclick="bulkSetEvent()" class="bg-cyan-600 hover:bg-cyan-700 px-4 py-2 rounded font-medium">
+                        Create
+                    </button>
+                </div>
+                {% endif %}
                 <!-- Sort by Team/Round -->
                 <div class="flex items-center gap-2 border-l border-gray-600 pl-4">
                     <button onclick="sortByTeamRound()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded font-medium">
@@ -698,6 +708,49 @@
                     location.reload();
                 } else {
                     alert(result.error || 'Failed to set event');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function bulkChangeEvent() {
+            const eventName = document.getElementById('bulkEventSelect').value;
+
+            if (!eventName) {
+                alert('Please select an event from the dropdown');
+                return;
+            }
+
+            const selectedVideos = [];
+            document.querySelectorAll('.video-checkbox:checked').forEach(cb => {
+                selectedVideos.push(cb.value);
+            });
+
+            if (selectedVideos.length === 0) {
+                alert('Please select at least one video');
+                return;
+            }
+
+            if (!confirm(`Move ${selectedVideos.length} video(s) to "${eventName}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/bulk-set-event', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        video_ids: selectedVideos,
+                        event: eventName
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    location.reload();
+                } else {
+                    alert(result.error || 'Failed to move videos');
                 }
             } catch (err) {
                 alert('Error: ' + err.message);
