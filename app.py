@@ -2071,7 +2071,7 @@ def convert_video_to_mp4(input_path, output_path):
     try:
         subprocess.run([
             'ffmpeg', '-y', '-i', input_path,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
             '-c:a', 'aac', '-b:a', '128k',
             '-movflags', '+faststart',
             output_path
@@ -2092,7 +2092,7 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
         # Run ffmpeg conversion
         result = subprocess.run([
             'ffmpeg', '-y', '-i', input_path,
-            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
             '-c:a', 'aac', '-b:a', '128k',
             '-movflags', '+faststart',
             output_path
