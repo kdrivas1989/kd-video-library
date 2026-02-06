@@ -34,3 +34,4 @@ terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/terraform.tfvars
 terraform/*.auto.tfvars
+node_modules/
