@@ -894,12 +894,12 @@
                 }
 
                 const ext = file.name.split('.').pop().toLowerCase();
-                const videoExtensions = ['mp4', 'webm', 'mov', 'm4v', 'ogg', 'ogv', 'mkv', 'mts', 'm2ts', 'avi'];
+                const s3DirectExtensions = ['mp4', 'webm', 'mov', 'm4v', 'ogg', 'ogv']; // Files that can go direct to S3
                 const needsConversion = ['mkv', 'mts', 'm2ts', 'avi'].includes(ext);
 
                 try {
-                    // Use direct S3 upload if S3 is enabled for any video file
-                    if (s3Enabled && videoExtensions.includes(ext)) {
+                    // Use direct S3 upload only for web-compatible formats (not MKV/AVI that need conversion)
+                    if (s3Enabled && s3DirectExtensions.includes(ext)) {
                         // Step 1: Get presigned URL
                         const presignedResponse = await fetch('/admin/s3-presigned-upload', {
                             method: 'POST',
