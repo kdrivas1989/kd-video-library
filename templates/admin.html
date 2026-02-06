@@ -436,14 +436,19 @@
             if (ffmpegLoaded) return true;
 
             try {
-                // Check if FFmpeg is available
-                if (typeof FFmpeg === 'undefined') {
-                    console.error('FFmpeg library not loaded');
+                // Check if FFmpeg is available (UMD exposes FFmpegWASM global)
+                let FFmpegClass;
+                if (typeof FFmpegWASM !== 'undefined' && FFmpegWASM.FFmpeg) {
+                    FFmpegClass = FFmpegWASM.FFmpeg;
+                } else if (typeof FFmpeg !== 'undefined') {
+                    FFmpegClass = FFmpeg;
+                } else {
+                    console.error('FFmpeg library not loaded. Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('ffmpeg')));
                     alert('Video converter not available. Please refresh the page and try again.');
                     return false;
                 }
 
-                ffmpeg = new FFmpeg();
+                ffmpeg = new FFmpegClass();
 
                 ffmpeg.on('progress', ({ progress }) => {
                     const pct = Math.round(progress * 100);
