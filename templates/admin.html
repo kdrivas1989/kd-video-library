@@ -74,6 +74,13 @@
                 <p id="refreshThumbsMessage" class="text-sm mt-2 hidden"></p>
                 <p id="refreshThumbsProgress" class="text-xs text-gray-500 mt-1 hidden"></p>
             </div>
+            <div class="bg-gray-800 rounded-lg p-6">
+                <p class="text-gray-400 text-sm mb-3">Scan videos and detect durations using ffprobe</p>
+                <button onclick="scanDurations()" id="scanDurationsBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm">
+                    Scan Durations
+                </button>
+                <p id="scanDurationsMessage" class="text-sm mt-2 hidden"></p>
+            </div>
         </div>
 
         <!-- Background Conversion Status -->
@@ -1083,6 +1090,40 @@
             } catch (error) {
                 msgDiv.textContent = 'Error: ' + error.message;
                 msgDiv.className = 'text-sm mt-2 text-red-400';
+            }
+        }
+
+        // Scan Durations
+        async function scanDurations() {
+            const btn = document.getElementById('scanDurationsBtn');
+            const msgDiv = document.getElementById('scanDurationsMessage');
+
+            btn.disabled = true;
+            btn.textContent = 'Scanning...';
+            msgDiv.textContent = 'Scanning videos for duration (this may take a while)...';
+            msgDiv.className = 'text-sm mt-2 text-yellow-400';
+            msgDiv.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/admin/scan-durations', { method: 'POST' });
+                const result = await response.json();
+
+                if (result.success) {
+                    msgDiv.textContent = result.message;
+                    msgDiv.className = 'text-sm mt-2 text-green-400';
+                    btn.disabled = false;
+                    btn.textContent = 'Scan Durations';
+                } else {
+                    msgDiv.textContent = result.error || 'Error scanning durations';
+                    msgDiv.className = 'text-sm mt-2 text-red-400';
+                    btn.disabled = false;
+                    btn.textContent = 'Scan Durations';
+                }
+            } catch (error) {
+                msgDiv.textContent = 'Error: ' + error.message;
+                msgDiv.className = 'text-sm mt-2 text-red-400';
+                btn.disabled = false;
+                btn.textContent = 'Scan Durations';
             }
         }
 

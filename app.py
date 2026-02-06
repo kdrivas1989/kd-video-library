@@ -2425,6 +2425,65 @@ def get_video_duration(file_path):
         return None
 
 
+def get_video_duration_from_url(url):
+    """Get video duration from URL using ffprobe."""
+    try:
+        result = subprocess.run(
+            ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+             '-of', 'default=noprint_wrappers=1:nokey=1', url],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            seconds = float(result.stdout.strip())
+            mins = int(seconds // 60)
+            secs = int(seconds % 60)
+            return f"{mins}:{secs:02d}"
+    except Exception as e:
+        print(f"[DURATION] Error getting duration from URL: {e}")
+    return None
+
+
+def scan_and_update_video_durations():
+    """Scan all videos and update their durations."""
+    videos = get_all_videos()
+    updated = 0
+    failed = 0
+    skipped = 0
+
+    for video in videos:
+        # Skip if already has duration
+        if video.get('duration') and video['duration'].strip():
+            skipped += 1
+            continue
+
+        duration = None
+        video_id = video['id']
+
+        # Try local file first
+        local_file = video.get('local_file')
+        if local_file:
+            local_path = os.path.join(VIDEOS_FOLDER, local_file)
+            if os.path.exists(local_path):
+                duration = get_video_duration(local_path)
+
+        # Try URL if no local file or local didn't work
+        if not duration and video.get('url'):
+            url = video['url']
+            # Only try ffprobe on direct video URLs (S3, etc), not YouTube/Vimeo
+            if url and not any(x in url for x in ['youtube.com', 'youtu.be', 'vimeo.com']):
+                duration = get_video_duration_from_url(url)
+
+        if duration:
+            video['duration'] = duration
+            save_video(video)
+            updated += 1
+            print(f"[DURATION] Updated {video['title']}: {duration}")
+        else:
+            failed += 1
+
+    return {'updated': updated, 'failed': failed, 'skipped': skipped}
+
+
 import re
 
 def parse_filename_metadata(filename, folder_path=''):
@@ -5151,6 +5210,18 @@ def migrate_to_s3():
         'failed': failed,
         'total': len(to_migrate),
         'errors': errors[:20]  # Limit errors returned
+    })
+
+
+@app.route('/admin/scan-durations', methods=['POST'])
+@admin_required
+def scan_video_durations():
+    """Scan all videos and update their durations."""
+    result = scan_and_update_video_durations()
+    return jsonify({
+        'success': True,
+        'message': f"Updated {result['updated']} videos, {result['skipped']} already had duration, {result['failed']} failed",
+        **result
     })
 
 
