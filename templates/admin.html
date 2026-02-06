@@ -148,6 +148,19 @@
                         {% endfor %}
                     </datalist>
                 </div>
+                <div class="w-64">
+                    <label class="block text-gray-300 mb-2">Video Labeling Format</label>
+                    <select id="uploadLabelFormat"
+                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="auto">Auto-detect</option>
+                        <option value="team_space_round">Team Round (e.g., 226 5)</option>
+                        <option value="team_underscore_round">Team_Round (e.g., 226_5)</option>
+                        <option value="team_dash_round">Team-Round (e.g., 226-5)</option>
+                        <option value="uspa_competition">USPA Competition (Comp_Event_Team-Name_Round)</option>
+                        <option value="round_only">Round only (e.g., Round 5)</option>
+                        <option value="custom">Custom (ask me)</option>
+                    </select>
+                </div>
             </div>
             <div id="dropZone"
                 class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-purple-500 transition"
@@ -760,10 +773,55 @@
             }
         }
 
+        // Check if filename has recognizable team/round pattern
+        function detectLabelFormat(filename) {
+            // Remove extension
+            const name = filename.replace(/\.[^/.]+$/, '');
+
+            // Check for common patterns
+            // USPA format: Year+CompName_Event-Class_TeamNum-TeamName_Round
+            // e.g., 2024USPAOpenNationalChampionships_Freeflying-Open_6001-ZJDescend_1
+            if (/^[^_]+_[^_]+-[^_]+_\d+-[^_]+_\d+$/.test(name)) return 'uspa_competition';
+            if (/\d+\s+\d+/.test(name)) return 'team_space_round';  // "226 5"
+            if (/\d+_\d+/.test(name)) return 'team_underscore_round';  // "226_5"
+            if (/\d+-\d+/.test(name)) return 'team_dash_round';  // "226-5"
+            if (/round\s*\d+/i.test(name)) return 'round_only';  // "Round 5"
+            if (/\d+/.test(name)) return 'has_numbers';  // Has some numbers
+            return 'unknown';
+        }
+
+        // Get custom label format from user
+        async function getCustomLabelFormat(filename) {
+            return new Promise((resolve) => {
+                const format = prompt(
+                    `Can't auto-detect labeling format for:\n"${filename}"\n\n` +
+                    `Enter the format (or cancel to skip):\n` +
+                    `1 = Team Round (e.g., 226 5)\n` +
+                    `2 = Team_Round (e.g., 226_5)\n` +
+                    `3 = Team-Round (e.g., 226-5)\n` +
+                    `4 = Round only\n` +
+                    `5 = USPA Competition (CompName_Event-Class_Team-Name_Round)\n` +
+                    `6 = No team/round info`,
+                    '1'
+                );
+
+                const formats = {
+                    '1': 'team_space_round',
+                    '2': 'team_underscore_round',
+                    '3': 'team_dash_round',
+                    '4': 'round_only',
+                    '5': 'uspa_competition',
+                    '6': 'none'
+                };
+                resolve(formats[format] || 'auto');
+            });
+        }
+
         async function uploadFilesWithMetadata(filesWithMeta) {
             const manualCategory = document.getElementById('uploadCategory').value;
             const manualSubcategory = document.getElementById('uploadSubcategory').value;
             const manualEvent = document.getElementById('uploadEvent').value;
+            let labelFormat = document.getElementById('uploadLabelFormat').value;
 
             const progressDiv = document.getElementById('uploadProgress');
             const resultsDiv = document.getElementById('uploadResults');
@@ -775,6 +833,16 @@
             let converted = 0;
             let backgroundJobs = 0;
             const results = [];
+
+            // If custom format selected, ask for first file and use for all
+            if (labelFormat === 'custom' && filesWithMeta.length > 0) {
+                const detected = detectLabelFormat(filesWithMeta[0].file.name);
+                if (detected === 'unknown' || detected === 'has_numbers') {
+                    labelFormat = await getCustomLabelFormat(filesWithMeta[0].file.name);
+                } else {
+                    labelFormat = detected;
+                }
+            }
 
             for (let i = 0; i < filesWithMeta.length; i++) {
                 let { file, event: fileEvent, category: fileCategory } = filesWithMeta[i];
@@ -813,6 +881,10 @@
                 // Always send folder_name if we have one - helps with detection
                 if (fileCategory) {
                     formData.append('folder_name', fileCategory);
+                }
+                // Send label format for team/round parsing
+                if (labelFormat && labelFormat !== 'auto') {
+                    formData.append('label_format', labelFormat);
                 }
 
                 const ext = file.name.split('.').pop().toLowerCase();

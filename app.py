@@ -1727,6 +1727,25 @@ def parse_filename_metadata(filename, folder_path=''):
             'fs-4way-female': ('fs', 'indoor_4way_fs', 'female'),
             'fs-8way-open': ('fs', 'indoor_8way', 'open'),
             'fs-8way-female': ('fs', 'indoor_8way', 'female'),
+            # USPA competition formats
+            'freeflying-open': ('ae', 'freefly', 'open'),
+            'freeflying-advanced': ('ae', 'freefly', 'advanced'),
+            'freeflying-intermediate': ('ae', 'freefly', 'intermediate'),
+            'freestyle-open': ('ae', 'freestyle', 'open'),
+            'freestyle-advanced': ('ae', 'freestyle', 'advanced'),
+            '4-way-open': ('fs', '4way_fs', 'open'),
+            '4-way-advanced': ('fs', '4way_fs', 'advanced'),
+            '4-way-intermediate': ('fs', '4way_fs', 'intermediate'),
+            '8-way-open': ('fs', '8way_fs', 'open'),
+            '8-way-advanced': ('fs', '8way_fs', 'advanced'),
+            'cf-4way-sequential': ('cf', '4way_seq', 'open'),
+            'cf-4way-rotations': ('cf', '4way_rot', 'open'),
+            'cf-2way-sequential': ('cf', '2way_seq', 'open'),
+            'wingsuit-performance': ('ws', 'performance', 'open'),
+            'wingsuit-acrobatic': ('ws', 'acrobatic', 'open'),
+            'canopy-piloting-speed': ('cp', 'speed', 'open'),
+            'canopy-piloting-distance': ('cp', 'distance', 'open'),
+            'canopy-piloting-accuracy': ('cp', 'accuracy', 'open'),
         }
 
         event_type_lower = event_type_part.lower()
