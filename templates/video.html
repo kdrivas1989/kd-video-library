@@ -253,7 +253,8 @@
                     </div>
                     {% endif %}
 
-                    <!-- Scoring Timeline -->
+                    {% if video.category != 'uncategorized' %}
+                    <!-- Scoring Timeline (hidden for uncategorized videos) -->
                     <div class="mt-4 pt-4 border-t border-gray-700">
                         <div class="flex items-center justify-between mb-3">
                             <div class="flex items-center gap-3">
@@ -1266,6 +1267,7 @@
                             </button>
                         </div>
                     </div>
+                {% endif %}
                 </div>
                 </div><!-- End flex-1 video container -->
             </div><!-- End flex container with draw panel -->

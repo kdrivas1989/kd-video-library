@@ -1764,14 +1764,18 @@ def delete_video_db(video_id):
 
 def increment_views(video_id):
     """Increment view count for a video."""
-    if USE_SUPABASE:
-        video = get_video(video_id)
-        if video:
-            supabase.table('videos').update({'views': video['views'] + 1}).eq('id', video_id).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('UPDATE videos SET views = views + 1 WHERE id = ?', (video_id,))
-        db.commit()
+    try:
+        if USE_SUPABASE:
+            video = get_video(video_id)
+            if video:
+                supabase.table('videos').update({'views': (video.get('views') or 0) + 1}).eq('id', video_id).execute()
+        else:
+            db = get_sqlite_db()
+            db.execute('UPDATE videos SET views = views + 1 WHERE id = ?', (video_id,))
+            db.commit()
+    except Exception as e:
+        # Don't crash the page if view count fails to update
+        print(f"Warning: Failed to increment views for {video_id}: {e}")
 
 
 def get_video_count_by_category(category):
