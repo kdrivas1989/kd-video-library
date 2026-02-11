@@ -129,30 +129,9 @@
 
                     <p class="text-xs text-gray-500 mt-2">Assigned by {{ a.assigner.name|default(a.assigned_by, true) }} on {{ a.created_at[:10] }}</p>
 
-                    <!-- Practice Score Display -->
-                    {% if a.practice_score is not none %}
-                    <div class="mt-3 p-2 bg-green-900/30 rounded">
-                        <p class="text-sm text-green-400">Your Score: <span class="font-bold text-lg">{{ a.practice_score }}</span></p>
-                        {% if a.practice_score_data and not a.practice_score_data.startswith('{') %}
-                        <p class="text-xs text-gray-400 mt-1">{{ a.practice_score_data }}</p>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-
                     <!-- Action Buttons -->
                     <div class="flex gap-2 mt-4">
-                        {% if a.practice_score is none %}
-                        <button onclick="openScoreModal('{{ a.id }}', '{{ a.video.title|default('Video', true)|e }}')"
-                            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded">
-                            Submit Score
-                        </button>
-                        {% else %}
-                        <button onclick="openScoreModal('{{ a.id }}', '{{ a.video.title|default('Video', true)|e }}', {{ a.practice_score }}, '{{ a.practice_score_data|default('')|e }}')"
-                            class="flex-1 bg-gray-600 hover:bg-gray-700 text-white text-sm px-3 py-2 rounded">
-                            Update Score
-                        </button>
-                        {% endif %}
-                        <a href="/video/{{ a.video_id }}" class="bg-gray-700 hover:bg-gray-600 text-white text-sm px-3 py-2 rounded">
+                        <a href="/video/{{ a.video_id }}" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded text-center">
                             Watch
                         </a>
                     </div>
@@ -203,39 +182,6 @@
             <a href="/" class="inline-block mt-4 bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg">Browse Videos</a>
         </div>
         {% endif %}
-    </div>
-
-    <!-- Score Modal -->
-    <div id="scoreModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 class="text-xl font-bold mb-4">Submit Practice Score</h3>
-            <p id="modalVideoTitle" class="text-gray-400 mb-4"></p>
-
-            <input type="hidden" id="modalAssignmentId">
-
-            <div class="mb-4">
-                <label class="block text-gray-400 text-sm mb-2">Score</label>
-                <input type="number" id="practiceScore" step="0.1" min="0" max="100"
-                    class="w-full px-4 py-2 rounded bg-gray-700 text-white text-xl"
-                    placeholder="Enter score (0-100)">
-            </div>
-
-            <div class="mb-6">
-                <label class="block text-gray-400 text-sm mb-2">Score Details (optional)</label>
-                <textarea id="scoreDetails" rows="3"
-                    class="w-full px-4 py-2 rounded bg-gray-700 text-white"
-                    placeholder="e.g., Deductions: -2 for late exit, -1 for grip..."></textarea>
-            </div>
-
-            <div class="flex gap-3">
-                <button onclick="submitPracticeScore()" class="flex-1 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-medium">
-                    Submit Score
-                </button>
-                <button onclick="closeScoreModal()" class="flex-1 bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg">
-                    Cancel
-                </button>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -366,66 +312,6 @@
                 alert('Error: ' + err.message);
             }
         }
-
-        function openScoreModal(assignmentId, videoTitle, existingScore = null, existingDetails = '') {
-            document.getElementById('modalAssignmentId').value = assignmentId;
-            document.getElementById('modalVideoTitle').textContent = videoTitle;
-            document.getElementById('practiceScore').value = existingScore !== null ? existingScore : '';
-            document.getElementById('scoreDetails').value = existingDetails;
-            document.getElementById('scoreModal').classList.remove('hidden');
-            document.getElementById('scoreModal').classList.add('flex');
-            document.getElementById('practiceScore').focus();
-        }
-
-        function closeScoreModal() {
-            document.getElementById('scoreModal').classList.add('hidden');
-            document.getElementById('scoreModal').classList.remove('flex');
-        }
-
-        async function submitPracticeScore() {
-            const assignmentId = document.getElementById('modalAssignmentId').value;
-            const score = document.getElementById('practiceScore').value;
-            const scoreData = document.getElementById('scoreDetails').value;
-
-            if (score === '' || isNaN(score)) {
-                alert('Please enter a valid score');
-                return;
-            }
-
-            try {
-                const response = await fetch('/assignment/' + assignmentId + '/score', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        score: parseFloat(score),
-                        score_data: scoreData
-                    })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    closeScoreModal();
-                    location.reload();
-                } else {
-                    alert(result.error || 'Failed to submit score');
-                }
-            } catch (err) {
-                alert('Error: ' + err.message);
-            }
-        }
-
-        // Close modal on escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeScoreModal();
-            }
-        });
-
-        // Close modal on background click
-        document.getElementById('scoreModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeScoreModal();
-            }
-        });
 
         // Auto-sort by Round & Team on page load
         document.addEventListener('DOMContentLoaded', function() {

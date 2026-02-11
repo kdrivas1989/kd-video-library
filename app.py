@@ -1495,28 +1495,6 @@ def init_db():
         except:
             pass
 
-        # Practice competitions tables
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS practice_competitions (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                category TEXT NOT NULL,
-                created_by TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                status TEXT DEFAULT 'active'
-            )
-        ''')
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS practice_assignments (
-                id TEXT PRIMARY KEY,
-                practice_id TEXT NOT NULL,
-                judge_username TEXT NOT NULL,
-                assigned_at TEXT NOT NULL,
-                FOREIGN KEY (practice_id) REFERENCES practice_competitions(id)
-            )
-        ''')
-
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 username TEXT PRIMARY KEY,
@@ -1590,15 +1568,6 @@ def init_db():
             )
         ''')
 
-        # Add practice_score columns to video_assignments if they don't exist
-        try:
-            cursor.execute('ALTER TABLE video_assignments ADD COLUMN practice_score REAL')
-        except:
-            pass
-        try:
-            cursor.execute('ALTER TABLE video_assignments ADD COLUMN practice_score_data TEXT')
-        except:
-            pass
         try:
             cursor.execute('ALTER TABLE video_assignments ADD COLUMN scored_at TEXT')
         except:
@@ -1792,10 +1761,21 @@ def get_video_count_by_category(category):
 def search_videos(query):
     """Search videos by title, description, or tags."""
     if USE_SUPABASE:
-        result = supabase.table('videos').select('*').or_(
-            f"title.ilike.%{query}%,description.ilike.%{query}%,tags.ilike.%{query}%"
-        ).order('created_at', desc=True).execute()
-        return result.data
+        # Paginate to handle search results with 1000+ videos
+        all_videos = []
+        offset = 0
+        batch_size = 1000
+        while True:
+            result = supabase.table('videos').select('*').or_(
+                f"title.ilike.%{query}%,description.ilike.%{query}%,tags.ilike.%{query}%"
+            ).order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
+            if not result.data:
+                break
+            all_videos.extend(result.data)
+            if len(result.data) < batch_size:
+                break
+            offset += batch_size
+        return all_videos
     else:
         db = get_sqlite_db()
         cursor = db.execute('''
@@ -1810,9 +1790,21 @@ def get_all_events():
     """Get all unique events."""
     try:
         if USE_SUPABASE:
-            result = supabase.table('videos').select('event').execute()
-            events = set(v['event'] for v in result.data if v.get('event'))
-            return sorted(events)
+            # Paginate to handle databases with 1000+ videos
+            all_events = set()
+            offset = 0
+            batch_size = 1000
+            while True:
+                result = supabase.table('videos').select('event').range(offset, offset + batch_size - 1).execute()
+                if not result.data:
+                    break
+                for v in result.data:
+                    if v.get('event'):
+                        all_events.add(v['event'])
+                if len(result.data) < batch_size:
+                    break
+                offset += batch_size
+            return sorted(all_events)
         else:
             db = get_sqlite_db()
             cursor = db.execute('SELECT DISTINCT event FROM videos WHERE event IS NOT NULL AND event != "" ORDER BY event')
@@ -1825,8 +1817,19 @@ def get_all_events():
 def get_videos_by_event(event_name):
     """Get videos by event name."""
     if USE_SUPABASE:
-        result = supabase.table('videos').select('*').eq('event', event_name).order('title').execute()
-        return result.data
+        # Paginate to handle events with 1000+ videos
+        all_videos = []
+        offset = 0
+        batch_size = 1000
+        while True:
+            result = supabase.table('videos').select('*').eq('event', event_name).order('title').range(offset, offset + batch_size - 1).execute()
+            if not result.data:
+                break
+            all_videos.extend(result.data)
+            if len(result.data) < batch_size:
+                break
+            offset += batch_size
+        return all_videos
     else:
         db = get_sqlite_db()
         cursor = db.execute('SELECT * FROM videos WHERE event = ? ORDER BY title', (event_name,))
@@ -3618,13 +3621,23 @@ def debug_db_status():
         }
 
         if USE_SUPABASE:
-            # Test query
-            result = supabase.table('videos').select('category').execute()
+            # Test query with pagination to get all videos
             categories = {}
-            for v in result.data:
-                cat = v.get('category', 'unknown')
-                categories[cat] = categories.get(cat, 0) + 1
-            status['total_videos'] = len(result.data)
+            total_videos = 0
+            offset = 0
+            batch_size = 1000
+            while True:
+                result = supabase.table('videos').select('category').range(offset, offset + batch_size - 1).execute()
+                if not result.data:
+                    break
+                for v in result.data:
+                    cat = v.get('category', 'unknown')
+                    categories[cat] = categories.get(cat, 0) + 1
+                total_videos += len(result.data)
+                if len(result.data) < batch_size:
+                    break
+                offset += batch_size
+            status['total_videos'] = total_videos
             status['categories'] = categories
         else:
             db = get_sqlite_db()
@@ -4661,101 +4674,6 @@ def update_assignment_status_route(assignment_id):
 
     update_assignment_status(assignment_id, status)
     return jsonify({'success': True})
-
-
-@app.route('/assignment/<assignment_id>/score', methods=['POST'])
-@judge_required
-def submit_practice_score(assignment_id):
-    """Submit a practice score for an assigned video."""
-    data = request.json
-    score = data.get('score')
-    score_data = data.get('score_data', '')
-
-    if score is None:
-        return jsonify({'error': 'Score is required'}), 400
-
-    if USE_SUPABASE:
-        supabase.table('video_assignments').update({
-            'practice_score': score,
-            'practice_score_data': score_data,
-            'scored_at': datetime.now().isoformat(),
-            'status': 'completed'
-        }).eq('id', assignment_id).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('''
-            UPDATE video_assignments
-            SET practice_score = ?, practice_score_data = ?, scored_at = ?, status = 'completed'
-            WHERE id = ?
-        ''', (score, score_data, datetime.now().isoformat(), assignment_id))
-        db.commit()
-
-    return jsonify({'success': True})
-
-
-@app.route('/assignments/report')
-@chief_judge_required
-def practice_scores_report():
-    """Generate a report of all practice scores."""
-    assignments = get_all_assignments()
-
-    # Enrich with video and user info
-    for a in assignments:
-        video = get_video(a['video_id'])
-        a['video'] = video if video else {}
-        assigned_user = get_user(a['assigned_to'])
-        a['assigned_user'] = assigned_user if assigned_user else {}
-        assigner = get_user(a['assigned_by'])
-        a['assigner'] = assigner if assigner else {}
-
-    # Group by assigner (chief judge)
-    grouped = {}
-    for a in assignments:
-        assigner = a['assigned_by']
-        if assigner not in grouped:
-            grouped[assigner] = {
-                'assigner': a['assigner'],
-                'assignments': [],
-                'total': 0,
-                'completed': 0
-            }
-        grouped[assigner]['assignments'].append(a)
-        grouped[assigner]['total'] += 1
-        if a.get('practice_score') is not None:
-            grouped[assigner]['completed'] += 1
-
-    return render_template('practice_report.html',
-                         grouped_assignments=grouped,
-                         all_assignments=assignments,
-                         categories=CATEGORIES,
-                         is_admin=session.get('role') == 'admin')
-
-
-@app.route('/assignments/report/csv')
-@chief_judge_required
-def practice_scores_csv():
-    """Download practice scores as CSV."""
-    assignments = get_all_assignments()
-
-    # Build CSV
-    output = "Video Title,Category,Assigned To,Assigned By,Practice Score,Score Data,Status,Scored At\n"
-    for a in assignments:
-        video = get_video(a['video_id'])
-        video_title = video['title'] if video else 'Unknown'
-        video_cat = video.get('category', '') if video else ''
-        assigned_user = get_user(a['assigned_to'])
-        assigned_name = assigned_user['name'] if assigned_user else a['assigned_to']
-        assigner = get_user(a['assigned_by'])
-        assigner_name = assigner['name'] if assigner else a['assigned_by']
-
-        output += f'"{video_title}","{video_cat}","{assigned_name}","{assigner_name}",'
-        output += f'{a.get("practice_score", "")},"{a.get("practice_score_data", "")}","{a.get("status", "")}","{a.get("scored_at", "")}"\n'
-
-    return Response(
-        output,
-        mimetype='text/csv',
-        headers={'Content-Disposition': 'attachment; filename=practice_scores_report.csv'}
-    )
 
 
 def download_and_convert_video(url, video_id):
@@ -6409,12 +6327,20 @@ def delete_vimeo_videos():
     deleted = 0
     try:
         if USE_SUPABASE:
-            # Get all Vimeo videos
-            result = supabase.table('videos').select('id, url').execute()
-            for video in result.data:
-                if video.get('url') and 'vimeo.com' in video['url']:
-                    supabase.table('videos').delete().eq('id', video['id']).execute()
-                    deleted += 1
+            # Get all Vimeo videos with pagination
+            offset = 0
+            batch_size = 1000
+            while True:
+                result = supabase.table('videos').select('id, url').range(offset, offset + batch_size - 1).execute()
+                if not result.data:
+                    break
+                for video in result.data:
+                    if video.get('url') and 'vimeo.com' in video['url']:
+                        supabase.table('videos').delete().eq('id', video['id']).execute()
+                        deleted += 1
+                if len(result.data) < batch_size:
+                    break
+                offset += batch_size
         else:
             db = get_sqlite_db()
             cursor = db.execute("SELECT COUNT(*) FROM videos WHERE url LIKE '%vimeo.com%'")
@@ -6434,8 +6360,18 @@ def fix_duplicates():
     removed = 0
     try:
         if USE_SUPABASE:
-            result = supabase.table('videos').select('*').execute()
-            videos = result.data
+            # Paginate to get all videos
+            videos = []
+            offset = 0
+            batch_size = 1000
+            while True:
+                result = supabase.table('videos').select('*').range(offset, offset + batch_size - 1).execute()
+                if not result.data:
+                    break
+                videos.extend(result.data)
+                if len(result.data) < batch_size:
+                    break
+                offset += batch_size
         else:
             db = get_sqlite_db()
             cursor = db.execute('SELECT * FROM videos')
@@ -6795,9 +6731,20 @@ def test_thumbnail():
     """Test thumbnail generation with a single video - returns full debug info."""
     ffmpeg = get_ffmpeg_path()
 
-    # Get one video without thumbnail
-    result = supabase.table('videos').select('id, url, thumbnail').execute()
-    videos = [v for v in (result.data or []) if not v.get('thumbnail')]
+    # Get one video without thumbnail (paginate to find one)
+    videos = []
+    offset = 0
+    batch_size = 1000
+    while True:
+        result = supabase.table('videos').select('id, url, thumbnail').range(offset, offset + batch_size - 1).execute()
+        if not result.data:
+            break
+        videos.extend([v for v in result.data if not v.get('thumbnail')])
+        if videos:  # Found at least one video without thumbnail
+            break
+        if len(result.data) < batch_size:
+            break
+        offset += batch_size
 
     if not videos:
         return jsonify({'error': 'No videos without thumbnails'})
@@ -6868,9 +6815,18 @@ def refresh_thumbnails():
         return jsonify({'error': f'ffmpeg check failed: {str(e)}'}), 500
 
     try:
-        # Get all videos with missing thumbnails
-        result = supabase.table('videos').select('id, url, thumbnail').execute()
-        videos = result.data or []
+        # Get all videos with missing thumbnails (paginate to get all)
+        videos = []
+        offset = 0
+        batch_size = 1000
+        while True:
+            result = supabase.table('videos').select('id, url, thumbnail').range(offset, offset + batch_size - 1).execute()
+            if not result.data:
+                break
+            videos.extend(result.data)
+            if len(result.data) < batch_size:
+                break
+            offset += batch_size
 
         missing_thumbs = [v for v in videos if not v.get('thumbnail')]
 
@@ -7334,13 +7290,6 @@ def events_list():
                          is_admin=session.get('role') == 'admin')
 
 
-# Draw generators
-@app.route('/draw-generator')
-def draw_generator():
-    """Draw generator page for creating competition draws based on USPA rules."""
-    return render_template('draw_generator.html')
-
-
 # Competition routes
 @app.route('/competitions')
 @chief_judge_required
@@ -7368,159 +7317,6 @@ def competitions_list():
         import traceback
         traceback.print_exc()
         return f"Error loading competitions: {str(e)}", 500
-
-
-# Practice Competitions Routes
-@app.route('/practice-competitions')
-@chief_judge_required
-def practice_competitions_list():
-    """Show all practice competitions (chief judge only)."""
-    practice_comps = get_all_practice_competitions()
-    judges = get_all_users()
-    judges = [u for u in judges if u.get('role') in ['judge', 'event_judge']]
-
-    return render_template('practice_competitions.html',
-                         practice_competitions=practice_comps,
-                         judges=judges,
-                         categories=CATEGORIES,
-                         is_admin=session.get('role') == 'admin')
-
-
-@app.route('/practice-competition/create', methods=['POST'])
-@chief_judge_required
-def create_practice_competition():
-    """Create a new practice competition."""
-    data = request.json
-    name = data.get('name', '').strip()
-    category = data.get('category', '').strip()
-
-    if not name:
-        return jsonify({'error': 'Name is required'}), 400
-    if not category:
-        return jsonify({'error': 'Category is required'}), 400
-
-    practice_id = str(uuid.uuid4())
-    practice_data = {
-        'id': practice_id,
-        'name': name,
-        'category': category,
-        'created_by': session.get('username'),
-        'created_at': datetime.now().isoformat(),
-        'status': 'active'
-    }
-
-    if USE_SUPABASE:
-        supabase.table('practice_competitions').insert(practice_data).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('''
-            INSERT INTO practice_competitions (id, name, category, created_by, created_at, status)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (practice_data['id'], practice_data['name'], practice_data['category'],
-              practice_data['created_by'], practice_data['created_at'], practice_data['status']))
-        db.commit()
-
-    return jsonify({'success': True, 'id': practice_id})
-
-
-@app.route('/practice-competition/<practice_id>/assign', methods=['POST'])
-@chief_judge_required
-def assign_judge_to_practice(practice_id):
-    """Assign a judge to a practice competition."""
-    data = request.json
-    judge_username = data.get('judge_username', '').strip()
-
-    if not judge_username:
-        return jsonify({'error': 'Judge username is required'}), 400
-
-    # Check if already assigned
-    if USE_SUPABASE:
-        existing = supabase.table('practice_assignments').select('id').eq('practice_id', practice_id).eq('judge_username', judge_username).execute()
-        if existing.data:
-            return jsonify({'error': 'Judge already assigned'}), 400
-
-        assignment_id = str(uuid.uuid4())
-        supabase.table('practice_assignments').insert({
-            'id': assignment_id,
-            'practice_id': practice_id,
-            'judge_username': judge_username,
-            'assigned_at': datetime.now().isoformat()
-        }).execute()
-    else:
-        db = get_sqlite_db()
-        existing = db.execute('SELECT id FROM practice_assignments WHERE practice_id = ? AND judge_username = ?',
-                             (practice_id, judge_username)).fetchone()
-        if existing:
-            return jsonify({'error': 'Judge already assigned'}), 400
-
-        assignment_id = str(uuid.uuid4())
-        db.execute('''
-            INSERT INTO practice_assignments (id, practice_id, judge_username, assigned_at)
-            VALUES (?, ?, ?, ?)
-        ''', (assignment_id, practice_id, judge_username, datetime.now().isoformat()))
-        db.commit()
-
-    return jsonify({'success': True})
-
-
-@app.route('/practice-competition/<practice_id>/unassign', methods=['POST'])
-@chief_judge_required
-def unassign_judge_from_practice(practice_id):
-    """Remove a judge from a practice competition."""
-    data = request.json
-    judge_username = data.get('judge_username', '').strip()
-
-    if not judge_username:
-        return jsonify({'error': 'Judge username is required'}), 400
-
-    if USE_SUPABASE:
-        supabase.table('practice_assignments').delete().eq('practice_id', practice_id).eq('judge_username', judge_username).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('DELETE FROM practice_assignments WHERE practice_id = ? AND judge_username = ?',
-                  (practice_id, judge_username))
-        db.commit()
-
-    return jsonify({'success': True})
-
-
-@app.route('/practice-competition/<practice_id>/delete', methods=['POST'])
-@chief_judge_required
-def delete_practice_competition(practice_id):
-    """Delete a practice competition."""
-    if USE_SUPABASE:
-        supabase.table('practice_assignments').delete().eq('practice_id', practice_id).execute()
-        supabase.table('practice_competitions').delete().eq('id', practice_id).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('DELETE FROM practice_assignments WHERE practice_id = ?', (practice_id,))
-        db.execute('DELETE FROM practice_competitions WHERE id = ?', (practice_id,))
-        db.commit()
-
-    return jsonify({'success': True})
-
-
-def get_all_practice_competitions():
-    """Get all practice competitions with assigned judges."""
-    if USE_SUPABASE:
-        result = supabase.table('practice_competitions').select('*').order('created_at', desc=True).execute()
-        practice_comps = result.data or []
-
-        # Get assignments for each practice competition
-        for pc in practice_comps:
-            assignments = supabase.table('practice_assignments').select('judge_username').eq('practice_id', pc['id']).execute()
-            pc['assigned_judges'] = [a['judge_username'] for a in (assignments.data or [])]
-    else:
-        db = get_sqlite_db()
-        practice_comps = [dict(row) for row in db.execute(
-            'SELECT * FROM practice_competitions ORDER BY created_at DESC').fetchall()]
-
-        for pc in practice_comps:
-            assignments = db.execute('SELECT judge_username FROM practice_assignments WHERE practice_id = ?',
-                                    (pc['id'],)).fetchall()
-            pc['assigned_judges'] = [a['judge_username'] for a in assignments]
-
-    return practice_comps
 
 
 @app.route('/competition/<comp_id>')
