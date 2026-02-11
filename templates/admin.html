@@ -1478,15 +1478,16 @@
                     } else {
                         let html = `<p class="text-yellow-400 mb-2">${result.total_skipped} videos have no matching pattern:</p>`;
                         result.skipped_videos.forEach(v => {
+                            const safeTitle = v.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                             html += `<div class="flex items-start gap-2 py-2 border-b border-gray-700">
                                 <span class="text-gray-300 flex-1 break-all text-xs">${v.title}</span>
                                 <a href="/video/${v.id}" target="_blank"
                                     class="text-green-400 hover:text-green-300 text-xs px-2 py-1 bg-gray-700 rounded flex-shrink-0">
                                     View
                                 </a>
-                                <button onclick="quickAddMapping('${v.title.replace(/'/g, "\\'")}')"
+                                <button onclick="quickCategorize('${v.id}', '${safeTitle}')"
                                     class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-gray-700 rounded flex-shrink-0">
-                                    + Map
+                                    Categorize
                                 </button>
                             </div>`;
                         });
@@ -1517,14 +1518,123 @@
             if (modal) modal.classList.add('hidden');
         }
 
-        // Quick add mapping from skipped video
-        function quickAddMapping(filename) {
-            showMappingModal();
-            // Extract a likely pattern from the filename
-            const words = filename.split(/[\s_-]+/);
-            // Find words that might be discipline identifiers
-            const pattern = words.find(w => w.length > 2 && w.length < 20) || filename.substring(0, 20);
-            document.getElementById('mappingPattern').value = pattern.toLowerCase();
+        // Quick categorize a skipped video
+        function quickCategorize(videoId, filename) {
+            const modal = document.getElementById('quickCategorizeModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                document.getElementById('qcVideoId').value = videoId;
+                document.getElementById('qcFilename').textContent = filename;
+                // Clear previous values
+                document.getElementById('qcEvent').value = '';
+                document.getElementById('qcDiscipline').value = '';
+                document.getElementById('qcSubcategory').innerHTML = '<option value="">Select discipline first...</option>';
+                document.getElementById('qcTeam').value = '';
+                document.getElementById('qcRound').value = '';
+
+                // Try to extract team and round numbers from filename
+                const nums = filename.match(/\d+/g);
+                if (nums && nums.length >= 2) {
+                    document.getElementById('qcTeam').value = nums[0];
+                    document.getElementById('qcRound').value = nums[1];
+                } else if (nums && nums.length === 1) {
+                    document.getElementById('qcTeam').value = nums[0];
+                }
+            }
+        }
+
+        function hideQuickCategorizeModal() {
+            const modal = document.getElementById('quickCategorizeModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        // Update subcategory options based on discipline
+        function updateQcSubcategories() {
+            const discipline = document.getElementById('qcDiscipline').value;
+            const subSelect = document.getElementById('qcSubcategory');
+
+            const subcategories = {
+                'fs': [
+                    {id: '4way_fs', name: '4-Way FS'},
+                    {id: '4way_vfs', name: '4-Way VFS'},
+                    {id: '2way_mfs', name: '2-Way MFS'},
+                    {id: '8way', name: '8-Way'},
+                    {id: '16way', name: '16-Way'},
+                    {id: '10way', name: '10-Way'},
+                    {id: 'indoor_4way_fs', name: 'Indoor 4-Way FS'},
+                    {id: 'indoor_4way_vfs', name: 'Indoor 4-Way VFS'},
+                    {id: 'indoor_2way_fs', name: 'Indoor 2-Way FS'},
+                    {id: 'indoor_2way_vfs', name: 'Indoor 2-Way VFS'},
+                    {id: 'indoor_8way', name: 'Indoor 8-Way'}
+                ],
+                'ae': [
+                    {id: 'freefly', name: 'Freefly'},
+                    {id: 'freestyle', name: 'Freestyle'}
+                ],
+                'cf': [
+                    {id: '4way_seq', name: '4-Way Sequential'},
+                    {id: '4way_rot', name: '4-Way Rotations'},
+                    {id: '2way', name: '2-Way'}
+                ],
+                'cp': [
+                    {id: 'accuracy', name: 'Accuracy'},
+                    {id: 'speed', name: 'Speed'},
+                    {id: 'distance', name: 'Distance'},
+                    {id: 'zone_accuracy', name: 'Zone Accuracy'}
+                ],
+                'ws': [
+                    {id: 'performance', name: 'Performance'},
+                    {id: 'acrobatic', name: 'Acrobatic'}
+                ]
+            };
+
+            subSelect.innerHTML = '<option value="">None</option>';
+            if (discipline && subcategories[discipline]) {
+                subcategories[discipline].forEach(sub => {
+                    subSelect.innerHTML += `<option value="${sub.id}">${sub.name}</option>`;
+                });
+            }
+        }
+
+        // Save quick categorization
+        async function saveQuickCategorize() {
+            const videoId = document.getElementById('qcVideoId').value;
+            const event = document.getElementById('qcEvent').value.trim();
+            const discipline = document.getElementById('qcDiscipline').value;
+            const subcategory = document.getElementById('qcSubcategory').value;
+            const team = document.getElementById('qcTeam').value.trim();
+            const round = document.getElementById('qcRound').value.trim();
+
+            if (!discipline) {
+                alert('Please select a discipline');
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/quick-categorize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        video_id: videoId,
+                        event: event,
+                        category: discipline,
+                        subcategory: subcategory,
+                        team: team,
+                        round: round
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    hideQuickCategorizeModal();
+                    // Remove the video from the skipped list
+                    previewSkipped();
+                    alert('Video categorized successfully!');
+                } else {
+                    alert(result.error || 'Failed to categorize video');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
         }
 
         // Load existing mappings
@@ -2624,6 +2734,74 @@
 
             <div id="existingMappings" class="mt-6 pt-4 border-t border-gray-700">
                 <p class="text-gray-500 text-sm">Loading mappings...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Categorize Modal -->
+    <div id="quickCategorizeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-white">Categorize Video</h3>
+                <button onclick="hideQuickCategorizeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+
+            <input type="hidden" id="qcVideoId">
+
+            <!-- Filename Display -->
+            <div class="mb-4 p-3 bg-gray-700 rounded">
+                <label class="block text-gray-400 text-xs mb-1">Filename</label>
+                <p id="qcFilename" class="text-white text-sm break-all font-mono"></p>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Event -->
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1">Event</label>
+                    <input type="text" id="qcEvent" placeholder="e.g., 2025 Nationals, 2024 World Meet"
+                        class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <p class="text-gray-500 text-xs mt-1">The competition or event name</p>
+                </div>
+
+                <!-- Discipline -->
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1">Discipline <span class="text-red-400">*</span></label>
+                    <select id="qcDiscipline" onchange="updateQcSubcategories()" class="w-full bg-gray-700 text-white px-3 py-2 rounded">
+                        <option value="">Select discipline...</option>
+                        <option value="fs">FS - Formation Skydiving</option>
+                        <option value="ae">AE - Artistic Events</option>
+                        <option value="cf">CF - Canopy Formation</option>
+                        <option value="cp">CP - Canopy Piloting</option>
+                        <option value="ws">WS - Wingsuit</option>
+                    </select>
+                </div>
+
+                <!-- Subcategory -->
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1">Subcategory</label>
+                    <select id="qcSubcategory" class="w-full bg-gray-700 text-white px-3 py-2 rounded">
+                        <option value="">Select discipline first...</option>
+                    </select>
+                    <p class="text-gray-500 text-xs mt-1">e.g., 4-Way, 8-Way, Freefly</p>
+                </div>
+
+                <!-- Team and Round -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Team Number</label>
+                        <input type="text" id="qcTeam" placeholder="e.g., 226"
+                            class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Round</label>
+                        <input type="text" id="qcRound" placeholder="e.g., 5"
+                            class="w-full bg-gray-700 text-white px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <button onclick="saveQuickCategorize()" class="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-medium">
+                    Save Categorization
+                </button>
             </div>
         </div>
     </div>

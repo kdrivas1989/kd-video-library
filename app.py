@@ -6715,6 +6715,64 @@ def edit_video(video_id):
     return jsonify({'success': True, 'message': 'Video updated'})
 
 
+@app.route('/admin/quick-categorize', methods=['POST'])
+@admin_required
+def quick_categorize():
+    """Quick categorize a video with event, discipline, subcategory, team, and round."""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        video_id = data.get('video_id')
+        if not video_id:
+            return jsonify({'error': 'Video ID is required'}), 400
+
+        video = get_video(video_id)
+        if not video:
+            return jsonify({'error': 'Video not found'}), 404
+
+        # Update video fields
+        if data.get('event'):
+            video['event'] = data['event'].strip()
+
+        if data.get('category'):
+            video['category'] = data['category']
+            video['category_auto'] = False  # Mark as manually categorized
+
+        if data.get('subcategory'):
+            video['subcategory'] = data['subcategory']
+
+        # Update title with team and round if provided
+        team = data.get('team', '').strip()
+        round_num = data.get('round', '').strip()
+
+        if team or round_num:
+            # Build a better title if we have team/round info
+            original_title = video.get('title', '')
+            # If the title already has team/round info, keep original
+            # Otherwise, we could prepend team/round for easier identification
+            # For now, just store team and round as metadata
+            video['team_number'] = team
+            video['round_number'] = round_num
+
+        save_video(video)
+
+        return jsonify({
+            'success': True,
+            'message': 'Video categorized successfully',
+            'video': {
+                'id': video_id,
+                'category': video.get('category'),
+                'subcategory': video.get('subcategory'),
+                'event': video.get('event')
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/admin/delete-score/<team_id>/<score_id>', methods=['DELETE'])
 @admin_required
 def delete_score(team_id, score_id):
