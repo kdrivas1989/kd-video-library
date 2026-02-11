@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Management - Video Library</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <nav class="bg-gray-800 p-4 sticky top-0 z-10">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="/" class="text-2xl font-bold text-blue-400">Video Library</a>
+            <div class="flex items-center gap-4">
+                <a href="/events" class="text-gray-300 hover:text-white">Events</a>
+                <a href="/videoupload" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg">Video Upload</a>
+                {% if is_admin %}
+                <a href="/admin/users" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg">Users</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold">Event Management</h1>
+            <button onclick="showCreateModal()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg">
+                + New Event
+            </button>
+        </div>
+
+        <!-- Disciplines Legend -->
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <h3 class="text-sm font-bold text-gray-400 mb-2">Available Disciplines:</h3>
+            <div class="flex flex-wrap gap-3">
+                {% for cat_id, cat in categories.items() %}
+                {% if cat_id != 'uncategorized' %}
+                <span class="bg-gray-700 text-white text-xs px-2 py-1 rounded">
+                    <span class="font-bold">{{ cat.abbrev }}</span> - {{ cat.name }}
+                </span>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Events List -->
+        {% if events %}
+        <div class="bg-gray-800 rounded-lg overflow-hidden">
+            <table class="w-full">
+                <thead class="bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left">Event Name</th>
+                        <th class="px-6 py-3 text-left">Year</th>
+                        <th class="px-6 py-3 text-left">Disciplines</th>
+                        <th class="px-6 py-3 text-left">Location</th>
+                        <th class="px-6 py-3 text-left">Videos</th>
+                        <th class="px-6 py-3 text-left">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                    {% for event in events %}
+                    <tr class="hover:bg-gray-700/50">
+                        <td class="px-6 py-4 font-medium">{{ event.name }}</td>
+                        <td class="px-6 py-4 text-gray-400">{{ event.year or '-' }}</td>
+                        <td class="px-6 py-4">
+                            <div class="flex flex-wrap gap-1">
+                                {% for disc in event.discipline_list %}
+                                <span class="bg-blue-600 text-white text-xs px-2 py-0.5 rounded">
+                                    {{ categories[disc].abbrev if disc in categories else disc|upper }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-gray-400">{{ event.location or '-' }}</td>
+                        <td class="px-6 py-4">
+                            <a href="/event/{{ event.name | urlencode }}" class="text-blue-400 hover:underline">
+                                {{ event.video_count }} video{{ 's' if event.video_count != 1 else '' }}
+                            </a>
+                        </td>
+                        <td class="px-6 py-4">
+                            <button onclick="showEditModal('{{ event.id }}', '{{ event.name }}', {{ event.year or 'null' }}, '{{ event.disciplines or '' }}', '{{ event.location or '' }}')"
+                                class="text-blue-400 hover:text-blue-300 mr-3">Edit</button>
+                            <button onclick="deleteEvent('{{ event.id }}', '{{ event.name }}')"
+                                class="text-red-400 hover:text-red-300">Delete</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-16 bg-gray-800 rounded-lg">
+            <p class="text-gray-500 text-xl">No events created yet</p>
+            <p class="text-gray-600 mt-2">Create events like "2025 Nationals" or "2016 Mondial"</p>
+            <button onclick="showCreateModal()" class="mt-4 bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg">
+                Create Your First Event
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Create Event Modal -->
+    <div id="createModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-lg w-full mx-4">
+            <h2 class="text-xl font-bold mb-4">Create New Event</h2>
+            <form onsubmit="createEvent(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Event Name</label>
+                        <input type="text" id="newName" required placeholder="e.g., 2025 USPA Nationals"
+                            class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-1">Year</label>
+                            <input type="number" id="newYear" placeholder="2025" min="1990" max="2100"
+                                class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-1">Location</label>
+                            <input type="text" id="newLocation" placeholder="e.g., Eloy, AZ"
+                                class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Disciplines</label>
+                        <div class="grid grid-cols-3 gap-2 bg-gray-700 p-3 rounded">
+                            {% for cat_id, cat in categories.items() %}
+                            {% if cat_id != 'uncategorized' %}
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="newDisciplines" value="{{ cat_id }}"
+                                    class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500">
+                                <span class="text-gray-300 text-sm">{{ cat.abbrev }}</span>
+                            </label>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" onclick="hideCreateModal()" class="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700">
+                        Create Event
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Event Modal -->
+    <div id="editModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-6 max-w-lg w-full mx-4">
+            <h2 class="text-xl font-bold mb-4">Edit Event</h2>
+            <form onsubmit="updateEvent(event)">
+                <input type="hidden" id="editId">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-1">Event Name</label>
+                        <input type="text" id="editName" required
+                            class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-1">Year</label>
+                            <input type="number" id="editYear" min="1990" max="2100"
+                                class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-1">Location</label>
+                            <input type="text" id="editLocation"
+                                class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Disciplines</label>
+                        <div class="grid grid-cols-3 gap-2 bg-gray-700 p-3 rounded" id="editDisciplinesContainer">
+                            {% for cat_id, cat in categories.items() %}
+                            {% if cat_id != 'uncategorized' %}
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="editDisciplines" value="{{ cat_id }}"
+                                    class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500">
+                                <span class="text-gray-300 text-sm">{{ cat.abbrev }}</span>
+                            </label>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" onclick="hideEditModal()" class="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function showCreateModal() {
+            document.getElementById('createModal').classList.remove('hidden');
+            document.getElementById('createModal').classList.add('flex');
+            document.getElementById('newName').value = '';
+            document.getElementById('newYear').value = new Date().getFullYear();
+            document.getElementById('newLocation').value = '';
+            document.querySelectorAll('input[name="newDisciplines"]').forEach(cb => cb.checked = false);
+        }
+
+        function hideCreateModal() {
+            document.getElementById('createModal').classList.add('hidden');
+            document.getElementById('createModal').classList.remove('flex');
+        }
+
+        function showEditModal(id, name, year, disciplines, location) {
+            document.getElementById('editModal').classList.remove('hidden');
+            document.getElementById('editModal').classList.add('flex');
+            document.getElementById('editId').value = id;
+            document.getElementById('editName').value = name;
+            document.getElementById('editYear').value = year || '';
+            document.getElementById('editLocation').value = location;
+
+            // Set discipline checkboxes
+            const discList = disciplines ? disciplines.split(',').map(d => d.trim()) : [];
+            document.querySelectorAll('input[name="editDisciplines"]').forEach(cb => {
+                cb.checked = discList.includes(cb.value);
+            });
+        }
+
+        function hideEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+            document.getElementById('editModal').classList.remove('flex');
+        }
+
+        function getSelectedDisciplines(name) {
+            const checkboxes = document.querySelectorAll(`input[name="${name}"]:checked`);
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        async function createEvent(e) {
+            e.preventDefault();
+
+            const data = {
+                name: document.getElementById('newName').value,
+                year: document.getElementById('newYear').value,
+                location: document.getElementById('newLocation').value,
+                disciplines: getSelectedDisciplines('newDisciplines')
+            };
+
+            try {
+                const response = await fetch('/admin/event/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    window.location.reload();
+                } else {
+                    alert(result.error || 'Failed to create event');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function updateEvent(e) {
+            e.preventDefault();
+
+            const eventId = document.getElementById('editId').value;
+            const data = {
+                name: document.getElementById('editName').value,
+                year: document.getElementById('editYear').value,
+                location: document.getElementById('editLocation').value,
+                disciplines: getSelectedDisciplines('editDisciplines')
+            };
+
+            try {
+                const response = await fetch(`/admin/event/${eventId}/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    window.location.reload();
+                } else {
+                    alert(result.error || 'Failed to update event');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function deleteEvent(eventId, eventName) {
+            if (!confirm(`Delete event "${eventName}"? This will not delete the videos.`)) return;
+
+            try {
+                const response = await fetch(`/admin/event/${eventId}/delete`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    window.location.reload();
+                } else {
+                    alert(result.error || 'Failed to delete event');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        // Close modals on escape
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                hideCreateModal();
+                hideEditModal();
+            }
+        });
+    </script>
+</body>
+</html>

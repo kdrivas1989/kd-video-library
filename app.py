@@ -1218,22 +1218,54 @@ CATEGORIES = {
 
 DATABASE = 'videos.db'
 
-# Role hierarchy (higher number = more access)
+# Role definitions with permissions
+# Users can have multiple roles stored as comma-separated values
 ROLES = {
-    'judge': 1,           # Can view and score videos
-    'jwg': 2,             # Judges Working Group - can manage training content
-    'chief_judge': 3,     # Can assign videos and manage competitions
-    'admin': 4            # Full access
+    'judge': {'level': 1, 'name': 'Judge', 'desc': 'View and score videos'},
+    'jwg': {'level': 2, 'name': 'JWG', 'desc': 'Judges Working Group'},
+    'chief_judge': {'level': 3, 'name': 'Chief Judge', 'desc': 'Assign videos'},
+    'doc': {'level': 2, 'name': 'Director of Competition', 'desc': 'Upload videos'},
+    'librarian': {'level': 2, 'name': 'Librarian', 'desc': 'Upload videos'},
+    'admin': {'level': 4, 'name': 'Admin', 'desc': 'Full access'}
 }
 
+def get_user_roles(user_role_str):
+    """Parse user roles from comma-separated string."""
+    if not user_role_str:
+        return []
+    return [r.strip() for r in user_role_str.split(',') if r.strip() in ROLES]
+
 def get_user_role_level(role):
-    """Get numeric level for a role."""
-    return ROLES.get(role, 0)
+    """Get numeric level for a role (returns max level if multiple roles)."""
+    if not role:
+        return 0
+    roles = get_user_roles(role) if ',' in str(role) else [role]
+    return max((ROLES.get(r, {}).get('level', 0) for r in roles), default=0)
 
 def has_role(required_role):
-    """Check if current user has at least the required role level."""
+    """Check if current user has at least the required role level or the specific role."""
     user_role = session.get('role', '')
-    return get_user_role_level(user_role) >= get_user_role_level(required_role)
+    user_roles = get_user_roles(user_role) if ',' in str(user_role) else [user_role]
+    # Check if user has the specific role or a higher level role
+    required_level = ROLES.get(required_role, {}).get('level', 0)
+    user_max_level = get_user_role_level(user_role)
+    return required_role in user_roles or user_max_level >= required_level
+
+def has_any_role(*roles):
+    """Check if current user has any of the specified roles."""
+    user_role = session.get('role', '')
+    user_roles = get_user_roles(user_role) if ',' in str(user_role) else [user_role]
+    return any(r in user_roles for r in roles) or 'admin' in user_roles
+
+def can_upload_videos():
+    """Check if current user can upload videos."""
+    return has_any_role('admin', 'chief_judge', 'doc', 'librarian')
+
+def is_admin():
+    """Check if current user is an admin (works with multi-roles)."""
+    user_role = session.get('role', '')
+    user_roles = get_user_roles(user_role) if ',' in str(user_role) else [user_role]
+    return 'admin' in user_roles
 
 def role_required(required_role):
     """Decorator to require a minimum role level."""
@@ -1257,6 +1289,17 @@ def jwg_required(f):
 
 def chief_judge_required(f):
     return role_required('chief_judge')(f)
+
+def upload_required(f):
+    """Decorator for routes that require video upload permissions."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('username'):
+            return redirect(url_for('login'))
+        if not can_upload_videos():
+            return "Access denied. You don't have permission to upload videos.", 403
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 def get_sqlite_db():
@@ -1531,6 +1574,22 @@ def init_db():
             cursor.execute('ALTER TABLE users ADD COLUMN assigned_categories TEXT')
         except:
             pass
+
+        # Events table (structured competition events)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS events (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                year INTEGER,
+                disciplines TEXT,
+                location TEXT,
+                start_date TEXT,
+                end_date TEXT,
+                status TEXT DEFAULT 'active',
+                created_at TEXT,
+                created_by TEXT
+            )
+        ''')
 
         # Conversion jobs table (for persistent tracking of video conversions)
         cursor.execute('''
@@ -1834,6 +1893,77 @@ def get_videos_by_event(event_name):
         db = get_sqlite_db()
         cursor = db.execute('SELECT * FROM videos WHERE event = ? ORDER BY title', (event_name,))
         return [dict(row) for row in cursor.fetchall()]
+
+
+# Structured Event Management Functions
+def get_structured_events():
+    """Get all structured events from the events table."""
+    if USE_SUPABASE:
+        result = supabase.table('events').select('*').order('year', desc=True).execute()
+        return result.data or []
+    else:
+        db = get_sqlite_db()
+        cursor = db.execute('SELECT * FROM events ORDER BY year DESC, name')
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_structured_event(event_id):
+    """Get a single structured event by ID."""
+    if USE_SUPABASE:
+        result = supabase.table('events').select('*').eq('id', event_id).execute()
+        return result.data[0] if result.data else None
+    else:
+        db = get_sqlite_db()
+        cursor = db.execute('SELECT * FROM events WHERE id = ?', (event_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def create_structured_event(event_data):
+    """Create a new structured event."""
+    event_id = str(uuid.uuid4())
+    event_data['id'] = event_id
+    event_data['created_at'] = datetime.now().isoformat()
+
+    if USE_SUPABASE:
+        supabase.table('events').insert(event_data).execute()
+    else:
+        db = get_sqlite_db()
+        db.execute('''
+            INSERT INTO events (id, name, year, disciplines, location, start_date, end_date, status, created_at, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (event_data['id'], event_data.get('name'), event_data.get('year'),
+              event_data.get('disciplines'), event_data.get('location'),
+              event_data.get('start_date'), event_data.get('end_date'),
+              event_data.get('status', 'active'), event_data['created_at'],
+              event_data.get('created_by')))
+        db.commit()
+    return event_id
+
+
+def update_structured_event(event_id, event_data):
+    """Update a structured event."""
+    if USE_SUPABASE:
+        supabase.table('events').update(event_data).eq('id', event_id).execute()
+    else:
+        db = get_sqlite_db()
+        db.execute('''
+            UPDATE events SET name = ?, year = ?, disciplines = ?, location = ?,
+            start_date = ?, end_date = ?, status = ? WHERE id = ?
+        ''', (event_data.get('name'), event_data.get('year'), event_data.get('disciplines'),
+              event_data.get('location'), event_data.get('start_date'),
+              event_data.get('end_date'), event_data.get('status'), event_id))
+        db.commit()
+
+
+def delete_structured_event(event_id):
+    """Delete a structured event."""
+    if USE_SUPABASE:
+        supabase.table('events').delete().eq('id', event_id).execute()
+    else:
+        db = get_sqlite_db()
+        db.execute('DELETE FROM events WHERE id = ?', (event_id,))
+        db.commit()
 
 
 def get_user(username):
@@ -2360,7 +2490,9 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user' not in session or session.get('role') != 'admin':
+        user_role = session.get('role', '')
+        user_roles = get_user_roles(user_role) if ',' in str(user_role) else [user_role]
+        if 'user' not in session or 'admin' not in user_roles:
             # For API requests (JSON), return JSON error instead of redirect
             if is_api_request():
                 return jsonify({'success': False, 'error': 'Admin access required. Please log in.'}), 401
@@ -4058,9 +4190,9 @@ Emma Chen,open,Canopy Piloting,10,CHN
 
 
 @app.route('/videoupload')
-@chief_judge_required
+@upload_required
 def admin_dashboard():
-    """Video upload dashboard (chief judge and admin)."""
+    """Video upload dashboard (admin, chief_judge, doc, librarian)."""
     try:
         videos = get_all_videos()
         total_videos = len(videos)
@@ -4310,7 +4442,7 @@ def admin_import_users_csv():
     if not users_data:
         return jsonify({'error': 'No users provided'}), 400
 
-    valid_roles = ['judge', 'jwg', 'chief_judge', 'admin']
+    valid_roles = ['judge', 'jwg', 'chief_judge', 'doc', 'librarian', 'admin']
     created = 0
     skipped = 0
     errors = []
@@ -7273,21 +7405,117 @@ def event_page(event_name):
 
 @app.route('/events')
 def events_list():
-    """Show all events."""
-    events = get_all_events()
+    """Show all events (structured and legacy)."""
+    # Get structured events
+    structured_events = get_structured_events()
 
-    # Get video count for each event
-    event_data = []
-    for event_name in events:
-        videos = get_videos_by_event(event_name)
-        event_data.append({
-            'name': event_name,
-            'video_count': len(videos)
-        })
+    # Parse disciplines for display
+    for event in structured_events:
+        if event.get('disciplines'):
+            disc_list = [d.strip() for d in event['disciplines'].split(',')]
+            event['discipline_list'] = disc_list
+            event['discipline_names'] = [CATEGORIES.get(d, {}).get('abbrev', d.upper()) for d in disc_list]
+        else:
+            event['discipline_list'] = []
+            event['discipline_names'] = []
+        # Count videos for this event
+        videos = get_videos_by_event(event['name'])
+        event['video_count'] = len(videos)
+
+    # Get legacy events (from video metadata) that aren't in structured events
+    legacy_event_names = get_all_events()
+    structured_names = [e['name'] for e in structured_events]
+    legacy_events = []
+    for event_name in legacy_event_names:
+        if event_name not in structured_names:
+            videos = get_videos_by_event(event_name)
+            legacy_events.append({
+                'name': event_name,
+                'video_count': len(videos)
+            })
 
     return render_template('events.html',
-                         events=event_data,
+                         structured_events=structured_events,
+                         legacy_events=legacy_events,
+                         categories=CATEGORIES,
+                         is_admin=session.get('role') == 'admin',
+                         is_chief_judge=session.get('role') in ['admin', 'chief_judge'])
+
+
+@app.route('/admin/events')
+@chief_judge_required
+def admin_events():
+    """Event management page."""
+    structured_events = get_structured_events()
+    for event in structured_events:
+        if event.get('disciplines'):
+            disc_list = [d.strip() for d in event['disciplines'].split(',')]
+            event['discipline_list'] = disc_list
+        else:
+            event['discipline_list'] = []
+        videos = get_videos_by_event(event['name'])
+        event['video_count'] = len(videos)
+
+    return render_template('admin_events.html',
+                         events=structured_events,
+                         categories=CATEGORIES,
                          is_admin=session.get('role') == 'admin')
+
+
+@app.route('/admin/event/create', methods=['POST'])
+@chief_judge_required
+def create_event_route():
+    """Create a new structured event."""
+    data = request.json
+    name = data.get('name', '').strip()
+    year = data.get('year')
+    disciplines = data.get('disciplines', [])  # List of category IDs
+
+    if not name:
+        return jsonify({'error': 'Event name is required'}), 400
+
+    event_data = {
+        'name': name,
+        'year': int(year) if year else None,
+        'disciplines': ','.join(disciplines) if disciplines else '',
+        'location': data.get('location', '').strip(),
+        'start_date': data.get('start_date', ''),
+        'end_date': data.get('end_date', ''),
+        'status': 'active',
+        'created_by': session.get('username')
+    }
+
+    event_id = create_structured_event(event_data)
+    return jsonify({'success': True, 'id': event_id})
+
+
+@app.route('/admin/event/<event_id>/update', methods=['POST'])
+@chief_judge_required
+def update_event_route(event_id):
+    """Update a structured event."""
+    data = request.json
+    disciplines = data.get('disciplines', [])
+
+    event_data = {
+        'name': data.get('name', '').strip(),
+        'year': int(data.get('year')) if data.get('year') else None,
+        'disciplines': ','.join(disciplines) if disciplines else '',
+        'location': data.get('location', '').strip(),
+        'start_date': data.get('start_date', ''),
+        'end_date': data.get('end_date', ''),
+        'status': data.get('status', 'active')
+    }
+
+    update_structured_event(event_id, event_data)
+    return jsonify({'success': True})
+
+
+@app.route('/admin/event/<event_id>/delete', methods=['POST'])
+@chief_judge_required
+def delete_event_route(event_id):
+    """Delete a structured event."""
+    delete_structured_event(event_id)
+    return jsonify({'success': True})
 
 
 # Competition routes

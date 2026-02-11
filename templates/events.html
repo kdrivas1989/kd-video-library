@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Categories - Video Library</title>
+    <title>Events - Video Library</title>
     <link href="/static/css/tailwind.css" rel="stylesheet">
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
@@ -21,9 +21,9 @@
                 <a href="/my-assignments" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg">My Assignments</a>
                 {% if is_chief_judge or is_admin %}
                 <a href="/videoupload" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg">Video Upload</a>
+                <a href="/admin/events" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg">Manage Events</a>
                 {% endif %}
                 {% if is_admin %}
-                <a href="/competitions" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg">Competitions</a>
                 <a href="/admin/users" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg">Admin</a>
                 {% endif %}
             </div>
@@ -35,24 +35,65 @@
         <div class="mb-6">
             <a href="/" class="text-blue-400 hover:underline">Home</a>
             <span class="text-gray-500 mx-2">/</span>
-            <span class="text-gray-300">Categories</span>
+            <span class="text-gray-300">Events</span>
         </div>
 
-        <h1 class="text-3xl font-bold mb-8">All Categories</h1>
+        <h1 class="text-3xl font-bold mb-8">Competition Events</h1>
 
-        {% if events %}
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {% for event in events %}
-            <a href="/event/{{ event.name | urlencode }}" class="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition">
-                <h2 class="text-xl font-bold text-white mb-2">{{ event.name }}</h2>
-                <p class="text-gray-400">{{ event.video_count }} video{{ 's' if event.video_count != 1 else '' }}</p>
-            </a>
-            {% endfor %}
+        <!-- Structured Events -->
+        {% if structured_events %}
+        <div class="mb-12">
+            <h2 class="text-xl font-bold text-gray-300 mb-4">Events</h2>
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for event in structured_events %}
+                <a href="/event/{{ event.name | urlencode }}" class="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition block">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-xl font-bold text-white">{{ event.name }}</h3>
+                        {% if event.year %}
+                        <span class="bg-blue-600 text-white text-xs px-2 py-1 rounded">{{ event.year }}</span>
+                        {% endif %}
+                    </div>
+                    {% if event.location %}
+                    <p class="text-gray-500 text-sm mb-2">{{ event.location }}</p>
+                    {% endif %}
+                    {% if event.discipline_names %}
+                    <div class="flex flex-wrap gap-1 mb-3">
+                        {% for disc in event.discipline_names %}
+                        <span class="bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded">{{ disc }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <p class="text-gray-400">{{ event.video_count }} video{{ 's' if event.video_count != 1 else '' }}</p>
+                </a>
+                {% endfor %}
+            </div>
         </div>
-        {% else %}
+        {% endif %}
+
+        <!-- Legacy Events (from video metadata) -->
+        {% if legacy_events %}
+        <div>
+            <h2 class="text-xl font-bold text-gray-300 mb-4">Other Events</h2>
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for event in legacy_events %}
+                <a href="/event/{{ event.name | urlencode }}" class="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition block">
+                    <h3 class="text-xl font-bold text-white mb-2">{{ event.name }}</h3>
+                    <p class="text-gray-400">{{ event.video_count }} video{{ 's' if event.video_count != 1 else '' }}</p>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if not structured_events and not legacy_events %}
         <div class="text-center py-16">
-            <p class="text-gray-500 text-xl">No categories yet</p>
-            <p class="text-gray-600 mt-2">Add categories when uploading videos</p>
+            <p class="text-gray-500 text-xl">No events yet</p>
+            <p class="text-gray-600 mt-2">Events will appear here when videos are uploaded</p>
+            {% if is_chief_judge or is_admin %}
+            <a href="/admin/events" class="inline-block mt-4 bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg">
+                Create an Event
+            </a>
+            {% endif %}
         </div>
         {% endif %}
     </div>

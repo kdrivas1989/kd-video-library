@@ -35,11 +35,13 @@
 
         <!-- Role Legend -->
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
-            <h3 class="text-sm font-bold text-gray-400 mb-2">Role Permissions:</h3>
+            <h3 class="text-sm font-bold text-gray-400 mb-2">Role Permissions (users can have multiple roles):</h3>
             <div class="flex flex-wrap gap-4 text-sm">
                 <span><span class="bg-purple-600 text-white px-2 py-0.5 rounded">Admin</span> Full access</span>
-                <span><span class="bg-blue-600 text-white px-2 py-0.5 rounded">Chief Judge</span> Manage all competitions</span>
-                <span><span class="bg-green-600 text-white px-2 py-0.5 rounded">Event Judge</span> Manage assigned events</span>
+                <span><span class="bg-blue-600 text-white px-2 py-0.5 rounded">Chief Judge</span> Assign videos</span>
+                <span><span class="bg-cyan-600 text-white px-2 py-0.5 rounded">DoC</span> Director of Competition - Upload videos</span>
+                <span><span class="bg-teal-600 text-white px-2 py-0.5 rounded">Librarian</span> Upload videos</span>
+                <span><span class="bg-green-600 text-white px-2 py-0.5 rounded">JWG</span> Judges Working Group</span>
                 <span><span class="bg-gray-600 text-white px-2 py-0.5 rounded">Judge</span> View and score videos</span>
             </div>
         </div>
@@ -65,15 +67,25 @@
                         <td class="px-6 py-4">{{ user.name }}</td>
                         <td class="px-6 py-4 text-gray-400">{{ user.email|default('-', true) }}</td>
                         <td class="px-6 py-4">
-                            {% if user.role == 'admin' %}
-                            <span class="bg-purple-600 text-white text-xs px-2 py-1 rounded">Admin</span>
-                            {% elif user.role == 'chief_judge' %}
-                            <span class="bg-blue-600 text-white text-xs px-2 py-1 rounded">Chief Judge</span>
-                            {% elif user.role == 'jwg' %}
-                            <span class="bg-green-600 text-white text-xs px-2 py-1 rounded">JWG</span>
-                            {% else %}
-                            <span class="bg-gray-600 text-white text-xs px-2 py-1 rounded">Judge</span>
-                            {% endif %}
+                            <div class="flex flex-wrap gap-1">
+                            {% set user_roles = user.role.split(',') if user.role else ['judge'] %}
+                            {% for role in user_roles %}
+                                {% set r = role.strip() %}
+                                {% if r == 'admin' %}
+                                <span class="bg-purple-600 text-white text-xs px-2 py-1 rounded">Admin</span>
+                                {% elif r == 'chief_judge' %}
+                                <span class="bg-blue-600 text-white text-xs px-2 py-1 rounded">Chief Judge</span>
+                                {% elif r == 'doc' %}
+                                <span class="bg-cyan-600 text-white text-xs px-2 py-1 rounded">DoC</span>
+                                {% elif r == 'librarian' %}
+                                <span class="bg-teal-600 text-white text-xs px-2 py-1 rounded">Librarian</span>
+                                {% elif r == 'jwg' %}
+                                <span class="bg-green-600 text-white text-xs px-2 py-1 rounded">JWG</span>
+                                {% elif r == 'judge' %}
+                                <span class="bg-gray-600 text-white text-xs px-2 py-1 rounded">Judge</span>
+                                {% endif %}
+                            {% endfor %}
+                            </div>
                         </td>
                         <td class="px-6 py-4">
                             {% set assigned = user.assigned_categories|default('')|string %}
@@ -155,14 +167,33 @@
                         <label for="sendWelcomeEmail" class="text-gray-300">Send welcome email with login credentials</label>
                     </div>
                     <div>
-                        <label class="block text-gray-400 text-sm mb-1">Role</label>
-                        <select id="newRole"
-                            class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="judge">Judge</option>
-                            <option value="jwg">JWG</option>
-                            <option value="chief_judge">Chief Judge</option>
-                            <option value="admin">Admin</option>
-                        </select>
+                        <label class="block text-gray-400 text-sm mb-2">Roles (select one or more)</label>
+                        <div class="grid grid-cols-2 gap-2 bg-gray-700 p-3 rounded">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="newRoles" value="judge" checked class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500">
+                                <span class="text-gray-300">Judge</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="newRoles" value="jwg" class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500">
+                                <span class="text-gray-300">JWG</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="newRoles" value="chief_judge" class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500">
+                                <span class="text-gray-300">Chief Judge</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="newRoles" value="doc" class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500">
+                                <span class="text-gray-300">DoC</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="newRoles" value="librarian" class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500">
+                                <span class="text-gray-300">Librarian</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="newRoles" value="admin" class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500">
+                                <span class="text-gray-300">Admin</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
                 <div class="flex justify-end gap-3 mt-6">
@@ -207,14 +238,33 @@
                             placeholder="********">
                     </div>
                     <div>
-                        <label class="block text-gray-400 text-sm mb-1">Role</label>
-                        <select id="editRole" onchange="togglePinField()"
-                            class="w-full px-4 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="judge">Judge</option>
-                            <option value="jwg">JWG</option>
-                            <option value="chief_judge">Chief Judge</option>
-                            <option value="admin">Admin</option>
-                        </select>
+                        <label class="block text-gray-400 text-sm mb-2">Roles (select one or more)</label>
+                        <div class="grid grid-cols-2 gap-2 bg-gray-700 p-3 rounded" id="editRolesContainer">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="editRoles" value="judge" class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500" onchange="togglePinField()">
+                                <span class="text-gray-300">Judge</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="editRoles" value="jwg" class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500" onchange="togglePinField()">
+                                <span class="text-gray-300">JWG</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="editRoles" value="chief_judge" class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500" onchange="togglePinField()">
+                                <span class="text-gray-300">Chief Judge</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="editRoles" value="doc" class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500" onchange="togglePinField()">
+                                <span class="text-gray-300">DoC</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="editRoles" value="librarian" class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500" onchange="togglePinField()">
+                                <span class="text-gray-300">Librarian</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="editRoles" value="admin" class="w-4 h-4 rounded bg-gray-600 border-gray-500 text-blue-500" onchange="togglePinField()">
+                                <span class="text-gray-300">Admin</span>
+                            </label>
+                        </div>
                     </div>
                     <div id="pinFieldContainer" class="hidden">
                         <label class="block text-gray-400 text-sm mb-1">Signature PIN <span class="text-gray-500">(4-6 digits for signing documents)</span></label>
@@ -255,7 +305,7 @@
                 <ul class="text-xs text-gray-400 space-y-1">
                     <li><code class="bg-gray-700 px-1 rounded">username</code> - Unique login name (lowercase, no spaces)</li>
                     <li><code class="bg-gray-700 px-1 rounded">name</code> - Full display name</li>
-                    <li><code class="bg-gray-700 px-1 rounded">role</code> - One of: judge, jwg, chief_judge, admin</li>
+                    <li><code class="bg-gray-700 px-1 rounded">role</code> - One or more of: judge, jwg, chief_judge, doc, librarian, admin (comma-separated)</li>
                 </ul>
                 <h4 class="text-sm font-medium text-gray-300 mt-3 mb-2">Optional Columns:</h4>
                 <ul class="text-xs text-gray-400 space-y-1">
@@ -331,11 +381,19 @@
             document.getElementById('newUsername').value = '';
             document.getElementById('newName').value = '';
             document.getElementById('newEmail').value = '';
-            document.getElementById('newRole').value = 'judge';
+            // Reset checkboxes - only judge checked by default
+            document.querySelectorAll('input[name="newRoles"]').forEach(cb => {
+                cb.checked = cb.value === 'judge';
+            });
         }
 
         function hideCreateModal() {
             document.getElementById('createModal').classList.add('hidden');
+        }
+
+        function getSelectedRoles(name) {
+            const checkboxes = document.querySelectorAll(`input[name="${name}"]:checked`);
+            return Array.from(checkboxes).map(cb => cb.value).join(',');
         }
 
         function showEditModal(username, name, email, role, hasPin) {
@@ -345,15 +403,20 @@
             document.getElementById('editName').value = name;
             document.getElementById('editEmail').value = email || '';
             document.getElementById('editPassword').value = '';
-            document.getElementById('editRole').value = role;
             document.getElementById('editSignaturePin').value = '';
+
+            // Set checkboxes based on user's roles
+            const userRoles = role ? role.split(',').map(r => r.trim()) : ['judge'];
+            document.querySelectorAll('input[name="editRoles"]').forEach(cb => {
+                cb.checked = userRoles.includes(cb.value);
+            });
             togglePinField();
         }
 
         function togglePinField() {
-            const role = document.getElementById('editRole').value;
+            const selectedRoles = getSelectedRoles('editRoles');
             const pinContainer = document.getElementById('pinFieldContainer');
-            if (role === 'chief_judge' || role === 'admin') {
+            if (selectedRoles.includes('chief_judge') || selectedRoles.includes('admin')) {
                 pinContainer.classList.remove('hidden');
             } else {
                 pinContainer.classList.add('hidden');
@@ -427,11 +490,17 @@
         async function createUser(e) {
             e.preventDefault();
 
+            const selectedRoles = getSelectedRoles('newRoles');
+            if (!selectedRoles) {
+                alert('Please select at least one role');
+                return;
+            }
+
             const data = {
                 username: document.getElementById('newUsername').value,
                 name: document.getElementById('newName').value,
                 email: document.getElementById('newEmail').value,
-                role: document.getElementById('newRole').value,
+                role: selectedRoles,
                 send_email: document.getElementById('sendWelcomeEmail').checked
             };
 
@@ -478,12 +547,18 @@
         async function updateUser(e) {
             e.preventDefault();
 
+            const selectedRoles = getSelectedRoles('editRoles');
+            if (!selectedRoles) {
+                alert('Please select at least one role');
+                return;
+            }
+
             const username = document.getElementById('editUsername').value;
             const data = {
                 name: document.getElementById('editName').value,
                 email: document.getElementById('editEmail').value,
                 password: document.getElementById('editPassword').value,
-                role: document.getElementById('editRole').value,
+                role: selectedRoles,
                 signature_pin: document.getElementById('editSignaturePin').value
             };
 
@@ -612,7 +687,7 @@
                 return;
             }
 
-            const validRoles = ['judge', 'jwg', 'chief_judge', 'admin'];
+            const validRoles = ['judge', 'jwg', 'chief_judge', 'doc', 'librarian', 'admin'];
             let html = `<p class="text-green-400 mb-2">Found ${csvData.length} user(s) to import:</p>`;
             html += '<table class="w-full text-left"><thead><tr class="text-gray-400 border-b border-gray-600">';
             html += '<th class="pb-1">Username</th><th class="pb-1">Name</th><th class="pb-1">Role</th><th class="pb-1">Status</th>';

@@ -15,6 +15,7 @@
             <a href="/videoupload" class="text-2xl font-bold text-white">Video Upload</a>
             <div class="flex items-center gap-4">
                 <a href="/" target="_blank" class="bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg font-semibold">Videos</a>
+                <a href="/admin/events" target="_blank" class="bg-yellow-600 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg font-semibold">Events</a>
                 <a href="/assignments" target="_blank" class="bg-cyan-600 hover:bg-cyan-500 px-4 py-2 rounded-lg font-semibold">Assign Videos</a>
                 {% if is_admin %}
                 <a href="/admin/users" target="_blank" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg">Users</a>
@@ -84,13 +85,6 @@
                 </button>
                 <p id="refreshThumbsMessage" class="text-sm mt-2 hidden"></p>
                 <p id="refreshThumbsProgress" class="text-xs text-gray-500 mt-1 hidden"></p>
-            </div>
-            <div class="bg-gray-800 rounded-lg p-6">
-                <p class="text-gray-400 text-sm mb-3">Scan videos and detect durations using ffprobe</p>
-                <button onclick="scanDurations()" id="scanDurationsBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm">
-                    Scan Durations
-                </button>
-                <p id="scanDurationsMessage" class="text-sm mt-2 hidden"></p>
             </div>
         </div>
 
