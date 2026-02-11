@@ -1898,25 +1898,33 @@ def get_videos_by_event(event_name):
 # Structured Event Management Functions
 def get_structured_events():
     """Get all structured events from the events table."""
-    if USE_SUPABASE:
-        result = supabase.table('events').select('*').order('year', desc=True).execute()
-        return result.data or []
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM events ORDER BY year DESC, name')
-        return [dict(row) for row in cursor.fetchall()]
+    try:
+        if USE_SUPABASE:
+            result = supabase.table('events').select('*').order('year', desc=True).execute()
+            return result.data or []
+        else:
+            db = get_sqlite_db()
+            cursor = db.execute('SELECT * FROM events ORDER BY year DESC, name')
+            return [dict(row) for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Error getting structured events: {e}")
+        return []
 
 
 def get_structured_event(event_id):
     """Get a single structured event by ID."""
-    if USE_SUPABASE:
-        result = supabase.table('events').select('*').eq('id', event_id).execute()
-        return result.data[0] if result.data else None
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM events WHERE id = ?', (event_id,))
-        row = cursor.fetchone()
-        return dict(row) if row else None
+    try:
+        if USE_SUPABASE:
+            result = supabase.table('events').select('*').eq('id', event_id).execute()
+            return result.data[0] if result.data else None
+        else:
+            db = get_sqlite_db()
+            cursor = db.execute('SELECT * FROM events WHERE id = ?', (event_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    except Exception as e:
+        print(f"Error getting structured event: {e}")
+        return None
 
 
 def create_structured_event(event_data):
@@ -1925,45 +1933,57 @@ def create_structured_event(event_data):
     event_data['id'] = event_id
     event_data['created_at'] = datetime.now().isoformat()
 
-    if USE_SUPABASE:
-        supabase.table('events').insert(event_data).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('''
-            INSERT INTO events (id, name, year, disciplines, location, start_date, end_date, status, created_at, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (event_data['id'], event_data.get('name'), event_data.get('year'),
-              event_data.get('disciplines'), event_data.get('location'),
-              event_data.get('start_date'), event_data.get('end_date'),
-              event_data.get('status', 'active'), event_data['created_at'],
-              event_data.get('created_by')))
-        db.commit()
-    return event_id
+    try:
+        if USE_SUPABASE:
+            supabase.table('events').insert(event_data).execute()
+        else:
+            db = get_sqlite_db()
+            db.execute('''
+                INSERT INTO events (id, name, year, disciplines, location, start_date, end_date, status, created_at, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (event_data['id'], event_data.get('name'), event_data.get('year'),
+                  event_data.get('disciplines'), event_data.get('location'),
+                  event_data.get('start_date'), event_data.get('end_date'),
+                  event_data.get('status', 'active'), event_data['created_at'],
+                  event_data.get('created_by')))
+            db.commit()
+        return event_id
+    except Exception as e:
+        print(f"Error creating structured event: {e}")
+        raise e
 
 
 def update_structured_event(event_id, event_data):
     """Update a structured event."""
-    if USE_SUPABASE:
-        supabase.table('events').update(event_data).eq('id', event_id).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('''
-            UPDATE events SET name = ?, year = ?, disciplines = ?, location = ?,
-            start_date = ?, end_date = ?, status = ? WHERE id = ?
-        ''', (event_data.get('name'), event_data.get('year'), event_data.get('disciplines'),
-              event_data.get('location'), event_data.get('start_date'),
-              event_data.get('end_date'), event_data.get('status'), event_id))
-        db.commit()
+    try:
+        if USE_SUPABASE:
+            supabase.table('events').update(event_data).eq('id', event_id).execute()
+        else:
+            db = get_sqlite_db()
+            db.execute('''
+                UPDATE events SET name = ?, year = ?, disciplines = ?, location = ?,
+                start_date = ?, end_date = ?, status = ? WHERE id = ?
+            ''', (event_data.get('name'), event_data.get('year'), event_data.get('disciplines'),
+                  event_data.get('location'), event_data.get('start_date'),
+                  event_data.get('end_date'), event_data.get('status'), event_id))
+            db.commit()
+    except Exception as e:
+        print(f"Error updating structured event: {e}")
+        raise e
 
 
 def delete_structured_event(event_id):
     """Delete a structured event."""
-    if USE_SUPABASE:
-        supabase.table('events').delete().eq('id', event_id).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('DELETE FROM events WHERE id = ?', (event_id,))
-        db.commit()
+    try:
+        if USE_SUPABASE:
+            supabase.table('events').delete().eq('id', event_id).execute()
+        else:
+            db = get_sqlite_db()
+            db.execute('DELETE FROM events WHERE id = ?', (event_id,))
+            db.commit()
+    except Exception as e:
+        print(f"Error deleting structured event: {e}")
+        raise e
 
 
 def get_user(username):
@@ -3874,6 +3894,33 @@ def category(cat_id):
     # Get all events for autocomplete (admin only)
     events = get_all_events() if session.get('role') == 'admin' else []
 
+    # Find duplicate events (same name case-insensitive or with different whitespace)
+    duplicate_events = []
+    user_role = session.get('role', '')
+    user_roles = get_user_roles(user_role) if ',' in str(user_role) else [user_role]
+    if 'admin' in user_roles:
+        # Group events by normalized name (lowercase, stripped)
+        normalized_events = {}
+        for event_name in event_list:
+            normalized = event_name.lower().strip()
+            if normalized not in normalized_events:
+                normalized_events[normalized] = []
+            normalized_events[normalized].append({
+                'name': event_name,
+                'video_count': len(videos_by_event.get(event_name, []))
+            })
+
+        # Find groups with multiple events
+        for normalized, event_group in normalized_events.items():
+            if len(event_group) > 1:
+                total_videos = sum(e['video_count'] for e in event_group)
+                duplicate_events.append({
+                    'name': event_group[0]['name'],  # Use first variant as canonical
+                    'variants': [e['name'] for e in event_group],
+                    'count': len(event_group),
+                    'total_videos': total_videos
+                })
+
     return render_template('category.html',
                          category=cat,
                          cat_id=cat_id,
@@ -3884,8 +3931,11 @@ def category(cat_id):
                          current_event=current_event,
                          current_sub=subcategory,
                          is_admin=session.get('role') == 'admin',
+                         is_chief_judge='chief_judge' in user_roles,
                          all_categories=CATEGORIES,
-                         events=events)
+                         events=events,
+                         duplicate_events=duplicate_events,
+                         sub_id=subcategory)
 
 
 @app.route('/video/<video_id>')
@@ -7063,6 +7113,69 @@ def rename_event_folder():
         'success': True,
         'message': f'Renamed folder to "{new_name}" ({success_count} videos updated)',
         'updated_count': success_count
+    })
+
+
+@app.route('/admin/merge-duplicate-events', methods=['POST'])
+@admin_required
+def merge_duplicate_events():
+    """Merge events with duplicate names (case-insensitive) into a single event."""
+    data = request.json
+    category = data.get('category', '')
+    subcategory = data.get('subcategory', '')
+
+    if not category:
+        return jsonify({'error': 'Category is required'}), 400
+
+    # Get all videos in this category/subcategory
+    if subcategory:
+        videos = get_videos_by_category(category, subcategory)
+    else:
+        videos = get_videos_by_category(category)
+
+    # Group videos by normalized event name
+    normalized_events = {}
+    for video in videos:
+        event_name = video.get('event', '').strip() if video.get('event') else ''
+        if event_name:
+            normalized = event_name.lower().strip()
+            if normalized not in normalized_events:
+                normalized_events[normalized] = {
+                    'canonical_name': event_name,  # Use first occurrence as canonical
+                    'videos': []
+                }
+            normalized_events[normalized]['videos'].append(video)
+
+    # Find and merge duplicates
+    merged_count = 0
+    events_merged = 0
+
+    for normalized, data in normalized_events.items():
+        videos_list = data['videos']
+        canonical_name = data['canonical_name']
+
+        # Check if there are videos with different case/spacing of the same name
+        variants = set(v.get('event', '') for v in videos_list)
+        if len(variants) > 1:
+            events_merged += 1
+            # Update all videos to use the canonical name
+            for video in videos_list:
+                if video.get('event', '') != canonical_name:
+                    video['event'] = canonical_name
+                    save_video(video)
+                    merged_count += 1
+
+    if events_merged == 0:
+        return jsonify({
+            'success': True,
+            'message': 'No duplicate events found to merge'
+        })
+
+    return jsonify({
+        'success': True,
+        'message': f'Merged {events_merged} duplicate event(s), updated {merged_count} videos',
+        'events_merged': events_merged,
+        'videos_updated': merged_count
     })
 
 

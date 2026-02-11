@@ -1478,10 +1478,14 @@
                     } else {
                         let html = `<p class="text-yellow-400 mb-2">${result.total_skipped} videos have no matching pattern:</p>`;
                         result.skipped_videos.forEach(v => {
-                            html += `<div class="flex items-center gap-2 py-1 border-b border-gray-700">
-                                <span class="text-gray-300 flex-1 truncate" title="${v.title}">${v.title}</span>
+                            html += `<div class="flex items-start gap-2 py-2 border-b border-gray-700">
+                                <span class="text-gray-300 flex-1 break-all text-xs">${v.title}</span>
+                                <a href="/video/${v.id}" target="_blank"
+                                    class="text-green-400 hover:text-green-300 text-xs px-2 py-1 bg-gray-700 rounded flex-shrink-0">
+                                    View
+                                </a>
                                 <button onclick="quickAddMapping('${v.title.replace(/'/g, "\\'")}')"
-                                    class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-gray-700 rounded">
+                                    class="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 bg-gray-700 rounded flex-shrink-0">
                                     + Map
                                 </button>
                             </div>`;
