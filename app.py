@@ -4672,6 +4672,7 @@ def assignments_page():
     judges = users  # Include all users including admins
     assignments = get_all_assignments()
     total_assignment_count = get_assignment_count()
+    events = get_all_events()
 
     # Enrich assignments with video and user info
     videos_dict = {v['id']: v for v in videos}
@@ -4688,6 +4689,7 @@ def assignments_page():
                          assignments=assignments,
                          total_assignment_count=total_assignment_count,
                          categories=CATEGORIES,
+                         events=events,
                          is_admin=session.get('role') == 'admin')
 
 
