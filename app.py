@@ -1647,31 +1647,23 @@ def init_db():
 def get_all_videos():
     """Get all videos from database."""
     if USE_SUPABASE:
-        # Supabase has a default limit of 1000, so paginate to get all
-        # Use count='exact' to verify we fetched everything
+        # Get exact total count first
+        count_result = supabase.table('videos').select('id', count='exact').limit(1).execute()
+        total = count_result.count or 0
+        if total == 0:
+            return []
+
         all_videos = []
+        batch_size = 500  # Smaller batches to avoid Supabase row limits
         offset = 0
-        batch_size = 1000
-        total_expected = None
-        while True:
-            query = supabase.table('videos').select('*', count='exact').order('created_at', desc=True).range(offset, offset + batch_size - 1)
-            result = query.execute()
-            if total_expected is None and result.count is not None:
-                total_expected = result.count
+        while offset < total:
+            result = supabase.table('videos').select('*').order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
             if not result.data:
+                print(f"[WARN] get_all_videos: empty response at offset {offset}, expected {total} total, got {len(all_videos)} so far")
                 break
             all_videos.extend(result.data)
-            if len(result.data) < batch_size:
-                break
+            print(f"[PAGINATION] get_all_videos: fetched {len(all_videos)}/{total}")
             offset += batch_size
-        if total_expected is not None and len(all_videos) < total_expected:
-            print(f"[WARN] get_all_videos: fetched {len(all_videos)} but expected {total_expected}, retrying missing rows")
-            while len(all_videos) < total_expected:
-                result = supabase.table('videos').select('*').order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
-                if not result.data:
-                    break
-                all_videos.extend(result.data)
-                offset += batch_size
         return all_videos
     else:
         db = get_sqlite_db()
@@ -1684,56 +1676,44 @@ def get_videos_by_category(category, subcategory=None):
     valid_categories = list(CATEGORIES.keys())
 
     if USE_SUPABASE:
-        # Paginate to handle categories with 1000+ videos
-        all_videos = []
-        offset = 0
-        batch_size = 1000
+        batch_size = 500
 
         # Special handling for uncategorized - include videos not in valid categories
         if category == 'uncategorized':
-            # Get all videos and filter client-side (Supabase doesn't support NOT IN easily)
-            total_expected = None
-            while True:
-                result = supabase.table('videos').select('*', count='exact').order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
-                if total_expected is None and result.count is not None:
-                    total_expected = result.count
+            # Get total count of all videos first
+            count_result = supabase.table('videos').select('id', count='exact').limit(1).execute()
+            total = count_result.count or 0
+            all_videos = []
+            offset = 0
+            while offset < total:
+                result = supabase.table('videos').select('*').order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
                 if not result.data:
                     break
-                # Filter to only include videos NOT in valid categories
                 for v in result.data:
                     vid_cat = v.get('category', '')
                     if vid_cat not in valid_categories or vid_cat == 'uncategorized':
                         all_videos.append(v)
-                if len(result.data) < batch_size:
-                    break
                 offset += batch_size
             return all_videos
 
-        total_expected = None
-        while True:
-            query = supabase.table('videos').select('*', count='exact').eq('category', category)
+        # Get count for this specific category
+        query = supabase.table('videos').select('id', count='exact').eq('category', category)
+        if subcategory:
+            query = query.eq('subcategory', subcategory)
+        count_result = query.limit(1).execute()
+        total = count_result.count or 0
+
+        all_videos = []
+        offset = 0
+        while offset < total:
+            query = supabase.table('videos').select('*').eq('category', category)
             if subcategory:
                 query = query.eq('subcategory', subcategory)
             result = query.order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
-            if total_expected is None and result.count is not None:
-                total_expected = result.count
             if not result.data:
                 break
             all_videos.extend(result.data)
-            if len(result.data) < batch_size:
-                break
             offset += batch_size
-        if total_expected is not None and len(all_videos) < total_expected:
-            print(f"[WARN] get_videos_by_category({category}): fetched {len(all_videos)} but expected {total_expected}, retrying")
-            while len(all_videos) < total_expected:
-                query = supabase.table('videos').select('*').eq('category', category)
-                if subcategory:
-                    query = query.eq('subcategory', subcategory)
-                result = query.order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
-                if not result.data:
-                    break
-                all_videos.extend(result.data)
-                offset += batch_size
         return all_videos
     else:
         db = get_sqlite_db()
@@ -1877,19 +1857,20 @@ def get_video_count_by_category(category):
 def search_videos(query):
     """Search videos by title, description, or tags."""
     if USE_SUPABASE:
-        # Paginate to handle search results with 1000+ videos
+        count_result = supabase.table('videos').select('id', count='exact').or_(
+            f"title.ilike.%{query}%,description.ilike.%{query}%,tags.ilike.%{query}%"
+        ).limit(1).execute()
+        total = count_result.count or 0
         all_videos = []
         offset = 0
-        batch_size = 1000
-        while True:
+        batch_size = 500
+        while offset < total:
             result = supabase.table('videos').select('*').or_(
                 f"title.ilike.%{query}%,description.ilike.%{query}%,tags.ilike.%{query}%"
             ).order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
             if not result.data:
                 break
             all_videos.extend(result.data)
-            if len(result.data) < batch_size:
-                break
             offset += batch_size
         return all_videos
     else:
@@ -1906,19 +1887,18 @@ def get_all_events():
     """Get all unique events."""
     try:
         if USE_SUPABASE:
-            # Paginate to handle databases with 1000+ videos
+            count_result = supabase.table('videos').select('id', count='exact').limit(1).execute()
+            total = count_result.count or 0
             all_events = set()
             offset = 0
-            batch_size = 1000
-            while True:
+            batch_size = 500
+            while offset < total:
                 result = supabase.table('videos').select('event').range(offset, offset + batch_size - 1).execute()
                 if not result.data:
                     break
                 for v in result.data:
                     if v.get('event'):
                         all_events.add(v['event'])
-                if len(result.data) < batch_size:
-                    break
                 offset += batch_size
             return sorted(all_events)
         else:
@@ -1933,17 +1913,16 @@ def get_all_events():
 def get_videos_by_event(event_name):
     """Get videos by event name."""
     if USE_SUPABASE:
-        # Paginate to handle events with 1000+ videos
+        count_result = supabase.table('videos').select('id', count='exact').eq('event', event_name).limit(1).execute()
+        total = count_result.count or 0
         all_videos = []
         offset = 0
-        batch_size = 1000
-        while True:
+        batch_size = 500
+        while offset < total:
             result = supabase.table('videos').select('*').eq('event', event_name).order('title').range(offset, offset + batch_size - 1).execute()
             if not result.data:
                 break
             all_videos.extend(result.data)
-            if len(result.data) < batch_size:
-                break
             offset += batch_size
         return all_videos
     else:
