@@ -7728,6 +7728,104 @@ def bulk_set_event():
     })
 
 
+@app.route('/admin/bulk-fix-titles', methods=['POST'])
+@admin_required
+def bulk_fix_titles():
+    """Fix videos with bad titles (uncategorized-hash, Unknown) by extracting from S3 URL or filename."""
+    import re as fix_re
+
+    data = request.json or {}
+    dry_run = data.get('dry_run', False)
+
+    # Get all videos
+    videos = get_all_videos()
+
+    fixed = []
+    skipped = []
+
+    for video in videos:
+        title = (video.get('title') or '').strip()
+        url = video.get('url') or ''
+        video_id = video.get('id', '')
+
+        # Check if title needs fixing
+        needs_fix = False
+        if not title or title.lower() == 'unknown':
+            needs_fix = True
+        elif fix_re.match(r'^uncategorized\s*[-–]\s*[a-f0-9]+$', title, fix_re.IGNORECASE):
+            needs_fix = True
+        elif fix_re.match(r'^[a-f0-9]{6,8}$', title):
+            # Title is just a UUID/hash
+            needs_fix = True
+
+        if not needs_fix:
+            continue
+
+        # Try to extract a better title from the S3 URL
+        new_title = None
+        s3_key = ''
+
+        if url:
+            # Extract S3 key from URL
+            if '.amazonaws.com/' in url:
+                s3_key = url.split('.amazonaws.com/')[-1]
+            elif 'backblaze' in url.lower() and '/file/' in url:
+                parts = url.split('/file/')
+                if len(parts) > 1:
+                    s3_key = '/'.join(parts[1].split('/')[1:])
+
+            if s3_key:
+                # Get filename from key
+                filename = s3_key.split('/')[-1]
+                name_without_ext = os.path.splitext(filename)[0]
+
+                # Skip if filename is also just a hash
+                if fix_re.match(r'^[a-f0-9]{6,8}$', name_without_ext):
+                    # Try folder name instead
+                    folder_parts = s3_key.split('/')
+                    if len(folder_parts) > 1:
+                        folder = folder_parts[0].replace('_', ' ').replace('-', ' ')
+                        if folder.lower() != 'uncategorized' and folder.lower() != 'videos':
+                            new_title = f"{folder} - {name_without_ext}"
+                else:
+                    # Use the parsed metadata for a clean title
+                    try:
+                        folder = s3_key.split('/')[0] if '/' in s3_key else ''
+                        meta = parse_filename_metadata(filename, folder)
+                        if meta.get('title') and meta['title'].lower() != 'unknown':
+                            new_title = meta['title']
+                        else:
+                            new_title = name_without_ext.replace('_', ' ').replace('-', ' ')
+                    except:
+                        new_title = name_without_ext.replace('_', ' ').replace('-', ' ')
+
+        # If still no title, try event + video_id
+        if not new_title:
+            event = video.get('event', '').strip()
+            if event:
+                new_title = f"{event} - {video_id}"
+            else:
+                # Can't determine a better title
+                skipped.append({'id': video_id, 'old_title': title, 'reason': 'no URL or event to derive title from'})
+                continue
+
+        if not dry_run:
+            video['title'] = new_title
+            save_video(video)
+
+        fixed.append({'id': video_id, 'old_title': title, 'new_title': new_title})
+
+    return jsonify({
+        'success': True,
+        'dry_run': dry_run,
+        'fixed_count': len(fixed),
+        'skipped_count': len(skipped),
+        'fixed': fixed[:50],  # Show first 50
+        'skipped': skipped[:20],
+        'message': f'{"Would fix" if dry_run else "Fixed"} {len(fixed)} video titles, skipped {len(skipped)}'
+    })
+
+
 def get_ffmpeg_path():
     """Get path to ffmpeg binary - checks custom location first, then system."""
     import shutil
