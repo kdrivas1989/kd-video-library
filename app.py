@@ -1648,17 +1648,30 @@ def get_all_videos():
     """Get all videos from database."""
     if USE_SUPABASE:
         # Supabase has a default limit of 1000, so paginate to get all
+        # Use count='exact' to verify we fetched everything
         all_videos = []
         offset = 0
         batch_size = 1000
+        total_expected = None
         while True:
-            result = supabase.table('videos').select('*').order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
+            query = supabase.table('videos').select('*', count='exact').order('created_at', desc=True).range(offset, offset + batch_size - 1)
+            result = query.execute()
+            if total_expected is None and result.count is not None:
+                total_expected = result.count
             if not result.data:
                 break
             all_videos.extend(result.data)
             if len(result.data) < batch_size:
                 break
             offset += batch_size
+        if total_expected is not None and len(all_videos) < total_expected:
+            print(f"[WARN] get_all_videos: fetched {len(all_videos)} but expected {total_expected}, retrying missing rows")
+            while len(all_videos) < total_expected:
+                result = supabase.table('videos').select('*').order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
+                if not result.data:
+                    break
+                all_videos.extend(result.data)
+                offset += batch_size
         return all_videos
     else:
         db = get_sqlite_db()
@@ -1679,8 +1692,11 @@ def get_videos_by_category(category, subcategory=None):
         # Special handling for uncategorized - include videos not in valid categories
         if category == 'uncategorized':
             # Get all videos and filter client-side (Supabase doesn't support NOT IN easily)
+            total_expected = None
             while True:
-                result = supabase.table('videos').select('*').order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
+                result = supabase.table('videos').select('*', count='exact').order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
+                if total_expected is None and result.count is not None:
+                    total_expected = result.count
                 if not result.data:
                     break
                 # Filter to only include videos NOT in valid categories
@@ -1693,17 +1709,31 @@ def get_videos_by_category(category, subcategory=None):
                 offset += batch_size
             return all_videos
 
+        total_expected = None
         while True:
-            query = supabase.table('videos').select('*').eq('category', category)
+            query = supabase.table('videos').select('*', count='exact').eq('category', category)
             if subcategory:
                 query = query.eq('subcategory', subcategory)
             result = query.order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
+            if total_expected is None and result.count is not None:
+                total_expected = result.count
             if not result.data:
                 break
             all_videos.extend(result.data)
             if len(result.data) < batch_size:
                 break
             offset += batch_size
+        if total_expected is not None and len(all_videos) < total_expected:
+            print(f"[WARN] get_videos_by_category({category}): fetched {len(all_videos)} but expected {total_expected}, retrying")
+            while len(all_videos) < total_expected:
+                query = supabase.table('videos').select('*').eq('category', category)
+                if subcategory:
+                    query = query.eq('subcategory', subcategory)
+                result = query.order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
+                if not result.data:
+                    break
+                all_videos.extend(result.data)
+                offset += batch_size
         return all_videos
     else:
         db = get_sqlite_db()
@@ -2676,11 +2706,25 @@ def get_video_thumbnail(url):
     return None
 
 
+def get_ffprobe_path():
+    """Get path to ffprobe binary."""
+    import shutil
+    custom_path = '/opt/render/project/src/bin/ffprobe'
+    if os.path.exists(custom_path):
+        return custom_path
+    system_ffprobe = shutil.which('ffprobe')
+    if system_ffprobe:
+        return system_ffprobe
+    for path in ['/usr/bin/ffprobe', '/usr/local/bin/ffprobe', '/opt/homebrew/bin/ffprobe']:
+        if os.path.exists(path):
+            return path
+    return 'ffprobe'
+
+
 def get_video_duration(file_path):
     """Get video duration using ffprobe."""
     try:
-        # Use full path to ffprobe for systemd compatibility
-        ffprobe_cmd = '/usr/bin/ffprobe'
+        ffprobe_cmd = get_ffprobe_path()
         result = subprocess.run(
             [ffprobe_cmd, '-v', 'quiet', '-show_entries', 'format=duration',
              '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
@@ -2697,8 +2741,7 @@ def get_video_duration(file_path):
 def get_video_duration_from_url(url):
     """Get video duration from URL using ffprobe."""
     try:
-        # Use full path to ffprobe for systemd compatibility
-        ffprobe_cmd = '/usr/bin/ffprobe'
+        ffprobe_cmd = get_ffprobe_path()
         result = subprocess.run(
             [ffprobe_cmd, '-v', 'quiet', '-show_entries', 'format=duration',
              '-of', 'default=noprint_wrappers=1:nokey=1', url],
@@ -3288,7 +3331,7 @@ def get_video_duration_seconds(file_path):
     """Get video duration in seconds using ffprobe."""
     try:
         result = subprocess.run(
-            ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+            [get_ffprobe_path(), '-v', 'quiet', '-show_entries', 'format=duration',
              '-of', 'default=noprint_wrappers=1:nokey=1', file_path],
             capture_output=True, text=True
         )
@@ -7706,10 +7749,20 @@ def bulk_set_event():
 
 def get_ffmpeg_path():
     """Get path to ffmpeg binary - checks custom location first, then system."""
+    import shutil
+    # Check Render deploy path first
     custom_path = '/opt/render/project/src/bin/ffmpeg'
     if os.path.exists(custom_path):
         return custom_path
-    return 'ffmpeg'  # Use system ffmpeg
+    # Check system PATH (works on macOS with homebrew, Linux, etc.)
+    system_ffmpeg = shutil.which('ffmpeg')
+    if system_ffmpeg:
+        return system_ffmpeg
+    # Common install locations
+    for path in ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/opt/homebrew/bin/ffmpeg']:
+        if os.path.exists(path):
+            return path
+    return 'ffmpeg'  # Last resort fallback
 
 
 def generate_thumbnail_from_s3_video(video_url, video_id):
