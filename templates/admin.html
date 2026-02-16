@@ -373,12 +373,21 @@
         <!-- Video List -->
         <div class="bg-gray-800 rounded-lg p-6">
             <h2 class="text-xl font-bold mb-4">Manage Videos</h2>
-            <!-- Filter by Discipline -->
+            <!-- Filters -->
             <div class="flex flex-wrap gap-4 mb-4">
                 <div>
                     <label class="block text-gray-400 text-sm mb-1">Filter by Discipline</label>
-                    <select id="filterEventSelect" onchange="filterVideosByEvent()" class="px-4 py-2 rounded bg-gray-700 text-white">
+                    <select id="filterCategorySelect" onchange="filterVideos()" class="px-4 py-2 rounded bg-gray-700 text-white">
                         <option value="">All Disciplines</option>
+                        {% for cat_id, cat in categories.items() %}
+                        <option value="{{ cat_id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1">Filter by Event</label>
+                    <select id="filterEventSelect" onchange="filterVideos()" class="px-4 py-2 rounded bg-gray-700 text-white">
+                        <option value="">All Events</option>
                         <option value="__none__">No Event Assigned</option>
                         {% for event in events %}
                         <option value="{{ event }}">{{ event }}</option>
@@ -432,7 +441,7 @@
             <div class="space-y-3 max-h-[800px] overflow-y-auto" id="videoListContainer">
                 {% if videos %}
                 {% for video in videos %}
-                <div class="bg-gray-700 rounded-lg p-4 video-list-item" data-video-id="{{ video.id }}" data-event="{{ video.event|default('', true) }}">
+                <div class="bg-gray-700 rounded-lg p-4 video-list-item" data-video-id="{{ video.id }}" data-event="{{ video.event|default('', true) }}" data-category="{{ video.category|default('uncategorized', true) }}">
                     <!-- Card View (default) -->
                     <div class="card-view-content flex gap-4">
                         <div class="w-32 h-20 bg-gray-600 rounded flex-shrink-0 overflow-hidden">
@@ -3265,10 +3274,11 @@
                                 el.classList.remove('ring-1', 'ring-yellow-400');
                             });
                         }
-                        // Update data-event attribute for filtering
-                        if (fields.event) {
-                            const row = document.querySelector(`.video-list-item[data-video-id="${videoId}"]`);
-                            if (row) row.dataset.event = fields.event;
+                        // Update data attributes for filtering
+                        const row2 = document.querySelector(`.video-list-item[data-video-id="${videoId}"]`);
+                        if (row2) {
+                            if (fields.event) row2.dataset.event = fields.event;
+                            if (fields.category) row2.dataset.category = fields.category;
                         }
                     }
                     // Clear all pending
@@ -3549,19 +3559,27 @@
         }
 
         // Filter videos by event
-        function filterVideosByEvent() {
-            const filterValue = document.getElementById('filterEventSelect').value;
+        function filterVideos() {
+            const eventFilter = document.getElementById('filterEventSelect').value;
+            const categoryFilter = document.getElementById('filterCategorySelect').value;
             const videos = document.querySelectorAll('.video-list-item');
             let visibleCount = 0;
 
             videos.forEach(video => {
                 const videoEvent = video.dataset.event || '';
+                const videoCategory = video.dataset.category || '';
                 let show = true;
 
-                if (filterValue === '__none__') {
-                    show = !videoEvent;  // Show only videos with no event
-                } else if (filterValue) {
-                    show = videoEvent === filterValue;
+                // Apply category filter
+                if (categoryFilter) {
+                    show = videoCategory === categoryFilter;
+                }
+
+                // Apply event filter
+                if (show && eventFilter === '__none__') {
+                    show = !videoEvent;
+                } else if (show && eventFilter) {
+                    show = videoEvent === eventFilter;
                 }
 
                 video.style.display = show ? '' : 'none';
@@ -3570,6 +3588,9 @@
 
             document.getElementById('videoFilterCount').textContent = `${visibleCount} video${visibleCount !== 1 ? 's' : ''} shown`;
         }
+
+        // Legacy alias
+        function filterVideosByEvent() { filterVideos(); }
 
         // Bulk assign event to visible videos
         async function bulkAssignEvent() {
