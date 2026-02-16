@@ -5887,9 +5887,11 @@ def get_presigned_upload_url():
     if not presigned_url:
         return jsonify({'error': 'Failed to generate presigned URL'}), 500
 
-    # Generate the final S3 URL (what the video will be accessible at)
+    # Generate the final URL (what the video will be accessible at)
     if AWS_CLOUDFRONT_DOMAIN:
         final_url = f"https://{AWS_CLOUDFRONT_DOMAIN}/{s3_key}"
+    elif STORAGE_PROVIDER == 'b2':
+        final_url = f"https://f005.backblazeb2.com/file/{AWS_S3_BUCKET}/{s3_key}"
     else:
         final_url = f"https://{AWS_S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
 
@@ -7650,6 +7652,53 @@ def bulk_rename_videos():
                 renamed_count += 1
 
         return jsonify({'success': True, 'renamed_count': renamed_count})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/bulk-save-videos', methods=['POST'])
+@admin_required
+def bulk_save_videos():
+    """Bulk save changes to multiple videos at once."""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        changes = data.get('changes', [])
+        if not changes:
+            return jsonify({'error': 'No changes provided'}), 400
+
+        saved_count = 0
+        errors = []
+        for change in changes:
+            video_id = change.get('id')
+            if not video_id:
+                continue
+            video = get_video(video_id)
+            if not video:
+                errors.append(f'Video {video_id} not found')
+                continue
+
+            old_category = video.get('category', 'uncategorized')
+            new_category = change.get('category')
+            if new_category and new_category != old_category:
+                video['category_auto'] = False
+
+            if 'title' in change:
+                video['title'] = change['title'].strip()
+            if 'category' in change:
+                video['category'] = change['category']
+            if 'subcategory' in change:
+                video['subcategory'] = change['subcategory'].strip()
+            if 'event' in change:
+                video['event'] = change['event'].strip()
+
+            save_video(video)
+            saved_count += 1
+
+        return jsonify({'success': True, 'saved_count': saved_count, 'errors': errors})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500

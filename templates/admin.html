@@ -444,20 +444,21 @@
                             <div class="flex items-center gap-2">
                                 <input type="text" value="{{ video.title }}"
                                     class="video-title-input flex-1 font-semibold text-white bg-transparent border-b border-transparent hover:border-gray-500 focus:border-blue-500 focus:outline-none px-1 py-0.5"
-                                    onchange="quickRenameVideo('{{ video.id }}', this.value)"
+                                    data-original="{{ video.title }}"
+                                    onchange="bufferChange('{{ video.id }}', 'title', this.value, this)"
                                     onkeydown="if(event.key==='Enter'){this.blur();}">
                             </div>
                             <div class="flex items-center gap-2 mt-1 text-sm text-gray-400">
-                                <select onchange="quickChangeCategory('{{ video.id }}', this.value, this)"
+                                <select onchange="bufferChange('{{ video.id }}', 'category', this.value, this); updateSubcategoryDropdown(this)"
                                     class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-blue-500"
-                                    data-video-id="{{ video.id }}">
+                                    data-video-id="{{ video.id }}" data-original="{{ video.category }}">
                                     {% for cat_id, cat in categories.items() %}
                                     <option value="{{ cat_id }}" {% if cat_id == video.category %}selected{% endif %}>{{ cat.abbrev }}</option>
                                     {% endfor %}
                                 </select>
-                                <select onchange="quickChangeSubcategory('{{ video.id }}', this.value)"
+                                <select onchange="bufferChange('{{ video.id }}', 'subcategory', this.value, this)"
                                     class="bg-gray-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-gray-500 subcategory-select"
-                                    data-video-id="{{ video.id }}" data-current="{{ video.subcategory|default('', true) }}"
+                                    data-video-id="{{ video.id }}" data-original="{{ video.subcategory|default('', true) }}" data-current="{{ video.subcategory|default('', true) }}"
                                     {% if not categories.get(video.category, {}).get('subcategories') %}style="display:none"{% endif %}>
                                     <option value="">--</option>
                                     {% if categories.get(video.category, {}).get('subcategories') %}
@@ -472,8 +473,8 @@
                                     list="eventList_{{ video.id }}"
                                     placeholder="No category"
                                     class="bg-cyan-700 text-white px-2 py-0.5 rounded text-xs w-32 event-input"
-                                    data-video-id="{{ video.id }}"
-                                    onchange="quickChangeEvent('{{ video.id }}', this.value)">
+                                    data-video-id="{{ video.id }}" data-original="{{ video.event|default('', true) }}"
+                                    onchange="bufferChange('{{ video.id }}', 'event', this.value, this)">
                                 <datalist id="eventList_{{ video.id }}">
                                     {% for event in events %}
                                     <option value="{{ event }}">
@@ -496,11 +497,12 @@
                             <input type="checkbox" class="video-checkbox w-4 h-4 rounded" data-video-id="{{ video.id }}">
                             <input type="text" value="{{ video.title }}"
                                 class="video-title-input flex-1 text-white bg-transparent border-b border-transparent hover:border-gray-500 focus:border-blue-500 focus:outline-none px-1 py-0.5 text-sm"
-                                onchange="quickRenameVideo('{{ video.id }}', this.value)"
+                                data-original="{{ video.title }}"
+                                onchange="bufferChange('{{ video.id }}', 'title', this.value, this)"
                                 onkeydown="if(event.key==='Enter'){this.blur();}">
-                            <select onchange="quickChangeCategory('{{ video.id }}', this.value, this)"
+                            <select onchange="bufferChange('{{ video.id }}', 'category', this.value, this); updateSubcategoryDropdown(this)"
                                 class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-blue-500 w-20"
-                                data-video-id="{{ video.id }}">
+                                data-video-id="{{ video.id }}" data-original="{{ video.category }}">
                                 {% for cat_id, cat in categories.items() %}
                                 <option value="{{ cat_id }}" {% if cat_id == video.category %}selected{% endif %}>{{ cat.abbrev }}</option>
                                 {% endfor %}
@@ -509,8 +511,8 @@
                                 list="eventListL_{{ video.id }}"
                                 placeholder="No discipline"
                                 class="bg-cyan-700 text-white px-2 py-0.5 rounded text-xs w-32 event-input"
-                                data-video-id="{{ video.id }}"
-                                onchange="quickChangeEvent('{{ video.id }}', this.value)">
+                                data-video-id="{{ video.id }}" data-original="{{ video.event|default('', true) }}"
+                                onchange="bufferChange('{{ video.id }}', 'event', this.value, this)">
                             <datalist id="eventListL_{{ video.id }}">
                                 {% for event in events %}
                                 <option value="{{ event }}">
@@ -535,6 +537,16 @@
                 {% endif %}
             </div>
         </div>
+    </div>
+
+    <!-- Floating Save Button -->
+    <div id="bulkSaveBar" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full shadow-lg cursor-pointer flex items-center gap-3 transition-all"
+        onclick="bulkSaveAllChanges()">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        <span id="bulkSaveLabel" class="font-semibold text-sm">Save 0 Changes</span>
+        <button onclick="event.stopPropagation(); discardAllChanges();" class="ml-2 text-white/70 hover:text-white text-xs underline">Discard</button>
     </div>
 
     <!-- Bulk Upload Modal -->
@@ -3181,7 +3193,135 @@
             }
         }
 
-        // Quick rename video (inline)
+        // --- Buffered bulk edit system ---
+        const pendingChanges = {}; // { videoId: { title, category, subcategory, event } }
+
+        function bufferChange(videoId, field, value, el) {
+            if (!pendingChanges[videoId]) {
+                pendingChanges[videoId] = {};
+            }
+            const original = el.dataset.original || '';
+            if (value.trim() === original.trim()) {
+                delete pendingChanges[videoId][field];
+                if (Object.keys(pendingChanges[videoId]).length === 0) {
+                    delete pendingChanges[videoId];
+                }
+                el.classList.remove('ring-1', 'ring-yellow-400');
+            } else {
+                pendingChanges[videoId][field] = value;
+                el.classList.add('ring-1', 'ring-yellow-400');
+            }
+            // Highlight the row
+            const row = document.querySelector(`.video-list-item[data-video-id="${videoId}"]`);
+            if (row) {
+                if (pendingChanges[videoId] && Object.keys(pendingChanges[videoId]).length > 0) {
+                    row.classList.add('border-l-4', 'border-yellow-400');
+                } else {
+                    row.classList.remove('border-l-4', 'border-yellow-400');
+                }
+            }
+            updateSaveBar();
+        }
+
+        function updateSaveBar() {
+            const count = Object.keys(pendingChanges).length;
+            const bar = document.getElementById('bulkSaveBar');
+            const label = document.getElementById('bulkSaveLabel');
+            if (count > 0) {
+                label.textContent = `Save ${count} Change${count !== 1 ? 's' : ''}`;
+                bar.classList.remove('hidden');
+            } else {
+                bar.classList.add('hidden');
+            }
+        }
+
+        async function bulkSaveAllChanges() {
+            const changes = Object.entries(pendingChanges).map(([id, fields]) => ({ id, ...fields }));
+            if (changes.length === 0) return;
+
+            const bar = document.getElementById('bulkSaveBar');
+            const label = document.getElementById('bulkSaveLabel');
+            label.textContent = 'Saving...';
+            bar.classList.add('pointer-events-none', 'opacity-70');
+
+            try {
+                const response = await fetch('/admin/bulk-save-videos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ changes })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    // Clear pending state and update originals
+                    for (const [videoId, fields] of Object.entries(pendingChanges)) {
+                        const row = document.querySelector(`.video-list-item[data-video-id="${videoId}"]`);
+                        if (row) {
+                            row.classList.remove('border-l-4', 'border-yellow-400');
+                            // Update data-original on all changed inputs
+                            row.querySelectorAll('[data-original]').forEach(el => {
+                                const tag = el.tagName.toLowerCase();
+                                if (tag === 'input') el.dataset.original = el.value;
+                                if (tag === 'select') el.dataset.original = el.value;
+                                el.classList.remove('ring-1', 'ring-yellow-400');
+                            });
+                        }
+                        // Update data-event attribute for filtering
+                        if (fields.event) {
+                            const row = document.querySelector(`.video-list-item[data-video-id="${videoId}"]`);
+                            if (row) row.dataset.event = fields.event;
+                        }
+                    }
+                    // Clear all pending
+                    Object.keys(pendingChanges).forEach(k => delete pendingChanges[k]);
+                    updateSaveBar();
+                    label.textContent = `Saved ${result.saved_count} video${result.saved_count !== 1 ? 's' : ''}`;
+                    setTimeout(() => bar.classList.add('hidden'), 1500);
+                } else {
+                    alert(result.error || 'Save failed');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                bar.classList.remove('pointer-events-none', 'opacity-70');
+            }
+        }
+
+        function discardAllChanges() {
+            // Revert all inputs to original values
+            for (const videoId of Object.keys(pendingChanges)) {
+                const row = document.querySelector(`.video-list-item[data-video-id="${videoId}"]`);
+                if (row) {
+                    row.classList.remove('border-l-4', 'border-yellow-400');
+                    row.querySelectorAll('[data-original]').forEach(el => {
+                        const tag = el.tagName.toLowerCase();
+                        if (tag === 'input') el.value = el.dataset.original;
+                        if (tag === 'select') el.value = el.dataset.original;
+                        el.classList.remove('ring-1', 'ring-yellow-400');
+                    });
+                }
+            }
+            Object.keys(pendingChanges).forEach(k => delete pendingChanges[k]);
+            updateSaveBar();
+        }
+
+        function updateSubcategoryDropdown(selectEl) {
+            const newCategory = selectEl.value;
+            const subSelect = selectEl.closest('.card-view-content, .list-view-content')?.querySelector('.subcategory-select');
+            if (!subSelect) return;
+            const cat = categories[newCategory];
+            if (cat && cat.subcategories && cat.subcategories.length > 0) {
+                subSelect.innerHTML = '<option value="">--</option>';
+                cat.subcategories.forEach(sub => {
+                    subSelect.innerHTML += `<option value="${sub.id}">${sub.name}</option>`;
+                });
+                subSelect.style.display = '';
+            } else {
+                subSelect.innerHTML = '<option value="">--</option>';
+                subSelect.style.display = 'none';
+            }
+        }
+
+        // Legacy: keep quickRenameVideo for any other callers
         async function quickRenameVideo(videoId, newTitle) {
             if (!newTitle.trim()) return;
             try {
