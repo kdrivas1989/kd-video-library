@@ -438,6 +438,10 @@
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
                         </button>
                     </div>
+                    <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer ml-2">
+                        <input type="checkbox" id="selectAllMain" onchange="toggleSelectAll()" class="w-4 h-4 rounded">
+                        Select All
+                    </label>
                     <span id="videoFilterCount" class="text-gray-500 text-sm"></span>
                 </div>
             </div>
@@ -457,6 +461,7 @@
                 <div class="bg-gray-700 rounded-lg p-4 video-list-item" data-video-id="{{ video.id }}" data-event="{{ video.event|default('', true) }}" data-category="{{ video.category|default('uncategorized', true) }}">
                     <!-- Card View (default) -->
                     <div class="card-view-content flex gap-4">
+                        <input type="checkbox" class="video-checkbox w-4 h-4 rounded flex-shrink-0 mt-2" data-video-id="{{ video.id }}">
                         <div class="w-32 h-20 bg-gray-600 rounded flex-shrink-0 overflow-hidden">
                             {% if video.thumbnail %}
                             <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="w-full h-full object-cover">
@@ -3493,12 +3498,17 @@
 
         // Select all checkboxes
         function toggleSelectAll() {
-            const selectAll = document.getElementById('selectAllCheckbox');
+            const mainCb = document.getElementById('selectAllMain');
+            const listCb = document.getElementById('selectAllCheckbox');
+            const isChecked = mainCb ? mainCb.checked : (listCb ? listCb.checked : false);
+            // Sync both checkboxes
+            if (mainCb) mainCb.checked = isChecked;
+            if (listCb) listCb.checked = isChecked;
             const checkboxes = document.querySelectorAll('.video-checkbox');
             checkboxes.forEach(cb => {
                 const item = cb.closest('.video-list-item');
                 if (item && item.style.display !== 'none') {
-                    cb.checked = selectAll.checked;
+                    cb.checked = isChecked;
                 }
             });
             updateBulkRenameCount();
