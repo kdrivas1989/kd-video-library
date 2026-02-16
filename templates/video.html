@@ -6113,25 +6113,102 @@
     {% if is_chief_judge or is_admin %}
     <!-- Edit Title Modal -->
     <div id="editTitleModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-            <h2 class="text-xl font-bold mb-4">Rename Video</h2>
-            <div class="mb-4">
-                <label class="block text-gray-400 text-sm mb-2">Title</label>
-                <input type="text" id="editTitleInput"
-                    value="{{ video.title }}"
-                    class="w-full px-4 py-3 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Video title">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4">
+            <h2 class="text-xl font-bold mb-4">Edit Video Info</h2>
+
+            <!-- Scan Frame Button -->
+            <div class="mb-4 p-3 bg-gray-700/50 rounded-lg">
+                <div class="flex items-center gap-3">
+                    <button onclick="scanVideoFrame()" id="scanFrameBtn" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm font-medium flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                        Scan Current Frame
+                    </button>
+                    <span id="scanStatus" class="text-gray-400 text-sm"></span>
+                </div>
+                <p class="text-gray-500 text-xs mt-2">Pause the video on a frame with text (team number, round, event) and click Scan to auto-detect info</p>
             </div>
-            <div class="flex justify-end gap-3">
-                <button onclick="hideEditTitleModal()" class="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500">
-                    Cancel
+
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <div class="col-span-2">
+                    <label class="block text-gray-400 text-xs mb-1">Title</label>
+                    <input type="text" id="editTitleInput"
+                        value="{{ video.title }}"
+                        class="w-full px-3 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="Video title">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-xs mb-1">Team Number</label>
+                    <input type="text" id="editTeamNumber"
+                        value="{{ video.team_number|default('', true) }}"
+                        class="w-full px-3 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="e.g. 4808">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-xs mb-1">Team Name</label>
+                    <input type="text" id="editTeamName"
+                        value="{{ video.team|default('', true) }}"
+                        class="w-full px-3 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="e.g. Russia">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-xs mb-1">Round</label>
+                    <input type="text" id="editRound"
+                        value="{{ video.round_num|default('', true) }}"
+                        class="w-full px-3 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="e.g. 3">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-xs mb-1">Event</label>
+                    <input type="text" id="editEvent"
+                        value="{{ video.event|default('', true) }}"
+                        class="w-full px-3 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="e.g. FAI World Championships">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-xs mb-1">Category</label>
+                    <select id="editCategory" class="w-full px-3 py-2 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        {% for cat_id, cat in categories.items() %}
+                        <option value="{{ cat_id }}" {% if cat_id == video.category %}selected{% endif %}>{{ cat.name }} ({{ cat.abbrev }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-xs mb-1">Subcategory</label>
+                    <input type="text" id="editSubcategory"
+                        value="{{ video.subcategory|default('', true) }}"
+                        class="w-full px-3 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="e.g. 8way">
+                </div>
+            </div>
+
+            <!-- OCR Preview -->
+            <div id="ocrPreview" class="hidden mb-3 p-2 bg-gray-900 rounded text-xs text-gray-400 max-h-24 overflow-y-auto">
+                <p class="text-gray-500 mb-1">Detected text:</p>
+                <pre id="ocrText" class="whitespace-pre-wrap"></pre>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <button onclick="buildTitleFromFields()" class="text-blue-400 hover:text-blue-300 text-sm">
+                    Build title from fields
                 </button>
-                <button onclick="saveVideoTitle()" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 font-medium">
-                    Save
-                </button>
+                <div class="flex gap-3">
+                    <button onclick="hideEditTitleModal()" class="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 text-sm">
+                        Cancel
+                    </button>
+                    <button onclick="saveVideoInfo()" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 font-medium text-sm">
+                        Save
+                    </button>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Tesseract.js for OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <canvas id="ocrCanvas" class="hidden"></canvas>
 
     <script>
         function showEditTitleModal() {
@@ -6144,18 +6221,165 @@
             document.getElementById('editTitleModal').classList.add('hidden');
         }
 
-        async function saveVideoTitle() {
+        function buildTitleFromFields() {
+            const team = document.getElementById('editTeamName').value.trim();
+            const teamNum = document.getElementById('editTeamNumber').value.trim();
+            const round = document.getElementById('editRound').value.trim();
+            const parts = [];
+            if (teamNum) parts.push(teamNum);
+            if (team) parts.push(team);
+            if (round) parts.push('Round ' + round);
+            if (parts.length > 0) {
+                document.getElementById('editTitleInput').value = parts.join(' - ');
+            }
+        }
+
+        async function scanVideoFrame() {
+            const video = document.getElementById('videoPlayer');
+            if (!video || video.readyState < 2) {
+                alert('Please load and pause the video on a frame with visible text first');
+                return;
+            }
+
+            const btn = document.getElementById('scanFrameBtn');
+            const status = document.getElementById('scanStatus');
+            btn.disabled = true;
+            btn.textContent = 'Scanning...';
+            status.textContent = 'Capturing frame and running OCR...';
+
+            try {
+                // Capture frame to canvas
+                const canvas = document.getElementById('ocrCanvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Run Tesseract OCR
+                const result = await Tesseract.recognize(canvas, 'eng', {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            status.textContent = `OCR: ${Math.round(m.progress * 100)}%`;
+                        }
+                    }
+                });
+
+                const text = result.data.text;
+                console.log('OCR Result:', text);
+
+                // Show raw OCR text
+                document.getElementById('ocrText').textContent = text;
+                document.getElementById('ocrPreview').classList.remove('hidden');
+
+                // Parse the OCR text for metadata
+                parseOcrText(text);
+
+                status.textContent = 'Scan complete!';
+                status.className = 'text-green-400 text-sm';
+            } catch (err) {
+                console.error('OCR Error:', err);
+                status.textContent = 'OCR failed: ' + err.message;
+                status.className = 'text-red-400 text-sm';
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg> Scan Current Frame';
+        }
+
+        function parseOcrText(text) {
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+            // Look for team number + name pattern: "4808 - Russia" or "4808-Russia"
+            let teamNum = '', teamName = '';
+            const teamMatch = text.match(/(\d{2,5})\s*[-–—]\s*([A-Za-z][\w\s]+)/);
+            if (teamMatch) {
+                teamNum = teamMatch[1];
+                teamName = teamMatch[2].trim();
+            }
+
+            // Look for round pattern: "Round 3" or "Rd 3" or "Round3"
+            let round = '';
+            const roundMatch = text.match(/[Rr](?:ound|d|ND)[\s.:]*(\d+)/);
+            if (roundMatch) {
+                round = roundMatch[1];
+            }
+
+            // Look for discipline: "8-Way", "4-Way", "8 Way", "VFS", etc.
+            let discipline = '';
+            const discMatch = text.match(/(\d+)\s*[-–]?\s*[Ww]ay/);
+            if (discMatch) {
+                discipline = discMatch[1] + '-Way';
+            } else if (/VFS/i.test(text)) {
+                discipline = 'VFS';
+            } else if (/[Ff]ree\s*[Ff]ly/i.test(text)) {
+                discipline = 'Freefly';
+            }
+
+            // Look for event name: "FAI World Parachuting Championships" or similar
+            let eventName = '';
+            for (const line of lines) {
+                if (/championship|nationals|world|FAI|competition|meet/i.test(line) && line.length > 10) {
+                    eventName = line.replace(/[^\w\s\-–]/g, '').trim();
+                    break;
+                }
+            }
+
+            // Populate fields (only if not already filled)
+            if (teamNum && !document.getElementById('editTeamNumber').value.trim()) {
+                document.getElementById('editTeamNumber').value = teamNum;
+            }
+            if (teamName && !document.getElementById('editTeamName').value.trim()) {
+                document.getElementById('editTeamName').value = teamName;
+            }
+            if (round && !document.getElementById('editRound').value.trim()) {
+                document.getElementById('editRound').value = round;
+            }
+            if (eventName && !document.getElementById('editEvent').value.trim()) {
+                document.getElementById('editEvent').value = eventName;
+            }
+
+            // Auto-detect category from discipline
+            if (discipline) {
+                const catSelect = document.getElementById('editCategory');
+                if (/way/i.test(discipline)) {
+                    catSelect.value = 'fs';
+                }
+                if (!document.getElementById('editSubcategory').value.trim()) {
+                    const num = discipline.match(/(\d+)/);
+                    if (num) {
+                        document.getElementById('editSubcategory').value = num[1] + 'way';
+                    }
+                }
+            }
+
+            // Auto-build title if fields were populated
+            if (teamNum || teamName || round) {
+                buildTitleFromFields();
+            }
+        }
+
+        async function saveVideoInfo() {
             const newTitle = document.getElementById('editTitleInput').value.trim();
             if (!newTitle) {
                 alert('Please enter a title');
                 return;
             }
 
+            const data = {
+                title: newTitle,
+                team: document.getElementById('editTeamName').value.trim(),
+                team_number: document.getElementById('editTeamNumber').value.trim(),
+                round_num: document.getElementById('editRound').value.trim(),
+                event: document.getElementById('editEvent').value.trim(),
+                category: document.getElementById('editCategory').value,
+                subcategory: document.getElementById('editSubcategory').value.trim()
+            };
+
             try {
                 const response = await fetch('/admin/edit-video/{{ video.id }}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: newTitle })
+                    body: JSON.stringify(data)
                 });
 
                 const result = await response.json();
@@ -6163,18 +6387,23 @@
                     document.getElementById('videoTitle').textContent = newTitle;
                     document.title = newTitle + ' - Video Library';
                     hideEditTitleModal();
+                    // Reload to show updated metadata
+                    location.reload();
                 } else {
-                    alert(result.error || 'Failed to rename video');
+                    alert(result.error || 'Failed to save video info');
                 }
             } catch (err) {
                 alert('Error: ' + err.message);
             }
         }
 
-        // Allow Enter to save title
+        // Keep old function name for compatibility
+        function saveVideoTitle() { saveVideoInfo(); }
+
+        // Keyboard shortcuts
         document.getElementById('editTitleInput').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
-                saveVideoTitle();
+                saveVideoInfo();
             } else if (e.key === 'Escape') {
                 hideEditTitleModal();
             }

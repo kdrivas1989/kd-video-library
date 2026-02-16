@@ -7520,6 +7520,12 @@ def edit_video(video_id):
     video['tags'] = (data.get('tags') or video.get('tags') or '').strip()
     video['duration'] = (data.get('duration') or video.get('duration') or '').strip()
     video['event'] = (data.get('event') or video.get('event') or '').strip()
+    if 'team' in data:
+        video['team'] = (data.get('team') or '').strip()
+    if 'team_number' in data:
+        video['team_number'] = (data.get('team_number') or '').strip()
+    if 'round_num' in data:
+        video['round_num'] = (data.get('round_num') or '').strip()
 
     save_video(video)
 
