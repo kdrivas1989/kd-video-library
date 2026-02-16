@@ -4351,8 +4351,20 @@ def admin_dashboard():
 
     is_admin = session.get('role') == 'admin'
 
+    # Filter to only videos missing information
+    incomplete_videos = []
+    for v in videos:
+        cat = v.get('category', 'uncategorized')
+        event = (v.get('event') or '').strip()
+        team = (v.get('team') or '').strip()
+        round_num = (v.get('round_num') or '').strip()
+        subcategory = (v.get('subcategory') or '').strip()
+        if cat in ('uncategorized', '', None) or not event or not team or not round_num or not subcategory:
+            incomplete_videos.append(v)
+
     return render_template('admin.html',
-                         videos=videos,
+                         videos=incomplete_videos,
+                         all_video_count=total_videos,
                          categories=CATEGORIES,
                          total_videos=total_videos,
                          total_views=total_views,
