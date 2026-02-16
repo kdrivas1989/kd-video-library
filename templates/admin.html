@@ -534,6 +534,17 @@
                                 <option value="{{ cat_id }}" {% if cat_id == video.category %}selected{% endif %}>{{ cat.abbrev }}</option>
                                 {% endfor %}
                             </select>
+                            <select onchange="bufferChange('{{ video.id }}', 'subcategory', this.value, this)"
+                                class="bg-gray-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-gray-500 subcategory-select"
+                                data-video-id="{{ video.id }}" data-original="{{ video.subcategory|default('', true) }}" data-current="{{ video.subcategory|default('', true) }}"
+                                {% if not categories.get(video.category, {}).get('subcategories') %}style="display:none"{% endif %}>
+                                <option value="">--</option>
+                                {% if categories.get(video.category, {}).get('subcategories') %}
+                                {% for sub in categories.get(video.category, {}).get('subcategories', []) %}
+                                <option value="{{ sub.id }}" {% if sub.id == video.subcategory %}selected{% endif %}>{{ sub.name }}</option>
+                                {% endfor %}
+                                {% endif %}
+                            </select>
                             <input type="text" value="{{ video.event|default('', true) }}"
                                 list="eventListL_{{ video.id }}"
                                 placeholder="No discipline"
