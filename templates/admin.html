@@ -431,6 +431,18 @@
                     </div>
                 </div>
                 <div>
+                    <label class="block text-gray-400 text-sm mb-1">Bulk Assign Discipline</label>
+                    <div class="flex gap-2">
+                        <select id="bulkDisciplineInput" class="px-3 py-2 rounded bg-gray-700 text-white w-48">
+                            <option value="">Select discipline...</option>
+                            {% for cat_id, cat in categories.items() %}
+                            <option value="{{ cat_id }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button onclick="bulkAssignDiscipline()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm">Assign to Selected</button>
+                    </div>
+                </div>
+                <div>
                     <label class="block text-gray-400 text-sm mb-1">Remove Text</label>
                     <div class="flex gap-2">
                         <input type="text" id="bulkRemoveInput" placeholder="Text to remove..." class="px-3 py-2 rounded bg-gray-700 text-white w-44">
@@ -3867,6 +3879,83 @@
                             sel.value = newSubcategory;
                             sel.dataset.original = newSubcategory;
                             sel.dataset.current = newSubcategory;
+                        });
+                    } else {
+                        failed++;
+                    }
+                } catch (e) {
+                    failed++;
+                }
+            }
+
+            alert(`Done! ${success} updated, ${failed} failed.`);
+        }
+
+        async function bulkAssignDiscipline() {
+            const newCategory = document.getElementById('bulkDisciplineInput').value;
+            if (!newCategory) {
+                alert('Please select a discipline');
+                return;
+            }
+
+            const selectedCheckboxes = document.querySelectorAll('.video-checkbox:checked');
+            let targetVideos;
+            if (selectedCheckboxes.length > 0) {
+                targetVideos = Array.from(selectedCheckboxes).map(cb => cb.closest('.video-list-item')).filter(v => v && v.style.display !== 'none');
+            } else {
+                targetVideos = Array.from(document.querySelectorAll('.video-list-item:not([style*="display: none"])'));
+            }
+
+            if (targetVideos.length === 0) {
+                alert('No videos to assign');
+                return;
+            }
+
+            const label = document.querySelector(`#bulkDisciplineInput option[value="${newCategory}"]`)?.textContent || newCategory;
+            if (!confirm(`Assign discipline "${label}" to ${targetVideos.length} video(s)?`)) {
+                return;
+            }
+
+            let success = 0;
+            let failed = 0;
+
+            for (const video of targetVideos) {
+                const videoId = video.dataset.videoId;
+                try {
+                    const response = await fetch(`/admin/edit-video/${videoId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ category: newCategory })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        success++;
+                        video.dataset.category = newCategory;
+                        // Update all category selects in this video item
+                        video.querySelectorAll('select[data-original]').forEach(sel => {
+                            if (sel.classList.contains('subcategory-select')) return;
+                            if (sel.id && sel.id.startsWith('bulk')) return;
+                            const options = Array.from(sel.options);
+                            const match = options.find(o => o.value === newCategory);
+                            if (match) {
+                                sel.value = newCategory;
+                                sel.dataset.original = newCategory;
+                            }
+                        });
+                        // Update subcategory dropdowns for the new category
+                        const cat = window.CATEGORIES[newCategory];
+                        video.querySelectorAll('.subcategory-select').forEach(sel => {
+                            sel.innerHTML = '<option value="">--</option>';
+                            if (cat && cat.subcategories && cat.subcategories.length > 0) {
+                                cat.subcategories.forEach(sub => {
+                                    sel.innerHTML += `<option value="${sub.id}">${sub.name}</option>`;
+                                });
+                                sel.style.display = '';
+                            } else {
+                                sel.style.display = 'none';
+                            }
+                            sel.dataset.original = '';
+                            sel.dataset.current = '';
                         });
                     } else {
                         failed++;
