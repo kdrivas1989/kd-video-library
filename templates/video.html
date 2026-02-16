@@ -150,7 +150,7 @@
                         </div>
                     </div>
                     {% if video.is_local or video.is_direct_url %}
-                    <video class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" playsinline preload="metadata" tabindex="-1" controls>
+                    <video class="w-full h-full" poster="{{ video.thumbnail }}" id="videoPlayer" playsinline preload="metadata" tabindex="-1" controls crossorigin="anonymous">
                         {% if '.webm' in video.video_src|lower %}
                         <source src="{{ video.video_src }}" type="video/webm">
                         {% elif '.ogg' in video.video_src|lower or '.ogv' in video.video_src|lower %}
@@ -6271,21 +6271,40 @@
             status.textContent = 'Capturing frame and running OCR...';
 
             try {
-                // Capture frame to canvas
-                const canvas = document.getElementById('ocrCanvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                let ocrInput;
+
+                // Try canvas capture first (works for same-origin videos)
+                try {
+                    const canvas = document.getElementById('ocrCanvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    // Test if canvas is tainted by trying to read pixel data
+                    canvas.toDataURL();
+                    ocrInput = canvas;
+                } catch (canvasErr) {
+                    // Canvas is tainted (cross-origin video) - use server-side frame capture
+                    console.log('Canvas tainted, using server-side frame capture');
+                    status.textContent = 'Capturing frame via server...';
+                    const currentTime = video.currentTime;
+                    const resp = await fetch(`/api/video/${videoId}/capture-frame?t=${currentTime}`);
+                    if (!resp.ok) throw new Error('Server frame capture failed');
+                    const blob = await resp.blob();
+                    ocrInput = URL.createObjectURL(blob);
+                }
 
                 // Run Tesseract OCR
-                const result = await Tesseract.recognize(canvas, 'eng', {
+                const result = await Tesseract.recognize(ocrInput, 'eng', {
                     logger: m => {
                         if (m.status === 'recognizing text') {
                             status.textContent = `OCR: ${Math.round(m.progress * 100)}%`;
                         }
                     }
                 });
+
+                // Clean up object URL if we created one
+                if (typeof ocrInput === 'string') URL.revokeObjectURL(ocrInput);
 
                 const text = result.data.text;
                 console.log('OCR Result:', text);

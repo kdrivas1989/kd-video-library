@@ -8373,6 +8373,63 @@ def set_video_start_time(video_id):
     return jsonify({'success': True, 'message': 'Start time saved', 'start_time': start_time})
 
 
+@app.route('/api/video/<video_id>/capture-frame')
+def capture_video_frame(video_id):
+    """Capture a frame from a video at a given timestamp. Used for OCR on cross-origin videos."""
+    import tempfile
+
+    video = get_video(video_id)
+    if not video:
+        return jsonify({'error': 'Video not found'}), 404
+
+    t = request.args.get('t', '0')
+
+    # Determine video URL
+    url = video.get('url', '')
+    if not url and video.get('local_file'):
+        url = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'videos', video['local_file'])
+
+    if not url:
+        return jsonify({'error': 'No video source'}), 400
+
+    try:
+        temp_out = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+        temp_out.close()
+
+        ffmpeg_cmd = get_ffmpeg_path()
+        cmd = [
+            ffmpeg_cmd, '-y',
+            '-ss', str(t),
+            '-i', url,
+            '-frames:v', '1',
+            '-q:v', '2',
+            temp_out.name
+        ]
+        result = subprocess.run(cmd, capture_output=True, timeout=30)
+
+        if result.returncode != 0 or not os.path.exists(temp_out.name) or os.path.getsize(temp_out.name) == 0:
+            os.unlink(temp_out.name)
+            return jsonify({'error': 'Frame capture failed'}), 500
+
+        response = send_from_directory(
+            os.path.dirname(temp_out.name),
+            os.path.basename(temp_out.name),
+            mimetype='image/jpeg'
+        )
+
+        @response.call_on_close
+        def cleanup():
+            try:
+                os.unlink(temp_out.name)
+            except:
+                pass
+
+        return response
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/video/<video_id>/trim', methods=['POST'])
 @chief_judge_required
 def trim_video(video_id):
