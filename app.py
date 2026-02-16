@@ -7588,6 +7588,34 @@ def edit_video(video_id):
     })
 
 
+@app.route('/admin/migrate-indoor', methods=['POST'])
+@admin_required
+def migrate_indoor():
+    """Migrate existing indoor videos from FS category to Indoor category."""
+    try:
+        indoor_subcategories = ['indoor_4way_fs', 'indoor_4way_vfs', 'indoor_2way_vfs', 'indoor_8way']
+        migrated = 0
+
+        if USE_SUPABASE:
+            for sub in indoor_subcategories:
+                result = supabase.table('videos').select('id').eq('category', 'fs').eq('subcategory', sub).execute()
+                if result.data:
+                    for video in result.data:
+                        supabase.table('videos').update({'category': 'indoor'}).eq('id', video['id']).execute()
+                        migrated += 1
+        else:
+            db = get_sqlite_db()
+            for sub in indoor_subcategories:
+                cursor = db.execute('UPDATE videos SET category = ? WHERE category = ? AND subcategory = ?',
+                                    ('indoor', 'fs', sub))
+                migrated += cursor.rowcount
+            db.commit()
+
+        return jsonify({'success': True, 'migrated': migrated})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/admin/bulk-rename-videos', methods=['POST'])
 @admin_required
 def bulk_rename_videos():
