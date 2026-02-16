@@ -396,9 +396,9 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-gray-400 text-sm mb-1">Bulk Assign Discipline</label>
+                    <label class="block text-gray-400 text-sm mb-1">Bulk Assign Event</label>
                     <div class="flex gap-2">
-                        <input type="text" id="bulkEventInput" list="bulkEventList" placeholder="Discipline name..." class="px-3 py-2 rounded bg-gray-700 text-white w-48">
+                        <input type="text" id="bulkEventInput" list="bulkEventList" placeholder="Event name..." class="px-3 py-2 rounded bg-gray-700 text-white w-48">
                         <datalist id="bulkEventList">
                             {% for event in events %}
                             <option value="{{ event }}">
@@ -410,6 +410,24 @@
                             <span id="bulkSaveLabel">Save Changes</span>
                         </button>
                         <button id="bulkDiscardBtn" onclick="discardAllChanges()" class="hidden bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded text-sm">Discard</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1">Bulk Assign Subcategory</label>
+                    <div class="flex gap-2">
+                        <select id="bulkSubcategoryInput" class="px-3 py-2 rounded bg-gray-700 text-white w-48">
+                            <option value="">Select subcategory...</option>
+                            {% for cat_id, cat in categories.items() %}
+                            {% if cat.subcategories %}
+                            <optgroup label="{{ cat.name }}">
+                                {% for sub in cat.subcategories %}
+                                <option value="{{ sub.id }}">{{ sub.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        <button onclick="bulkAssignSubcategory()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm">Assign to Selected</button>
                     </div>
                 </div>
                 <div>
@@ -3803,6 +3821,62 @@
             alert(`Done! ${success} updated, ${failed} failed.`);
             // Re-apply filter to hide moved videos
             filterVideosByEvent();
+        }
+
+        async function bulkAssignSubcategory() {
+            const newSubcategory = document.getElementById('bulkSubcategoryInput').value;
+            if (!newSubcategory) {
+                alert('Please select a subcategory');
+                return;
+            }
+
+            const selectedCheckboxes = document.querySelectorAll('.video-checkbox:checked');
+            let targetVideos;
+            if (selectedCheckboxes.length > 0) {
+                targetVideos = Array.from(selectedCheckboxes).map(cb => cb.closest('.video-list-item')).filter(v => v && v.style.display !== 'none');
+            } else {
+                targetVideos = Array.from(document.querySelectorAll('.video-list-item:not([style*="display: none"])'));
+            }
+
+            if (targetVideos.length === 0) {
+                alert('No videos to assign');
+                return;
+            }
+
+            const label = document.querySelector(`#bulkSubcategoryInput option[value="${newSubcategory}"]`)?.textContent || newSubcategory;
+            if (!confirm(`Assign subcategory "${label}" to ${targetVideos.length} video(s)?`)) {
+                return;
+            }
+
+            let success = 0;
+            let failed = 0;
+
+            for (const video of targetVideos) {
+                const videoId = video.dataset.videoId;
+                try {
+                    const response = await fetch(`/admin/edit-video/${videoId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ subcategory: newSubcategory })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        success++;
+                        // Update all subcategory selects in this video item
+                        video.querySelectorAll('.subcategory-select').forEach(sel => {
+                            sel.value = newSubcategory;
+                            sel.dataset.original = newSubcategory;
+                            sel.dataset.current = newSubcategory;
+                        });
+                    } else {
+                        failed++;
+                    }
+                } catch (e) {
+                    failed++;
+                }
+            }
+
+            alert(`Done! ${success} updated, ${failed} failed.`);
         }
 
         // Sort videos by team number, then round number
