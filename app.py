@@ -6600,6 +6600,89 @@ def test_pattern_template():
         return jsonify({'success': False, 'error': result}), 400
 
 
+@app.route('/admin/apply-pattern-template', methods=['POST'])
+@admin_required
+def apply_pattern_template():
+    """Apply a pattern template to matching uncategorized videos."""
+    try:
+        data = request.json or {}
+        template = data.get('template', '').strip()
+        category = data.get('category', 'uncategorized')
+        subcategory = data.get('subcategory', '')
+
+        if not template:
+            return jsonify({'success': False, 'error': 'Template is required'}), 400
+
+        # Parse the template to get the regex
+        success, regex_pattern, field_names, result = parse_pattern_template(template, None)
+        if not success:
+            return jsonify({'success': False, 'error': result}), 400
+
+        # Get all videos
+        videos = get_all_videos()
+        updated = 0
+        skipped = 0
+        details = []
+
+        for video in videos:
+            current_cat = video.get('category', 'uncategorized')
+            # Only apply to uncategorized or auto-categorized videos
+            if current_cat not in ('uncategorized', '', None) and not video.get('category_auto', True):
+                continue
+
+            filename = video.get('title') or video.get('local_file') or ''
+            if not filename:
+                skipped += 1
+                continue
+
+            # Test if the pattern matches this filename
+            match = re.match(regex_pattern, filename, re.IGNORECASE)
+            if not match:
+                skipped += 1
+                continue
+
+            # Extract fields
+            extracted = {}
+            for i, field_name in enumerate(field_names):
+                try:
+                    extracted[field_name] = match.group(i + 1)
+                except:
+                    pass
+
+            # Apply changes
+            changes = {}
+            if category and category != 'uncategorized':
+                changes['category'] = category
+                changes['category_auto'] = True
+            if subcategory:
+                changes['subcategory'] = subcategory
+            if extracted.get('COMPETITION'):
+                changes['event'] = extracted['COMPETITION']
+            if extracted.get('TEAMNAME'):
+                changes['team'] = extracted['TEAMNAME']
+            if extracted.get('TEAMNUMBER'):
+                changes['team_number'] = extracted['TEAMNUMBER']
+            if extracted.get('ROUND'):
+                changes['round_num'] = extracted['ROUND']
+
+            if changes:
+                for key, val in changes.items():
+                    video[key] = val
+                save_video(video)
+                updated += 1
+                details.append(f"{filename} → {category}" + (f"/{subcategory}" if subcategory else ""))
+
+        return jsonify({
+            'success': True,
+            'updated': updated,
+            'skipped': skipped,
+            'details': details[:50]  # Limit to first 50
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/admin/debug-patterns', methods=['GET', 'POST'])
 @admin_required
 def debug_patterns():

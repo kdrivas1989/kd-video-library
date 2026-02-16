@@ -2545,8 +2545,12 @@
                         .map(([k, v]) => `<span class="text-cyan-400">${k}</span>="${v}"`)
                         .join(', ');
                     resultDiv.innerHTML = `
-                        <div class="text-green-400 mb-1">✓ Pattern valid! Press Tab then Enter to save.</div>
-                        <div class="text-xs">${fields}</div>
+                        <div class="text-green-400 mb-1">✓ Pattern valid! Matched ${result.fields ? result.fields.length : 0} fields.</div>
+                        <div class="text-xs mb-2">${fields}</div>
+                        <div class="flex gap-2">
+                            <button onclick="buildAndSaveTemplate()" class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-xs font-medium">Save Template</button>
+                            <button onclick="applyPatternToVideos()" class="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs font-medium">Apply to Videos</button>
+                        </div>
                     `;
                     resultDiv.className = 'mt-2 p-3 rounded text-sm bg-green-900/30';
 
@@ -2564,9 +2568,6 @@
                             catSelect.value = catId;
                         }
                     }
-
-                    // Focus the Save button for quick Tab+Enter
-                    document.getElementById('saveTemplateBtn').focus();
                 } else {
                     resultDiv.innerHTML = `<span class="text-red-400">✗ ${result.error}</span>`;
                     resultDiv.className = 'mt-2 p-3 rounded text-sm bg-red-900/30';
@@ -2656,6 +2657,82 @@
                     resultDiv.className = 'mt-2 p-3 rounded text-sm bg-green-900/30';
                 } else {
                     resultDiv.innerHTML = `<span class="text-red-400">✗ ${result.error}</span>`;
+                    resultDiv.className = 'mt-2 p-3 rounded text-sm bg-red-900/30';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="text-red-400">Error: ${error.message}</span>`;
+                resultDiv.className = 'mt-2 p-3 rounded text-sm bg-red-900/30';
+            }
+        }
+
+        // Apply the current pattern template to matching videos
+        async function applyPatternToVideos() {
+            const template = buildTemplateFromFields();
+            const category = document.getElementById('patternCategory').value;
+            const resultDiv = document.getElementById('patternResult');
+
+            if (!template || template.indexOf('{') === -1) {
+                alert('Please fill in at least one field first');
+                return;
+            }
+
+            // Derive subcategory
+            const subValue = document.getElementById('tplSubcategory').value.toLowerCase().replace(/\s+/g, '');
+            let subcategory = null;
+            if (subValue.includes('acrobatic') || subValue.includes('acro')) subcategory = 'acrobatic';
+            else if (subValue.includes('performance') || subValue.includes('perf')) subcategory = 'performance';
+            else if (subValue.includes('4way') || subValue.includes('4-way')) {
+                if (subValue.includes('rot')) subcategory = '4way_rot';
+                else if (subValue.includes('seq')) subcategory = '4way_seq';
+                else if (subValue.includes('vfs')) subcategory = '4way_vfs';
+                else subcategory = '4way_fs';
+            } else if (subValue.includes('8way') || subValue.includes('8-way')) subcategory = '8way';
+            else if (subValue.includes('2way') || subValue.includes('2-way')) {
+                if (subValue.includes('seq')) subcategory = '2way_seq';
+                else subcategory = '2way_mfs';
+            } else if (subValue.includes('speed')) subcategory = 'speed';
+            else if (subValue.includes('distance')) subcategory = 'distance';
+            else if (subValue.includes('accuracy')) subcategory = 'accuracy';
+            else if (subValue.includes('freestyle')) subcategory = 'freestyle';
+
+            resultDiv.innerHTML = '<span class="text-yellow-400">Saving template and applying to videos...</span>';
+            resultDiv.className = 'mt-2 p-3 rounded text-sm bg-gray-700';
+            resultDiv.classList.remove('hidden');
+
+            try {
+                // Step 1: Save the template
+                const saveResp = await fetch('/admin/save-pattern-template', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ template, example: null, category, subcategory })
+                });
+                const saveResult = await saveResp.json();
+                if (!saveResult.success) {
+                    resultDiv.innerHTML = `<span class="text-red-400">Save failed: ${saveResult.error}</span>`;
+                    resultDiv.className = 'mt-2 p-3 rounded text-sm bg-red-900/30';
+                    return;
+                }
+
+                // Step 2: Apply pattern to videos
+                resultDiv.innerHTML = '<span class="text-yellow-400">Template saved. Applying to videos...</span>';
+                const applyResp = await fetch('/admin/apply-pattern-template', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ template, category, subcategory })
+                });
+                const applyResult = await applyResp.json();
+
+                if (applyResult.success) {
+                    resultDiv.innerHTML = `
+                        <div class="text-green-400 mb-1">✓ Applied! Updated ${applyResult.updated} video${applyResult.updated !== 1 ? 's' : ''}.</div>
+                        ${applyResult.skipped ? `<div class="text-gray-400 text-xs">${applyResult.skipped} videos did not match.</div>` : ''}
+                        ${applyResult.details && applyResult.details.length > 0 ? `<div class="text-xs mt-1 max-h-32 overflow-y-auto">${applyResult.details.map(d => `<div class="text-gray-300">${d}</div>`).join('')}</div>` : ''}
+                    `;
+                    resultDiv.className = 'mt-2 p-3 rounded text-sm bg-green-900/30';
+                    // Reload after a moment to reflect changes
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    resultDiv.innerHTML = `<span class="text-red-400">Apply failed: ${applyResult.error}</span>`;
                     resultDiv.className = 'mt-2 p-3 rounded text-sm bg-red-900/30';
                 }
             } catch (error) {
