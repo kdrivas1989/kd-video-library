@@ -1829,6 +1829,7 @@
         async function checkDurationScanStatus() {
             const btn = document.getElementById('scanDurationsBtn');
             const msgDiv = document.getElementById('scanDurationsMessage');
+            if (!btn || !msgDiv) return;
 
             try {
                 const response = await fetch('/admin/scan-durations/status');

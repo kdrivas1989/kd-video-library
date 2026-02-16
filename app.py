@@ -224,14 +224,18 @@ try:
     AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
     AWS_CLOUDFRONT_DOMAIN = os.environ.get('AWS_CLOUDFRONT_DOMAIN', '')
 
+    from botocore.config import Config as BotoConfig
+
     if B2_KEY_ID and B2_APPLICATION_KEY and B2_BUCKET:
         # Use Backblaze B2 (S3-compatible API)
+        # Force path-style addressing so presigned URLs use the B2 endpoint
         s3_client = boto3.client(
             's3',
             aws_access_key_id=B2_KEY_ID,
             aws_secret_access_key=B2_APPLICATION_KEY,
             endpoint_url=B2_ENDPOINT,
-            region_name=B2_REGION
+            region_name=B2_REGION,
+            config=BotoConfig(s3={'addressing_style': 'path'}, signature_version='s3v4')
         )
         AWS_S3_BUCKET = B2_BUCKET  # Use same variable for bucket name
         AWS_REGION = B2_REGION
