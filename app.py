@@ -7351,8 +7351,8 @@ def parse_pattern_template(template, example=None):
                 regex_parts.append(r'((?:19|20)\d{2})')
             elif field_name in ('ROUND', 'TEAMNUMBER', 'NUMBER') and value.isdigit():
                 regex_parts.append(r'(\d+)')
-            elif field_name == 'DISCIPLINE' and value.upper() in ('FS', 'CF', 'WS', 'CP', 'AE', 'VFS', 'IN', 'INDOOR'):
-                regex_parts.append(r'(FS|CF|WS|CP|AE|VFS|Indoor|IN)')
+            elif field_name == 'DISCIPLINE' and value.upper() in ('FS', 'CF', 'WS', 'WSA', 'CP', 'AE', 'VFS', 'IN', 'INDOOR'):
+                regex_parts.append(r'(FS|CF|WSA|WS|CP|AE|VFS|Indoor|IN)')
             else:
                 # Generate regex from the example value's character pattern
                 regex_parts.append(generate_regex_from_value(value))
@@ -7420,7 +7420,7 @@ def parse_pattern_template(template, example=None):
         elif field_name in ('ROUND', 'TEAMNUMBER', 'NUMBER'):
             regex_parts.append(r'(\d+)')
         elif field_name == 'DISCIPLINE':
-            regex_parts.append(r'(FS|CF|WS|CP|AE|VFS|Indoor|IN)')
+            regex_parts.append(r'(FS|CF|WSA|WS|CP|AE|VFS|Indoor|IN)')
         elif field_name == 'SUBCATEGORY':
             # Size/format like "8 Way", "4 Way", "8way"
             regex_parts.append(r'(\d+\s*[Ww]ay)')

@@ -2250,7 +2250,7 @@
 
             // Strategy: Find the discipline code first, then work backwards and forwards
             // Look for discipline followed by digit (subcategory) or dash/space
-            const discRegex = /(?:^|[^A-Za-z])(FS|CF|WS|CP|AE|VFS|Indoor|IN)(?=\d|[-\s]|$)/i;
+            const discRegex = /(?:^|[^A-Za-z])(FS|CF|WSA|WS|CP|AE|VFS|Indoor|IN)(?=\d|[-\s]|$)/i;
             const discMatch = example.match(discRegex);
 
             if (!discMatch) {
@@ -2270,7 +2270,13 @@
             const beforeDisc = example.substring(0, discIndex);
             const afterDisc = example.substring(discIndex + discipline.length);
 
-            document.getElementById('tplDiscipline').value = discipline;
+            // WSA = Wingsuit Acrobatic: set discipline to WS and subcategory to acrobatic
+            if (discipline === 'WSA') {
+                document.getElementById('tplDiscipline').value = 'WS';
+                document.getElementById('tplSubcategory').value = 'Acrobatic';
+            } else {
+                document.getElementById('tplDiscipline').value = discipline;
+            }
 
             // Parse what's BEFORE the discipline (prefix, year, competition)
             // Pattern: "2018 WPC - 2018FAIWorldParachutingChampionships " or "2018FAIWorldChamps "
@@ -2384,6 +2390,7 @@
                     'FS': 'fs',
                     'CF': 'cf',
                     'WS': 'ws',
+                    'WSA': 'ws',
                     'CP': 'cp',
                     'AE': 'ae',
                     'VFS': 'fs',
@@ -2548,7 +2555,7 @@
                     if (discipline) {
                         const catSelect = document.getElementById('patternCategory');
                         const disciplineMap = {
-                            'FS': 'fs', 'CF': 'cf', 'WS': 'ws', 'CP': 'cp',
+                            'FS': 'fs', 'CF': 'cf', 'WS': 'ws', 'WSA': 'ws', 'CP': 'cp',
                             'AE': 'ae', 'VFS': 'fs', 'MFS': 'fs', 'WP': 'wp', 'SP': 'sp',
                             'INDOOR': 'indoor', 'IN': 'indoor'
                         };
