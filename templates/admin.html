@@ -334,8 +334,8 @@
                 class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center cursor-pointer hover:border-purple-500 transition"
                 ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
                 onclick="document.getElementById('fileInput').click()">
-                <input type="file" id="fileInput" multiple accept="video/*,.mts,.m2ts,.avi,.mkv" class="hidden" onchange="handleFileSelect(event)">
-                <input type="file" id="usbFileInput" multiple accept="video/*,.mts,.m2ts,.avi,.mkv" class="hidden" onchange="handleUsbFileSelect(event)">
+                <input type="file" id="fileInput" multiple accept="video/*,.mts,.m2ts,.avi,.mkv,.csv" class="hidden" onchange="handleFileSelect(event)">
+                <input type="file" id="usbFileInput" multiple accept="video/*,.mts,.m2ts,.avi,.mkv,.csv" class="hidden" onchange="handleUsbFileSelect(event)">
                 <svg class="w-12 h-12 mx-auto text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                 </svg>
@@ -397,16 +397,44 @@
                         <button onclick="bulkAssignEvent()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm">Assign to Visible</button>
                     </div>
                 </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1">Bulk Rename (Find &amp; Replace)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="bulkFindInput" placeholder="Find text..." class="px-3 py-2 rounded bg-gray-700 text-white w-36">
+                        <input type="text" id="bulkReplaceInput" placeholder="Replace with..." class="px-3 py-2 rounded bg-gray-700 text-white w-36">
+                        <button onclick="bulkRenameVideos()" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded text-sm">Apply to Selected</button>
+                        <span id="bulkRenameCount" class="text-gray-500 text-sm self-center"></span>
+                    </div>
+                </div>
                 <div class="flex items-end gap-2">
                     <button onclick="sortByTeamRound()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm">Sort by Team/Round</button>
+                    <div class="flex gap-1 ml-2">
+                        <button onclick="toggleView('card')" id="cardViewBtn" class="px-2 py-2 rounded text-sm bg-blue-600 hover:bg-blue-700" title="Card view">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                        </button>
+                        <button onclick="toggleView('list')" id="listViewBtn" class="px-2 py-2 rounded text-sm bg-gray-600 hover:bg-gray-500" title="List view">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+                        </button>
+                    </div>
                     <span id="videoFilterCount" class="text-gray-500 text-sm"></span>
+                </div>
+            </div>
+            <!-- List View Header (hidden by default) -->
+            <div id="listViewHeader" class="hidden bg-gray-900 rounded-t-lg px-4 py-2 text-sm text-gray-400 font-semibold">
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" class="w-4 h-4 rounded">
+                    <span class="flex-1">Title</span>
+                    <span class="w-20 text-center">Category</span>
+                    <span class="w-32 text-center">Discipline</span>
+                    <span class="w-32 text-center">Actions</span>
                 </div>
             </div>
             <div class="space-y-3 max-h-[800px] overflow-y-auto" id="videoListContainer">
                 {% if videos %}
                 {% for video in videos %}
                 <div class="bg-gray-700 rounded-lg p-4 video-list-item" data-video-id="{{ video.id }}" data-event="{{ video.event|default('', true) }}">
-                    <div class="flex gap-4">
+                    <!-- Card View (default) -->
+                    <div class="card-view-content flex gap-4">
                         <div class="w-32 h-20 bg-gray-600 rounded flex-shrink-0 overflow-hidden">
                             {% if video.thumbnail %}
                             <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="w-full h-full object-cover">
@@ -415,7 +443,7 @@
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
                                 <input type="text" value="{{ video.title }}"
-                                    class="flex-1 font-semibold text-white bg-transparent border-b border-transparent hover:border-gray-500 focus:border-blue-500 focus:outline-none px-1 py-0.5"
+                                    class="video-title-input flex-1 font-semibold text-white bg-transparent border-b border-transparent hover:border-gray-500 focus:border-blue-500 focus:outline-none px-1 py-0.5"
                                     onchange="quickRenameVideo('{{ video.id }}', this.value)"
                                     onkeydown="if(event.key==='Enter'){this.blur();}">
                             </div>
@@ -459,6 +487,42 @@
                                     class="text-red-400 hover:text-red-300 text-sm">Delete</button>
                                 <a href="/video/{{ video.id }}" target="_blank"
                                     class="text-gray-400 hover:text-gray-300 text-sm">View</a>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- List View (hidden by default) -->
+                    <div class="list-view-content hidden">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="video-checkbox w-4 h-4 rounded" data-video-id="{{ video.id }}">
+                            <input type="text" value="{{ video.title }}"
+                                class="video-title-input flex-1 text-white bg-transparent border-b border-transparent hover:border-gray-500 focus:border-blue-500 focus:outline-none px-1 py-0.5 text-sm"
+                                onchange="quickRenameVideo('{{ video.id }}', this.value)"
+                                onkeydown="if(event.key==='Enter'){this.blur();}">
+                            <select onchange="quickChangeCategory('{{ video.id }}', this.value, this)"
+                                class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-blue-500 w-20"
+                                data-video-id="{{ video.id }}">
+                                {% for cat_id, cat in categories.items() %}
+                                <option value="{{ cat_id }}" {% if cat_id == video.category %}selected{% endif %}>{{ cat.abbrev }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" value="{{ video.event|default('', true) }}"
+                                list="eventListL_{{ video.id }}"
+                                placeholder="No discipline"
+                                class="bg-cyan-700 text-white px-2 py-0.5 rounded text-xs w-32 event-input"
+                                data-video-id="{{ video.id }}"
+                                onchange="quickChangeEvent('{{ video.id }}', this.value)">
+                            <datalist id="eventListL_{{ video.id }}">
+                                {% for event in events %}
+                                <option value="{{ event }}">
+                                {% endfor %}
+                            </datalist>
+                            <div class="flex gap-2 w-32 justify-center">
+                                <button onclick="editVideo('{{ video.id }}')"
+                                    class="text-blue-400 hover:text-blue-300 text-xs">Details</button>
+                                <button onclick="deleteVideo('{{ video.id }}')"
+                                    class="text-red-400 hover:text-red-300 text-xs">Delete</button>
+                                <a href="/video/{{ video.id }}" target="_blank"
+                                    class="text-gray-400 hover:text-gray-300 text-xs">View</a>
                             </div>
                         </div>
                     </div>
@@ -801,9 +865,25 @@
                     allFiles = Array.from(e.dataTransfer.files).map(f => ({ file: f, event: '', category: '' }));
                 }
 
-                // Filter for video files
+                // Separate video files and CSV files
                 const videoFiles = allFiles.filter(f => f.file.type.startsWith('video/') ||
                     f.file.name.toLowerCase().match(/\.(mp4|webm|mov|m4v|ogg|ogv|mts|m2ts|avi|mkv)$/));
+                const csvFiles = allFiles.filter(f => f.file.name.toLowerCase().endsWith('.csv'));
+
+                // Match CSV files to videos by base filename (for WS uploads)
+                if (csvFiles.length > 0) {
+                    const csvMap = {};
+                    csvFiles.forEach(f => {
+                        const baseName = f.file.name.replace(/\.[^/.]+$/, '').toLowerCase();
+                        csvMap[baseName] = f.file;
+                    });
+                    videoFiles.forEach(vf => {
+                        const baseName = vf.file.name.replace(/\.[^/.]+$/, '').toLowerCase();
+                        if (csvMap[baseName]) {
+                            vf.csvFile = csvMap[baseName];
+                        }
+                    });
+                }
 
                 // Restore drop zone
                 dropZone.innerHTML = originalContent;
@@ -943,11 +1023,21 @@
                 // Filter for video files
                 const videoFiles = files.filter(f => f.type.startsWith('video/') ||
                     f.name.toLowerCase().match(/\.(mp4|webm|mov|m4v|ogg|ogv|mts|m2ts|avi|mkv)$/));
+                // Collect CSV files and match by base filename
+                const csvFiles = files.filter(f => f.name.toLowerCase().endsWith('.csv'));
+                const csvMap = {};
+                csvFiles.forEach(f => {
+                    const baseName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
+                    csvMap[baseName] = f;
+                });
 
                 if (videoFiles.length > 0) {
                     const wasUploading = isUploading;
-                    // Convert to new format with empty metadata
-                    const filesWithMeta = videoFiles.map(f => ({ file: f, event: '', category: '' }));
+                    // Convert to new format with empty metadata + matched CSV
+                    const filesWithMeta = videoFiles.map(f => {
+                        const baseName = f.name.replace(/\.[^/.]+$/, '').toLowerCase();
+                        return { file: f, event: '', category: '', csvFile: csvMap[baseName] || null };
+                    });
                     uploadQueue.push(...filesWithMeta);
                     updateQueueStatus();
 
@@ -1106,7 +1196,7 @@
             }
 
             for (let i = 0; i < filesWithMeta.length; i++) {
-                let { file, event: fileEvent, category: fileCategory } = filesWithMeta[i];
+                let { file, event: fileEvent, category: fileCategory, csvFile } = filesWithMeta[i];
 
                 // Use folder-detected values, or fall back to manual inputs
                 const eventToUse = fileEvent || manualEvent;
@@ -1146,6 +1236,10 @@
                 // Send label format for team/round parsing
                 if (labelFormat && labelFormat !== 'auto') {
                     formData.append('label_format', labelFormat);
+                }
+                // Include matching CSV file (for WS videos)
+                if (csvFile) {
+                    formData.append('csv_file', csvFile);
                 }
 
                 const ext = file.name.split('.').pop().toLowerCase();
@@ -2705,10 +2799,11 @@
                     {id: '2way_mfs', name: '2-Way MFS'},
                     {id: '8way', name: '8-Way'},
                     {id: '16way', name: '16-Way'},
-                    {id: '10way', name: '10-Way'},
+                    {id: '10way', name: '10-Way'}
+                ],
+                'indoor': [
                     {id: 'indoor_4way_fs', name: 'Indoor 4-Way FS'},
                     {id: 'indoor_4way_vfs', name: 'Indoor 4-Way VFS'},
-                    {id: 'indoor_2way_fs', name: 'Indoor 2-Way FS'},
                     {id: 'indoor_2way_vfs', name: 'Indoor 2-Way VFS'},
                     {id: 'indoor_8way', name: 'Indoor 8-Way'}
                 ],
@@ -3093,6 +3188,144 @@
                 const result = await response.json();
                 if (!result.success) {
                     alert(result.error || 'Failed to rename');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // View toggle: card vs list
+        function toggleView(mode) {
+            localStorage.setItem('videoViewMode', mode);
+            const cardBtn = document.getElementById('cardViewBtn');
+            const listBtn = document.getElementById('listViewBtn');
+            const listHeader = document.getElementById('listViewHeader');
+            const container = document.getElementById('videoListContainer');
+
+            if (mode === 'list') {
+                cardBtn.className = 'px-2 py-2 rounded text-sm bg-gray-600 hover:bg-gray-500';
+                listBtn.className = 'px-2 py-2 rounded text-sm bg-blue-600 hover:bg-blue-700';
+                listHeader.classList.remove('hidden');
+                container.classList.remove('space-y-3');
+                container.classList.add('space-y-1');
+                container.querySelectorAll('.video-list-item').forEach(item => {
+                    item.classList.remove('p-4');
+                    item.classList.add('px-4', 'py-1');
+                    item.querySelector('.card-view-content')?.classList.add('hidden');
+                    item.querySelector('.list-view-content')?.classList.remove('hidden');
+                });
+            } else {
+                cardBtn.className = 'px-2 py-2 rounded text-sm bg-blue-600 hover:bg-blue-700';
+                listBtn.className = 'px-2 py-2 rounded text-sm bg-gray-600 hover:bg-gray-500';
+                listHeader.classList.add('hidden');
+                container.classList.remove('space-y-1');
+                container.classList.add('space-y-3');
+                container.querySelectorAll('.video-list-item').forEach(item => {
+                    item.classList.remove('px-4', 'py-1');
+                    item.classList.add('p-4');
+                    item.querySelector('.card-view-content')?.classList.remove('hidden');
+                    item.querySelector('.list-view-content')?.classList.add('hidden');
+                });
+            }
+        }
+
+        // Restore saved view mode on page load
+        (function() {
+            const savedMode = localStorage.getItem('videoViewMode');
+            if (savedMode === 'list') {
+                toggleView('list');
+            }
+        })();
+
+        // Select all checkboxes
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAllCheckbox');
+            const checkboxes = document.querySelectorAll('.video-checkbox');
+            checkboxes.forEach(cb => {
+                const item = cb.closest('.video-list-item');
+                if (item && item.style.display !== 'none') {
+                    cb.checked = selectAll.checked;
+                }
+            });
+            updateBulkRenameCount();
+        }
+
+        // Get selected video IDs (from checkboxes)
+        function getSelectedVideoIds() {
+            const checked = document.querySelectorAll('.video-checkbox:checked');
+            return Array.from(checked).map(cb => cb.dataset.videoId);
+        }
+
+        // Update bulk rename preview count
+        function updateBulkRenameCount() {
+            const findText = document.getElementById('bulkFindInput')?.value || '';
+            const selected = getSelectedVideoIds();
+            const countEl = document.getElementById('bulkRenameCount');
+            if (!countEl) return;
+
+            if (selected.length > 0) {
+                countEl.textContent = `${selected.length} selected`;
+            } else {
+                const visible = document.querySelectorAll('.video-list-item:not([style*="display: none"])');
+                countEl.textContent = `${visible.length} visible`;
+            }
+        }
+
+        // Listen for checkbox changes
+        document.addEventListener('change', function(e) {
+            if (e.target.classList.contains('video-checkbox')) {
+                updateBulkRenameCount();
+            }
+        });
+
+        // Bulk rename: find & replace on selected (or all visible) videos
+        async function bulkRenameVideos() {
+            const findText = document.getElementById('bulkFindInput').value;
+            const replaceText = document.getElementById('bulkReplaceInput').value;
+            if (!findText) {
+                alert('Please enter text to find');
+                return;
+            }
+
+            let videoIds = getSelectedVideoIds();
+            let targetLabel = 'selected';
+
+            // If none selected, use all visible
+            if (videoIds.length === 0) {
+                const visibleItems = document.querySelectorAll('.video-list-item:not([style*="display: none"])');
+                videoIds = Array.from(visibleItems).map(item => item.dataset.videoId);
+                targetLabel = 'visible';
+            }
+
+            if (videoIds.length === 0) {
+                alert('No videos to rename');
+                return;
+            }
+
+            if (!confirm(`Replace "${findText}" with "${replaceText}" in ${videoIds.length} ${targetLabel} video(s)?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/bulk-rename-videos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_ids: videoIds, find: findText, replace: replaceText })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert(`Renamed ${result.renamed_count} video(s)`);
+                    // Update title inputs in the DOM
+                    videoIds.forEach(vid => {
+                        const item = document.querySelector(`.video-list-item[data-video-id="${vid}"]`);
+                        if (item) {
+                            item.querySelectorAll('.video-title-input').forEach(input => {
+                                input.value = input.value.split(findText).join(replaceText);
+                            });
+                        }
+                    });
+                } else {
+                    alert(result.error || 'Bulk rename failed');
                 }
             } catch (error) {
                 alert('Error: ' + error.message);
@@ -3854,10 +4087,12 @@
                                 <option value="4way_fs">4-Way FS</option>
                                 <option value="8way">8-Way</option>
                                 <option value="4way_vfs">4-Way VFS</option>
+                            </optgroup>
+                            <optgroup label="Indoor">
                                 <option value="indoor_4way_fs">Indoor 4-Way FS</option>
                                 <option value="indoor_4way_vfs">Indoor 4-Way VFS</option>
-                                <option value="indoor_2way_fs">Indoor 2-Way FS</option>
                                 <option value="indoor_2way_vfs">Indoor 2-Way VFS</option>
+                                <option value="indoor_8way">Indoor 8-Way</option>
                             </optgroup>
                             <optgroup label="AE">
                                 <option value="freefly">Freefly</option>

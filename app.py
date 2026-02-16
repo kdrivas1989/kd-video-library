@@ -479,7 +479,6 @@ EVENT_DISPLAY_NAMES = {
     'sp_mixed_team': 'SP Mixed Team',
     'indoor_4way_fs': 'Indoor 4-Way FS',
     'indoor_4way_vfs': 'Indoor 4-Way VFS',
-    'indoor_2way_fs': 'Indoor 2-Way FS',
     'indoor_2way_vfs': 'Indoor 2-Way VFS',
     'indoor_8way': 'Indoor 8-Way',
     'indoor_freestyle': 'Indoor Freestyle',
@@ -1207,9 +1206,15 @@ CATEGORIES = {
             {'id': '8way', 'name': '8-Way'},
             {'id': '16way', 'name': '16-Way'},
             {'id': '10way', 'name': '10-Way'},
+        ]
+    },
+    'indoor': {
+        'name': 'Indoor',
+        'abbrev': 'IN',
+        'description': 'Indoor skydiving competition videos',
+        'subcategories': [
             {'id': 'indoor_4way_fs', 'name': 'Indoor 4-Way FS'},
             {'id': 'indoor_4way_vfs', 'name': 'Indoor 4-Way VFS'},
-            {'id': 'indoor_2way_fs', 'name': 'Indoor 2-Way FS'},
             {'id': 'indoor_2way_vfs', 'name': 'Indoor 2-Way VFS'},
             {'id': 'indoor_8way', 'name': 'Indoor 8-Way'}
         ]
@@ -2868,22 +2873,20 @@ def parse_filename_metadata(filename, folder_path=''):
         team_part = parts[2]
         round_part = parts[3] if len(parts) > 3 else ''
 
-        # Map event types to category and subcategory (indoor events now under fs)
+        # Map event types to category and subcategory
         event_type_mapping = {
-            'fs4-way-open': ('fs', 'indoor_4way_fs', 'open'),
-            'fs4-way-female': ('fs', 'indoor_4way_fs', 'female'),
-            'fs4-way-junior': ('fs', 'indoor_4way_fs', 'junior'),
-            'fs8-way-open': ('fs', 'indoor_8way', 'open'),
-            'fs8-way-female': ('fs', 'indoor_8way', 'female'),
-            'vfs-open': ('fs', 'indoor_4way_vfs', 'open'),
-            'vfs-female': ('fs', 'indoor_4way_vfs', 'female'),
-            '2way-mfs': ('fs', 'indoor_2way_fs', 'open'),
-            '2way-fs': ('fs', 'indoor_2way_fs', 'open'),
-            '2way-vfs': ('fs', 'indoor_2way_vfs', 'open'),
-            'fs-4way-open': ('fs', 'indoor_4way_fs', 'open'),
-            'fs-4way-female': ('fs', 'indoor_4way_fs', 'female'),
-            'fs-8way-open': ('fs', 'indoor_8way', 'open'),
-            'fs-8way-female': ('fs', 'indoor_8way', 'female'),
+            'fs4-way-open': ('indoor', 'indoor_4way_fs', 'open'),
+            'fs4-way-female': ('indoor', 'indoor_4way_fs', 'female'),
+            'fs4-way-junior': ('indoor', 'indoor_4way_fs', 'junior'),
+            'fs8-way-open': ('indoor', 'indoor_8way', 'open'),
+            'fs8-way-female': ('indoor', 'indoor_8way', 'female'),
+            'vfs-open': ('indoor', 'indoor_4way_vfs', 'open'),
+            'vfs-female': ('indoor', 'indoor_4way_vfs', 'female'),
+            '2way-vfs': ('indoor', 'indoor_2way_vfs', 'open'),
+            'fs-4way-open': ('indoor', 'indoor_4way_fs', 'open'),
+            'fs-4way-female': ('indoor', 'indoor_4way_fs', 'female'),
+            'fs-8way-open': ('indoor', 'indoor_8way', 'open'),
+            'fs-8way-female': ('indoor', 'indoor_8way', 'female'),
             # USPA competition formats
             'freeflying-open': ('ae', 'freefly', 'open'),
             'freeflying-advanced': ('ae', 'freefly', 'advanced'),
@@ -2985,17 +2988,18 @@ def parse_filename_metadata(filename, folder_path=''):
             'zone_accuracy': [r'zone', r'zone.?accuracy']
         },
         'fs': {
-            'indoor_4way_fs': [r'indoor.*4.?way(?!.*vfs)', r'indoor.*fs.?4'],
-            'indoor_4way_vfs': [r'indoor.*vfs', r'indoor.*vertical'],
-            'indoor_2way_fs': [r'indoor.*2.?way(?!.*vfs)', r'indoor.*mfs'],
-            'indoor_2way_vfs': [r'indoor.*2.?way.*vfs'],
-            'indoor_8way': [r'indoor.*8.?way'],
             '4way_fs': [r'\b4.?way\b(?!.*vfs)', r'4way.?fs'],
             '4way_vfs': [r'vfs', r'vertical', r'4.?way.?vfs'],
             '2way_mfs': [r'2.?way', r'mfs'],
             '8way': [r'\b8.?way\b'],
             '10way': [r'\b10.?way\b'],
             '16way': [r'\b16.?way\b']
+        },
+        'indoor': {
+            'indoor_4way_fs': [r'indoor.*4.?way(?!.*vfs)', r'indoor.*fs.?4'],
+            'indoor_4way_vfs': [r'indoor.*vfs', r'indoor.*vertical'],
+            'indoor_2way_vfs': [r'indoor.*2.?way.*vfs'],
+            'indoor_8way': [r'indoor.*8.?way'],
         },
         'cf': {
             '4way': [r'\b4.?way\b'],
@@ -3016,12 +3020,15 @@ def parse_filename_metadata(filename, folder_path=''):
             if metadata['subcategory']:
                 break
 
-    # If indoor content and fs category, prefix subcategory with indoor_
+    # If indoor content, switch to indoor category and prefix subcategory
     if is_indoor_content and metadata['category'] == 'fs' and metadata['subcategory']:
         if not metadata['subcategory'].startswith('indoor_'):
             indoor_sub = f"indoor_{metadata['subcategory']}"
-            if indoor_sub in ['indoor_4way_fs', 'indoor_4way_vfs', 'indoor_2way_fs', 'indoor_2way_vfs', 'indoor_8way']:
+            if indoor_sub in ['indoor_4way_fs', 'indoor_4way_vfs', 'indoor_2way_vfs', 'indoor_8way']:
                 metadata['subcategory'] = indoor_sub
+                metadata['category'] = 'indoor'
+        else:
+            metadata['category'] = 'indoor'
 
     # Event detection from folder path and filename
     folder_parts = folder_path.split(os.sep)
@@ -3194,13 +3201,6 @@ def detect_category_from_filename(filename):
             'zone_accuracy': ['zone', 'pond swoop']
         },
         'fs': {
-            # Indoor subcategories (check first when is_indoor)
-            'indoor_2way_vfs': ['indoor 2way vfs', 'indoor 2-way vfs', '2way vfs', '2-way vfs', '2wayvfs'],
-            'indoor_4way_vfs': ['indoor 4way vfs', 'indoor 4-way vfs', '4way vfs', '4-way vfs', '4wayvfs', 'indoor vfs'],
-            'indoor_2way_fs': ['indoor 2way', 'indoor 2-way', 'indoor 2 way'],
-            'indoor_4way_fs': ['indoor 4way', 'indoor 4-way', 'indoor 4 way'],
-            'indoor_8way': ['indoor 8way', 'indoor 8-way', 'indoor 8 way'],
-            # Regular FS subcategories
             '4way_vfs': ['vfs', 'vertical'],
             '4way_fs': ['4way', '4-way', '4 way'],
             '2way_mfs': ['2way', '2-way', '2 way', 'mfs'],
@@ -3265,12 +3265,14 @@ def detect_category_from_filename(filename):
             if detected_subcategory:
                 break
 
-        # If indoor was detected but no indoor-specific subcategory found, prefix with indoor_
+        # If indoor was detected, switch to indoor category and prefix subcategory
         if is_indoor and detected_category == 'fs' and detected_subcategory and not detected_subcategory.startswith('indoor_'):
             indoor_sub = f'indoor_{detected_subcategory}'
-            # Check if this indoor subcategory exists
-            if indoor_sub in ['indoor_4way_fs', 'indoor_4way_vfs', 'indoor_2way_fs', 'indoor_2way_vfs', 'indoor_8way']:
+            if indoor_sub in ['indoor_4way_fs', 'indoor_4way_vfs', 'indoor_2way_vfs', 'indoor_8way']:
                 detected_subcategory = indoor_sub
+                detected_category = 'indoor'
+        elif is_indoor and detected_category == 'fs' and detected_subcategory and detected_subcategory.startswith('indoor_'):
+            detected_category = 'indoor'
 
     # Detect event name
     for pattern, replacement in event_patterns:
@@ -5529,6 +5531,18 @@ def upload_video():
     if not title:
         title = os.path.splitext(filename)[0].replace('_', ' ').replace('-', ' ')
 
+    # Handle matching CSV file (for WS videos)
+    csv_saved = False
+    if 'csv_file' in request.files:
+        csv_file = request.files['csv_file']
+        if csv_file and csv_file.filename:
+            csv_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'flysight')
+            os.makedirs(csv_folder, exist_ok=True)
+            csv_filename = f"{video_id}.csv"
+            csv_path = os.path.join(csv_folder, csv_filename)
+            csv_file.save(csv_path)
+            csv_saved = True
+
     needs_conversion = ext in CONVERSION_FORMATS
 
     try:
@@ -5553,7 +5567,7 @@ def upload_video():
                 'thumbnail': None,
                 'category': category,
                 'subcategory': subcategory,
-                'tags': '',
+                'tags': 'flysight_csv' if csv_saved else '',
                 'duration': None,
                 'created_at': datetime.now().isoformat(),
                 'views': 0,
@@ -5628,7 +5642,7 @@ def upload_video():
                 'thumbnail': None,
                 'category': category,
                 'subcategory': subcategory,
-                'tags': '',
+                'tags': 'flysight_csv' if csv_saved else '',
                 'duration': None,
                 'created_at': datetime.now().isoformat(),
                 'views': 0,
@@ -7572,6 +7586,41 @@ def edit_video(video_id):
         'auto_moved': auto_moved,
         'learned_patterns': learned_patterns
     })
+
+
+@app.route('/admin/bulk-rename-videos', methods=['POST'])
+@admin_required
+def bulk_rename_videos():
+    """Bulk find & replace in video titles."""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        video_ids = data.get('video_ids', [])
+        find_text = data.get('find', '')
+        replace_text = data.get('replace', '')
+
+        if not video_ids:
+            return jsonify({'error': 'No video IDs provided'}), 400
+        if not find_text:
+            return jsonify({'error': 'Find text is required'}), 400
+
+        renamed_count = 0
+        for vid in video_ids:
+            video = get_video(vid)
+            if not video:
+                continue
+            old_title = video.get('title', '')
+            if find_text in old_title:
+                video['title'] = old_title.replace(find_text, replace_text)
+                save_video(video)
+                renamed_count += 1
+
+        return jsonify({'success': True, 'renamed_count': renamed_count})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/admin/quick-categorize', methods=['POST'])
