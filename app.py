@@ -1647,84 +1647,28 @@ def init_db():
 def get_all_videos():
     """Get all videos from database."""
     if USE_SUPABASE:
-        # First get exact count to verify we fetch everything
-        count_result = supabase.table('videos').select('id', count='exact').limit(1).execute()
-        expected_count = count_result.count if count_result.count else 0
-        print(f"[get_all_videos] Expected total: {expected_count}")
-
-        # Cursor-based pagination using created_at + id to handle duplicates
+        # Cursor-based pagination using id to bypass Supabase max_rows limit
         all_videos = []
-        batch_size = 200
-        page = 0
+        batch_size = 500
+        last_id = None
+        batch_num = 0
 
         while True:
-            start = page * batch_size
-            end = start + batch_size - 1
-            result = supabase.table('videos').select('*').order('created_at', desc=True).order('id').range(start, end).execute()
+            batch_num += 1
+            query = supabase.table('videos').select('*').order('id', desc=False).limit(batch_size)
+            if last_id is not None:
+                query = query.gt('id', last_id)
+            result = query.execute()
             fetched = len(result.data) if result.data else 0
-            print(f"[get_all_videos] page {page}: range({start},{end}) fetched {fetched}")
+            print(f"[get_all_videos] cursor batch {batch_num}: fetched {fetched}, last_id={last_id}")
             if not result.data:
                 break
             all_videos.extend(result.data)
-            page += 1
+            last_id = result.data[-1]['id']
             if fetched < batch_size:
                 break
-            # Safety: if we've fetched enough based on count, stop
-            if expected_count > 0 and len(all_videos) >= expected_count:
-                break
 
-        # If range() hit a wall (Supabase max_rows), fall back to cursor-based by id
-        if expected_count > 0 and len(all_videos) < expected_count:
-            print(f"[get_all_videos] range() only got {len(all_videos)}/{expected_count}, trying cursor-based...")
-            all_videos = []
-            last_id = None
-            batch_num = 0
-            while True:
-                batch_num += 1
-                query = supabase.table('videos').select('*').order('id', desc=False).limit(batch_size)
-                if last_id is not None:
-                    query = query.gt('id', last_id)
-                result = query.execute()
-                fetched = len(result.data) if result.data else 0
-                print(f"[get_all_videos] cursor batch {batch_num}: fetched {fetched}, last_id={last_id}")
-                if not result.data:
-                    break
-                all_videos.extend(result.data)
-                last_id = result.data[-1]['id']
-                if fetched < batch_size:
-                    break
-                if len(all_videos) >= expected_count:
-                    break
-
-        # If still not enough, try fetching remaining IDs we might have missed
-        if expected_count > 0 and len(all_videos) < expected_count:
-            print(f"[get_all_videos] cursor got {len(all_videos)}/{expected_count}, trying id-list approach...")
-            # Get all IDs first (smaller payload)
-            all_ids = []
-            last_id = None
-            while True:
-                query = supabase.table('videos').select('id').order('id', desc=False).limit(batch_size)
-                if last_id is not None:
-                    query = query.gt('id', last_id)
-                result = query.execute()
-                if not result.data:
-                    break
-                all_ids.extend([r['id'] for r in result.data])
-                last_id = result.data[-1]['id']
-                if len(result.data) < batch_size:
-                    break
-            print(f"[get_all_videos] got {len(all_ids)} IDs")
-
-            # Fetch full records by ID in batches
-            fetched_ids = {v['id'] for v in all_videos}
-            missing_ids = [vid for vid in all_ids if vid not in fetched_ids]
-            for i in range(0, len(missing_ids), 50):
-                batch_ids = missing_ids[i:i+50]
-                result = supabase.table('videos').select('*').in_('id', batch_ids).execute()
-                if result.data:
-                    all_videos.extend(result.data)
-
-        print(f"[get_all_videos] FINAL TOTAL: {len(all_videos)} videos fetched (expected {expected_count})")
+        print(f"[get_all_videos] FINAL TOTAL: {len(all_videos)} videos fetched")
         all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
         return all_videos
     else:
