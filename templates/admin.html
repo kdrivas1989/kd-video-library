@@ -404,6 +404,11 @@
                             {% endfor %}
                         </datalist>
                         <button onclick="bulkAssignEvent()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm">Assign to Visible</button>
+                        <button id="bulkSaveBtn" onclick="bulkSaveAllChanges()" class="hidden bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span id="bulkSaveLabel">Save Changes</span>
+                        </button>
+                        <button id="bulkDiscardBtn" onclick="discardAllChanges()" class="hidden bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded text-sm">Discard</button>
                     </div>
                 </div>
                 <div>
@@ -546,16 +551,6 @@
                 {% endif %}
             </div>
         </div>
-    </div>
-
-    <!-- Floating Save Button -->
-    <div id="bulkSaveBar" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full shadow-lg cursor-pointer flex items-center gap-3 transition-all"
-        onclick="bulkSaveAllChanges()">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-        <span id="bulkSaveLabel" class="font-semibold text-sm">Save 0 Changes</span>
-        <button onclick="event.stopPropagation(); discardAllChanges();" class="ml-2 text-white/70 hover:text-white text-xs underline">Discard</button>
     </div>
 
     <!-- Bulk Upload Modal -->
@@ -3234,13 +3229,18 @@
 
         function updateSaveBar() {
             const count = Object.keys(pendingChanges).length;
-            const bar = document.getElementById('bulkSaveBar');
+            const btn = document.getElementById('bulkSaveBtn');
+            const discardBtn = document.getElementById('bulkDiscardBtn');
             const label = document.getElementById('bulkSaveLabel');
             if (count > 0) {
                 label.textContent = `Save ${count} Change${count !== 1 ? 's' : ''}`;
-                bar.classList.remove('hidden');
+                btn.classList.remove('hidden');
+                btn.classList.add('flex');
+                discardBtn.classList.remove('hidden');
             } else {
-                bar.classList.add('hidden');
+                btn.classList.add('hidden');
+                btn.classList.remove('flex');
+                discardBtn.classList.add('hidden');
             }
         }
 
@@ -3248,10 +3248,10 @@
             const changes = Object.entries(pendingChanges).map(([id, fields]) => ({ id, ...fields }));
             if (changes.length === 0) return;
 
-            const bar = document.getElementById('bulkSaveBar');
+            const btn = document.getElementById('bulkSaveBtn');
             const label = document.getElementById('bulkSaveLabel');
             label.textContent = 'Saving...';
-            bar.classList.add('pointer-events-none', 'opacity-70');
+            btn.classList.add('pointer-events-none', 'opacity-70');
 
             try {
                 const response = await fetch('/admin/bulk-save-videos', {
@@ -3285,14 +3285,14 @@
                     Object.keys(pendingChanges).forEach(k => delete pendingChanges[k]);
                     updateSaveBar();
                     label.textContent = `Saved ${result.saved_count} video${result.saved_count !== 1 ? 's' : ''}`;
-                    setTimeout(() => bar.classList.add('hidden'), 1500);
+                    setTimeout(() => updateSaveBar(), 1500);
                 } else {
                     alert(result.error || 'Save failed');
                 }
             } catch (error) {
                 alert('Error: ' + error.message);
             } finally {
-                bar.classList.remove('pointer-events-none', 'opacity-70');
+                btn.classList.remove('pointer-events-none', 'opacity-70');
             }
         }
 
