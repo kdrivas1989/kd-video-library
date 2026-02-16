@@ -1647,23 +1647,22 @@ def init_db():
 def get_all_videos():
     """Get all videos from database."""
     if USE_SUPABASE:
-        # Get exact total count first
-        count_result = supabase.table('videos').select('id', count='exact').limit(1).execute()
-        total = count_result.count or 0
-        if total == 0:
-            return []
-
+        # Use cursor-based pagination with id to avoid Supabase range() limits
         all_videos = []
-        batch_size = 500  # Smaller batches to avoid Supabase row limits
-        offset = 0
-        while offset < total:
-            result = supabase.table('videos').select('*').order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
+        batch_size = 500
+        last_id = ''
+
+        while True:
+            result = supabase.table('videos').select('*').order('id').gt('id', last_id).limit(batch_size).execute()
             if not result.data:
-                print(f"[WARN] get_all_videos: empty response at offset {offset}, expected {total} total, got {len(all_videos)} so far")
                 break
             all_videos.extend(result.data)
-            print(f"[PAGINATION] get_all_videos: fetched {len(all_videos)}/{total}")
-            offset += batch_size
+            last_id = result.data[-1]['id']
+            if len(result.data) < batch_size:
+                break
+
+        # Sort by created_at descending for display
+        all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
         return all_videos
     else:
         db = get_sqlite_db()
@@ -1680,40 +1679,38 @@ def get_videos_by_category(category, subcategory=None):
 
         # Special handling for uncategorized - include videos not in valid categories
         if category == 'uncategorized':
-            # Get total count of all videos first
-            count_result = supabase.table('videos').select('id', count='exact').limit(1).execute()
-            total = count_result.count or 0
+            # Cursor-based pagination through all videos, filtering client-side
             all_videos = []
-            offset = 0
-            while offset < total:
-                result = supabase.table('videos').select('*').order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
+            last_id = ''
+            while True:
+                result = supabase.table('videos').select('*').order('id').gt('id', last_id).limit(batch_size).execute()
                 if not result.data:
                     break
                 for v in result.data:
                     vid_cat = v.get('category', '')
                     if vid_cat not in valid_categories or vid_cat == 'uncategorized':
                         all_videos.append(v)
-                offset += batch_size
+                last_id = result.data[-1]['id']
+                if len(result.data) < batch_size:
+                    break
+            all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
             return all_videos
 
-        # Get count for this specific category
-        query = supabase.table('videos').select('id', count='exact').eq('category', category)
-        if subcategory:
-            query = query.eq('subcategory', subcategory)
-        count_result = query.limit(1).execute()
-        total = count_result.count or 0
-
+        # Cursor-based pagination for specific category
         all_videos = []
-        offset = 0
-        while offset < total:
-            query = supabase.table('videos').select('*').eq('category', category)
+        last_id = ''
+        while True:
+            query = supabase.table('videos').select('*').eq('category', category).order('id').gt('id', last_id).limit(batch_size)
             if subcategory:
                 query = query.eq('subcategory', subcategory)
-            result = query.order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
+            result = query.execute()
             if not result.data:
                 break
             all_videos.extend(result.data)
-            offset += batch_size
+            last_id = result.data[-1]['id']
+            if len(result.data) < batch_size:
+                break
+        all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
         return all_videos
     else:
         db = get_sqlite_db()
@@ -1857,21 +1854,20 @@ def get_video_count_by_category(category):
 def search_videos(query):
     """Search videos by title, description, or tags."""
     if USE_SUPABASE:
-        count_result = supabase.table('videos').select('id', count='exact').or_(
-            f"title.ilike.%{query}%,description.ilike.%{query}%,tags.ilike.%{query}%"
-        ).limit(1).execute()
-        total = count_result.count or 0
         all_videos = []
-        offset = 0
         batch_size = 500
-        while offset < total:
+        last_id = ''
+        while True:
             result = supabase.table('videos').select('*').or_(
                 f"title.ilike.%{query}%,description.ilike.%{query}%,tags.ilike.%{query}%"
-            ).order('created_at', desc=True).range(offset, offset + batch_size - 1).execute()
+            ).order('id').gt('id', last_id).limit(batch_size).execute()
             if not result.data:
                 break
             all_videos.extend(result.data)
-            offset += batch_size
+            last_id = result.data[-1]['id']
+            if len(result.data) < batch_size:
+                break
+        all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
         return all_videos
     else:
         db = get_sqlite_db()
@@ -1887,19 +1883,19 @@ def get_all_events():
     """Get all unique events."""
     try:
         if USE_SUPABASE:
-            count_result = supabase.table('videos').select('id', count='exact').limit(1).execute()
-            total = count_result.count or 0
             all_events = set()
-            offset = 0
             batch_size = 500
-            while offset < total:
-                result = supabase.table('videos').select('event').range(offset, offset + batch_size - 1).execute()
+            last_id = ''
+            while True:
+                result = supabase.table('videos').select('id, event').order('id').gt('id', last_id).limit(batch_size).execute()
                 if not result.data:
                     break
                 for v in result.data:
                     if v.get('event'):
                         all_events.add(v['event'])
-                offset += batch_size
+                last_id = result.data[-1]['id']
+                if len(result.data) < batch_size:
+                    break
             return sorted(all_events)
         else:
             db = get_sqlite_db()
@@ -1913,17 +1909,18 @@ def get_all_events():
 def get_videos_by_event(event_name):
     """Get videos by event name."""
     if USE_SUPABASE:
-        count_result = supabase.table('videos').select('id', count='exact').eq('event', event_name).limit(1).execute()
-        total = count_result.count or 0
         all_videos = []
-        offset = 0
         batch_size = 500
-        while offset < total:
-            result = supabase.table('videos').select('*').eq('event', event_name).order('title').range(offset, offset + batch_size - 1).execute()
+        last_id = ''
+        while True:
+            result = supabase.table('videos').select('*').eq('event', event_name).order('id').gt('id', last_id).limit(batch_size).execute()
             if not result.data:
                 break
             all_videos.extend(result.data)
-            offset += batch_size
+            last_id = result.data[-1]['id']
+            if len(result.data) < batch_size:
+                break
+        all_videos.sort(key=lambda v: v.get('title', ''))
         return all_videos
     else:
         db = get_sqlite_db()
@@ -2245,17 +2242,18 @@ def delete_duplicate_assignments():
     """Delete duplicate assignments (same video assigned to same judge multiple times)."""
     try:
         if USE_SUPABASE:
-            # Get all assignments
+            # Get all assignments (cursor-based)
             all_assignments = []
-            offset = 0
+            last_id = ''
             while True:
-                result = supabase.table('video_assignments').select('id, video_id, assigned_to, created_at').order('created_at', desc=False).range(offset, offset + 999).execute()
+                result = supabase.table('video_assignments').select('id, video_id, assigned_to, created_at').order('id').gt('id', last_id).limit(500).execute()
                 if not result.data:
                     break
                 all_assignments.extend(result.data)
-                offset += 1000
-                if len(result.data) < 1000:
+                last_id = result.data[-1]['id']
+                if len(result.data) < 500:
                     break
+            all_assignments.sort(key=lambda a: a.get('created_at', ''))
 
             print(f"[DEDUP] Found {len(all_assignments)} total assignments")
 
@@ -3837,22 +3835,21 @@ def debug_db_status():
         }
 
         if USE_SUPABASE:
-            # Test query with pagination to get all videos
+            # Cursor-based pagination to get all video categories
             categories = {}
             total_videos = 0
-            offset = 0
-            batch_size = 1000
+            last_id = ''
             while True:
-                result = supabase.table('videos').select('category').range(offset, offset + batch_size - 1).execute()
+                result = supabase.table('videos').select('id, category').order('id').gt('id', last_id).limit(500).execute()
                 if not result.data:
                     break
                 for v in result.data:
                     cat = v.get('category', 'unknown')
                     categories[cat] = categories.get(cat, 0) + 1
                 total_videos += len(result.data)
-                if len(result.data) < batch_size:
+                last_id = result.data[-1]['id']
+                if len(result.data) < 500:
                     break
-                offset += batch_size
             status['total_videos'] = total_videos
             status['categories'] = categories
         else:
@@ -6813,18 +6810,18 @@ def delete_vimeo_videos():
     deleted = 0
     try:
         if USE_SUPABASE:
-            # Get all Vimeo videos with pagination
-            offset = 0
-            batch_size = 1000
+            # Get all Vimeo videos with cursor-based pagination
+            last_id = ''
             while True:
-                result = supabase.table('videos').select('id, url').range(offset, offset + batch_size - 1).execute()
+                result = supabase.table('videos').select('id, url').order('id').gt('id', last_id).limit(500).execute()
                 if not result.data:
                     break
                 for video in result.data:
                     if video.get('url') and 'vimeo.com' in video['url']:
                         supabase.table('videos').delete().eq('id', video['id']).execute()
                         deleted += 1
-                if len(result.data) < batch_size:
+                last_id = result.data[-1]['id']
+                if len(result.data) < 500:
                     break
                 offset += batch_size
         else:
@@ -6882,18 +6879,17 @@ def fix_duplicates():
     removed = 0
     try:
         if USE_SUPABASE:
-            # Paginate to get all videos
+            # Cursor-based pagination to get all videos
             videos = []
-            offset = 0
-            batch_size = 1000
+            last_id = ''
             while True:
-                result = supabase.table('videos').select('*').range(offset, offset + batch_size - 1).execute()
+                result = supabase.table('videos').select('*').order('id').gt('id', last_id).limit(500).execute()
                 if not result.data:
                     break
                 videos.extend(result.data)
-                if len(result.data) < batch_size:
+                last_id = result.data[-1]['id']
+                if len(result.data) < 500:
                     break
-                offset += batch_size
         else:
             db = get_sqlite_db()
             cursor = db.execute('SELECT * FROM videos')
@@ -7929,20 +7925,19 @@ def test_thumbnail():
     """Test thumbnail generation with a single video - returns full debug info."""
     ffmpeg = get_ffmpeg_path()
 
-    # Get one video without thumbnail (paginate to find one)
+    # Get one video without thumbnail (cursor-based)
     videos = []
-    offset = 0
-    batch_size = 1000
+    last_id = ''
     while True:
-        result = supabase.table('videos').select('id, url, thumbnail').range(offset, offset + batch_size - 1).execute()
+        result = supabase.table('videos').select('id, url, thumbnail').order('id').gt('id', last_id).limit(500).execute()
         if not result.data:
             break
         videos.extend([v for v in result.data if not v.get('thumbnail')])
         if videos:  # Found at least one video without thumbnail
             break
-        if len(result.data) < batch_size:
+        last_id = result.data[-1]['id']
+        if len(result.data) < 500:
             break
-        offset += batch_size
 
     if not videos:
         return jsonify({'error': 'No videos without thumbnails'})
@@ -8013,18 +8008,17 @@ def refresh_thumbnails():
         return jsonify({'error': f'ffmpeg check failed: {str(e)}'}), 500
 
     try:
-        # Get all videos with missing thumbnails (paginate to get all)
+        # Get all videos with missing thumbnails (cursor-based)
         videos = []
-        offset = 0
-        batch_size = 1000
+        last_id = ''
         while True:
-            result = supabase.table('videos').select('id, url, thumbnail').range(offset, offset + batch_size - 1).execute()
+            result = supabase.table('videos').select('id, url, thumbnail').order('id').gt('id', last_id).limit(500).execute()
             if not result.data:
                 break
             videos.extend(result.data)
-            if len(result.data) < batch_size:
+            last_id = result.data[-1]['id']
+            if len(result.data) < 500:
                 break
-            offset += batch_size
 
         missing_thumbs = [v for v in videos if not v.get('thumbnail')]
 
