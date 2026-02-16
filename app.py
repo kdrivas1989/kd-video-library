@@ -5852,7 +5852,8 @@ def s3_status():
         'enabled': USE_S3,
         'bucket': AWS_S3_BUCKET if USE_S3 else None,
         'region': AWS_REGION if USE_S3 else None,
-        'cloudfront': AWS_CLOUDFRONT_DOMAIN if USE_S3 and AWS_CLOUDFRONT_DOMAIN else None
+        'cloudfront': AWS_CLOUDFRONT_DOMAIN if USE_S3 and AWS_CLOUDFRONT_DOMAIN else None,
+        'provider': STORAGE_PROVIDER
     })
 
 
@@ -12756,6 +12757,8 @@ def debug_status():
             'status': 'ok',
             'database': db_status,
             'supabase_connected': USE_SUPABASE,
+            'storage_provider': STORAGE_PROVIDER,
+            's3_enabled': USE_S3,
             'competitions_count': len(competitions) if competitions else 0,
             'has_event_types_column': has_event_types,
             'sample_competition': competitions[0] if competitions else None
