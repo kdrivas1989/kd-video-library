@@ -1896,7 +1896,7 @@ def search_videos(query):
 
 
 def get_all_events():
-    """Get all unique events."""
+    """Get all unique events, including empty event folders."""
     try:
         if USE_SUPABASE:
             all_events = set()
@@ -1912,11 +1912,26 @@ def get_all_events():
                 last_id = result.data[-1]['id']
                 if len(result.data) < batch_size:
                     break
+            # Also include event folders that may not have videos yet
+            try:
+                folders = supabase.table('event_folders').select('name').execute()
+                for f in (folders.data or []):
+                    if f.get('name'):
+                        all_events.add(f['name'])
+            except:
+                pass
             return sorted(all_events)
         else:
             db = get_sqlite_db()
             cursor = db.execute('SELECT DISTINCT event FROM videos WHERE event IS NOT NULL AND event != "" ORDER BY event')
-            return [row[0] for row in cursor.fetchall()]
+            events = set(row[0] for row in cursor.fetchall())
+            try:
+                cursor = db.execute('SELECT name FROM event_folders WHERE name IS NOT NULL AND name != ""')
+                for row in cursor.fetchall():
+                    events.add(row[0])
+            except:
+                pass
+            return sorted(events)
     except Exception as e:
         print(f"Error getting events: {e}")
         return []
@@ -6972,10 +6987,16 @@ def create_event_folder():
     # use them implicitly when assigning videos. Let's store explicitly.
     if USE_SUPABASE:
         try:
-            # Check if folder already exists (by checking videos with this event)
+            # Check if folder already exists (by checking videos or event_folders table)
             existing = supabase.table('videos').select('id').eq('event', name).limit(1).execute()
             if existing.data:
                 return jsonify({'success': False, 'error': 'Event folder already exists'}), 400
+            try:
+                existing_folder = supabase.table('event_folders').select('name').eq('name', name).limit(1).execute()
+                if existing_folder.data:
+                    return jsonify({'success': False, 'error': 'Event folder already exists'}), 400
+            except:
+                pass
 
             # Store in event_folders table (create if needed)
             try:
