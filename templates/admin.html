@@ -615,6 +615,17 @@
             <p id="bulkFileCount" class="text-gray-400 mb-4">0 videos selected</p>
             <div class="space-y-4">
                 <div>
+                    <label class="block text-gray-300 mb-2">Event</label>
+                    <input type="text" id="modalEvent" list="modalEventList"
+                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="e.g., Nationals 2025">
+                    <datalist id="modalEventList">
+                        {% for event in events %}
+                        <option value="{{ event }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <div>
                     <label class="block text-gray-300 mb-2">Category *</label>
                     <select id="modalCategory" required
                         class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -631,17 +642,6 @@
                         class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
                         <option value="">All / None</option>
                     </select>
-                </div>
-                <div>
-                    <label class="block text-gray-300 mb-2">Category</label>
-                    <input type="text" id="modalEvent" list="modalEventList"
-                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        placeholder="e.g., 4-Way, 8-Way">
-                    <datalist id="modalEventList">
-                        {% for event in events %}
-                        <option value="{{ event }}">
-                        {% endfor %}
-                    </datalist>
                 </div>
                 <div id="modalProgress" class="hidden"></div>
                 <div id="modalMessage" class="hidden"></div>
