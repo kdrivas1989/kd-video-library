@@ -4392,8 +4392,17 @@ def admin_api_videos():
 
     per_page = min(per_page, 200)
 
+    show_all = request.args.get('show_all', '0') == '1'
+
     videos = get_all_videos()
     total = len(videos)
+
+    # By default only show videos missing information
+    if not show_all:
+        videos = [v for v in videos if
+                  v.get('category', 'uncategorized') in ('uncategorized', '', None) or
+                  not (v.get('event') or '').strip() or
+                  not (v.get('subcategory') or '').strip()]
 
     # Apply filters
     if category:

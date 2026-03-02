@@ -331,7 +331,13 @@
 
         <!-- Video List -->
         <div class="bg-gray-800 rounded-lg p-6">
-            <h2 class="text-xl font-bold mb-1">Manage Videos</h2>
+            <div class="flex items-center justify-between mb-1">
+                <h2 class="text-xl font-bold">Manage Videos</h2>
+                <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                    <input type="checkbox" id="showAllVideos" onchange="filterVideos()" class="w-4 h-4 rounded">
+                    Show all videos
+                </label>
+            </div>
             <p class="text-gray-400 text-sm mb-4" id="videoCountLabel">Loading...</p>
             <!-- Filters -->
             <div class="flex flex-wrap gap-4 mb-4">
@@ -3698,7 +3704,9 @@
             const category = document.getElementById('filterCategorySelect').value;
             const event = document.getElementById('filterEventSelect').value;
 
+            const showAll = document.getElementById('showAllVideos').checked;
             const params = new URLSearchParams({ page, per_page: perPage });
+            if (showAll) params.set('show_all', '1');
             if (category) params.set('category', category);
             if (event) params.set('event', event);
 
