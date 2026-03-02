@@ -345,7 +345,7 @@
         <!-- Video List -->
         <div class="bg-gray-800 rounded-lg p-6">
             <h2 class="text-xl font-bold mb-1">Manage Videos</h2>
-            <p class="text-gray-400 text-sm mb-4">Showing {{ videos|length }} video{{ 's' if videos|length != 1 }} missing information (of {{ all_video_count }} total)</p>
+            <p class="text-gray-400 text-sm mb-4">{{ videos|length }} video{{ 's' if videos|length != 1 }}</p>
             <!-- Filters -->
             <div class="flex flex-wrap gap-4 mb-4">
                 <div>
