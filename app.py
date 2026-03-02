@@ -4418,8 +4418,10 @@ def admin_create_user():
     if not username or not name:
         return jsonify({'error': 'Username and name are required'}), 400
 
-    if role not in ROLES:
-        return jsonify({'error': 'Invalid role'}), 400
+    # Support comma-separated roles
+    for r in [r.strip() for r in role.split(',')]:
+        if r not in ROLES:
+            return jsonify({'error': f'Invalid role: {r}'}), 400
 
     # Check if user already exists
     existing = get_user(username)
@@ -4507,8 +4509,11 @@ def admin_update_user(username):
     password = data.get('password', '').strip()
     signature_pin = data.get('signature_pin', '').strip()
 
-    if role not in ROLES:
-        return jsonify({'error': 'Invalid role'}), 400
+    # Support comma-separated roles
+    role_list = [r.strip() for r in role.split(',')]
+    for r in role_list:
+        if r not in ROLES:
+            return jsonify({'error': f'Invalid role: {r}'}), 400
 
     # Validate PIN if provided
     if signature_pin and (len(signature_pin) < 4 or len(signature_pin) > 6 or not signature_pin.isdigit()):
