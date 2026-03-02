@@ -4336,21 +4336,46 @@ Emma Chen,open,Canopy Piloting,10,CHN
 def admin_dashboard():
     """Video upload dashboard (admin, chief_judge, doc, librarian)."""
     try:
+        videos = get_all_videos()
+        total_videos = len(videos)
+        total_views = sum(v.get('views', 0) for v in videos)
         events = get_all_events()
+
+        # Count videos per category
+        category_counts = {}
+        for cat_id in CATEGORIES:
+            category_counts[cat_id] = 0
+        for video in videos:
+            cat = video.get('category', 'uncategorized')
+            if cat in category_counts:
+                category_counts[cat] += 1
+            else:
+                category_counts['uncategorized'] = category_counts.get('uncategorized', 0) + 1
+
+        # Count videos per event folder
+        event_counts = {}
+        for video in videos:
+            evt = video.get('event', '')
+            if evt:
+                event_counts[evt] = event_counts.get(evt, 0) + 1
     except Exception as e:
         print(f"Admin dashboard error: {e}")
+        total_videos = 0
+        total_views = 0
         events = []
+        category_counts = {}
+        event_counts = {}
 
     is_admin = session.get('role') == 'admin'
 
     return render_template('admin.html',
                          videos=[],
-                         all_video_count=0,
+                         all_video_count=total_videos,
                          categories=CATEGORIES,
-                         total_videos=0,
-                         total_views=0,
-                         category_counts={},
-                         event_counts={},
+                         total_videos=total_videos,
+                         total_views=total_views,
+                         category_counts=category_counts,
+                         event_counts=event_counts,
                          events=events,
                          dropbox_app_key=DROPBOX_APP_KEY,
                          is_admin=is_admin)
