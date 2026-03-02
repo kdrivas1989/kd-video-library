@@ -4029,7 +4029,10 @@ def category(cat_id):
 
 @app.route('/video/<video_id>')
 def video(video_id):
-    """Show single video page."""
+    """Show single video page. Requires login."""
+    if not session.get('username'):
+        return redirect(url_for('login'))
+
     video = get_video(video_id)
 
     if not video:
@@ -4122,14 +4125,14 @@ def login():
     """Login page."""
     error = None
     if request.method == 'POST':
-        username = request.form.get('username', '').lower()
+        email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
 
-        user = get_user(username)
+        user = get_user_by_email(email)
 
         if user and user['password'] == password:
-            session['username'] = username
-            session['user'] = username
+            session['username'] = user['username']
+            session['user'] = user['username']
             session['role'] = user['role']
             session['name'] = user['name']
 
@@ -4144,7 +4147,7 @@ def login():
                 # Admin, chief_judge, jwg go to admin dashboard
                 return redirect(url_for('admin_dashboard'))
         else:
-            error = 'Invalid username or password'
+            error = 'Invalid email or password'
 
     return render_template('login.html', error=error)
 
