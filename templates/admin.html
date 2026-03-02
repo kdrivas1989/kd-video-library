@@ -440,6 +440,7 @@
                     </div>
                 </div>
                 <div class="flex items-end gap-2">
+                    <button onclick="bulkDeleteVideos()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm">Delete Selected</button>
                     <button onclick="sortByTeamRound()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm">Sort by Team/Round</button>
                     <div class="flex gap-1 ml-2">
                         <button onclick="toggleView('card')" id="cardViewBtn" class="px-2 py-2 rounded text-sm bg-blue-600 hover:bg-blue-700" title="Card view">
@@ -3211,6 +3212,32 @@
                 }
             } catch (error) {
                 alert('Error deleting video: ' + error.message);
+            }
+        }
+
+        async function bulkDeleteVideos() {
+            const videoIds = getSelectedVideoIds();
+            if (videoIds.length === 0) {
+                alert('No videos selected. Check the boxes next to videos you want to delete.');
+                return;
+            }
+            if (!confirm(`Are you sure you want to delete ${videoIds.length} video(s)? This cannot be undone.`)) return;
+
+            try {
+                const resp = await fetch('/admin/bulk-delete-videos', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({video_ids: videoIds})
+                });
+                const result = await resp.json();
+                if (result.error) {
+                    alert(result.error);
+                } else {
+                    alert(result.message);
+                    loadVideosPage(currentPage);
+                }
+            } catch (e) {
+                alert('Error deleting videos: ' + e.message);
             }
         }
 

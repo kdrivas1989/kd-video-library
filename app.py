@@ -6916,6 +6916,33 @@ def delete_video(video_id):
     return jsonify({'success': True, 'message': 'Video deleted'})
 
 
+@app.route('/admin/bulk-delete-videos', methods=['POST'])
+@admin_required
+def bulk_delete_videos():
+    """Delete multiple videos at once."""
+    data = request.get_json()
+    video_ids = data.get('video_ids', [])
+    if not video_ids:
+        return jsonify({'error': 'No videos selected'}), 400
+
+    deleted = 0
+    for vid in video_ids:
+        video = get_video(vid)
+        if video:
+            if video.get('local_file'):
+                local_path = os.path.join(VIDEOS_FOLDER, video['local_file'])
+                if os.path.exists(local_path):
+                    os.remove(local_path)
+            if video.get('thumbnail') and video['thumbnail'].startswith('/static/videos/'):
+                thumb_path = os.path.join(VIDEOS_FOLDER, os.path.basename(video['thumbnail']))
+                if os.path.exists(thumb_path):
+                    os.remove(thumb_path)
+            delete_video_db(vid)
+            deleted += 1
+
+    return jsonify({'success': True, 'deleted': deleted, 'message': f'{deleted} video(s) deleted'})
+
+
 @app.route('/admin/get-video/<video_id>', methods=['GET'])
 @admin_required
 def get_video_details(video_id):
