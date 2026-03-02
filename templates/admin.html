@@ -368,6 +368,18 @@
                     </select>
                 </div>
                 <div>
+                    <label class="block text-gray-400 text-sm mb-1">Video Labeling Format</label>
+                    <select id="manageLabelFormat" class="px-4 py-2 rounded bg-gray-700 text-white">
+                        <option value="auto">Auto-detect</option>
+                        <option value="team_space_round">Team Round (e.g., 226 5)</option>
+                        <option value="team_underscore_round">Team_Round (e.g., 226_5)</option>
+                        <option value="team_dash_round">Team-Round (e.g., 226-5)</option>
+                        <option value="uspa_competition">USPA Competition (Comp_Event_Team-Name_Round)</option>
+                        <option value="round_only">Round only (e.g., Round 5)</option>
+                        <option value="custom">Custom (ask me)</option>
+                    </select>
+                </div>
+                <div>
                     <label class="block text-gray-400 text-sm mb-1">Bulk Assign Event</label>
                     <div class="flex gap-2">
                         <input type="text" id="bulkEventInput" list="bulkEventList" placeholder="Event name..." class="px-3 py-2 rounded bg-gray-700 text-white w-48">
