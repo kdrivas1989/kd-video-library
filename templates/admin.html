@@ -168,22 +168,6 @@
                 </div>
             </div>
             <div class="bg-gray-800 rounded-lg p-6">
-                <p class="text-gray-400 text-sm mb-2">Apply learned patterns to existing videos</p>
-                <p class="text-xs text-gray-500 mb-3">When you manually categorize videos, patterns are learned. Apply them to other uncategorized videos.</p>
-                <div class="flex items-center gap-2">
-                    <button onclick="previewLearnedPatterns()" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-sm">
-                        Preview
-                    </button>
-                    <button onclick="applyLearnedPatterns()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm">
-                        Apply Patterns
-                    </button>
-                </div>
-                <p id="learnedPatternsMessage" class="text-sm mt-2 hidden"></p>
-                <div id="learnedPatternsPreview" class="hidden mt-4 max-h-60 overflow-y-auto">
-                    <div id="learnedPatternsList" class="text-xs space-y-1"></div>
-                </div>
-            </div>
-            <div class="bg-gray-800 rounded-lg p-6">
                 <p class="text-gray-400 text-sm mb-2">Event Folders</p>
                 <p class="text-xs text-gray-500 mb-3">Create folders to organize videos by competition/event</p>
                 <div class="flex gap-2 mb-3">
@@ -221,19 +205,6 @@
                 </button>
                 <p id="refreshThumbsMessage" class="text-sm mt-2 hidden"></p>
                 <p id="refreshThumbsProgress" class="text-xs text-gray-500 mt-1 hidden"></p>
-            </div>
-            <div class="bg-gray-800 rounded-lg p-6">
-                <p class="text-gray-400 text-sm mb-3">Fix bad titles (uncategorized-hash, Unknown)</p>
-                <div class="flex gap-2">
-                    <button onclick="fixBadTitles(true)" id="previewFixTitlesBtn" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg text-sm">
-                        Preview
-                    </button>
-                    <button onclick="fixBadTitles(false)" id="fixTitlesBtn" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg text-sm">
-                        Fix Titles
-                    </button>
-                </div>
-                <p id="fixTitlesMessage" class="text-sm mt-2 hidden"></p>
-                <div id="fixTitlesPreview" class="hidden mt-3 max-h-48 overflow-y-auto text-xs space-y-1"></div>
             </div>
         </div>
 
@@ -289,9 +260,12 @@
             <div id="manualCategorySection" class="flex flex-wrap gap-4 items-end mb-4">
                 <div class="w-64">
                     <label class="block text-gray-300 mb-2">Event</label>
-                    <input type="text" id="uploadEvent" list="uploadEventList"
-                        class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        placeholder="e.g., Nationals 2025">
+                    <div class="flex gap-2">
+                        <input type="text" id="uploadEvent" list="uploadEventList"
+                            class="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            placeholder="e.g., Nationals 2025">
+                        <button type="button" onclick="createUploadEvent()" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium whitespace-nowrap">+ New</button>
+                    </div>
                     <datalist id="uploadEventList">
                         {% for event in events %}
                         <option value="{{ event }}">
@@ -3810,6 +3784,42 @@
                         option.value = name;
                         datalist.appendChild(option);
                     }
+                    alert(`Event "${name}" created!`);
+                } else {
+                    alert(result.error || 'Failed to create event');
+                }
+            } catch (e) {
+                alert('Error creating event: ' + e.message);
+            }
+        }
+
+        // Create new event from upload section
+        async function createUploadEvent() {
+            const name = document.getElementById('uploadEvent').value.trim();
+            if (!name) {
+                alert('Enter an event name first');
+                return;
+            }
+            try {
+                const response = await fetch('/admin/create-event-folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    // Add to both datalists
+                    ['uploadEventList', 'bulkEventList', 'modalEventList'].forEach(id => {
+                        const datalist = document.getElementById(id);
+                        if (datalist) {
+                            const exists = Array.from(datalist.options).some(opt => opt.value === name);
+                            if (!exists) {
+                                const option = document.createElement('option');
+                                option.value = name;
+                                datalist.appendChild(option);
+                            }
+                        }
+                    });
                     alert(`Event "${name}" created!`);
                 } else {
                     alert(result.error || 'Failed to create event');
