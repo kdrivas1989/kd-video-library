@@ -356,15 +356,18 @@
                 </div>
                 <div>
                     <label class="block text-gray-400 text-sm mb-1">Video Labeling Format</label>
-                    <select id="manageLabelFormat" class="px-4 py-2 rounded bg-gray-700 text-white">
-                        <option value="auto">Auto-detect</option>
-                        <option value="team_space_round">Team Round (e.g., 226 5)</option>
-                        <option value="team_underscore_round">Team_Round (e.g., 226_5)</option>
-                        <option value="team_dash_round">Team-Round (e.g., 226-5)</option>
-                        <option value="uspa_competition">USPA Competition (Comp_Event_Team-Name_Round)</option>
-                        <option value="round_only">Round only (e.g., Round 5)</option>
-                        <option value="custom">Custom (ask me)</option>
-                    </select>
+                    <div class="flex gap-2">
+                        <select id="manageLabelFormat" class="px-4 py-2 rounded bg-gray-700 text-white">
+                            <option value="auto">Auto-detect</option>
+                            <option value="team_space_round">Team Round (e.g., 226 5)</option>
+                            <option value="team_underscore_round">Team_Round (e.g., 226_5)</option>
+                            <option value="team_dash_round">Team-Round (e.g., 226-5)</option>
+                            <option value="uspa_competition">USPA Competition (Comp_Event_Team-Name_Round)</option>
+                            <option value="round_only">Round only (e.g., Round 5)</option>
+                            <option value="custom">Custom (ask me)</option>
+                        </select>
+                        <button onclick="applyLabelFormatToSelected()" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded text-sm whitespace-nowrap">Assign to Selected</button>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-gray-400 text-sm mb-1">Bulk Assign Event</label>
@@ -3797,6 +3800,27 @@
         }
 
         // Bulk assign event to visible videos
+        async function applyLabelFormatToSelected() {
+            const format = document.getElementById('manageLabelFormat').value;
+            const selected = Array.from(document.querySelectorAll('.video-checkbox:checked')).map(cb => cb.dataset.videoId);
+            if (selected.length === 0) {
+                alert('Select videos first');
+                return;
+            }
+            if (!confirm(`Apply "${format}" label format to ${selected.length} video(s)?`)) return;
+            try {
+                const resp = await fetch('/admin/bulk-set-label-format', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_ids: selected, label_format: format })
+                });
+                const result = await resp.json();
+                alert(result.message || 'Done');
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
         async function bulkAssignEvent() {
             const newEvent = document.getElementById('bulkEventInput').value.trim();
             if (!newEvent) {

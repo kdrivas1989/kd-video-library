@@ -8017,6 +8017,67 @@ def bulk_set_event():
     })
 
 
+@app.route('/admin/bulk-set-label-format', methods=['POST'])
+@admin_required
+def bulk_set_label_format():
+    """Parse team/round from titles using the specified label format and update videos."""
+    import re
+    data = request.json
+    video_ids = data.get('video_ids', [])
+    label_format = data.get('label_format', 'auto')
+
+    if not video_ids:
+        return jsonify({'error': 'No videos selected'}), 400
+
+    patterns = {
+        'team_space_round': r'(\d+)\s+(\d+)',
+        'team_underscore_round': r'(\d+)_(\d+)',
+        'team_dash_round': r'(\d+)-(\d+)',
+        'round_only': r'[Rr](?:ound)?\s*(\d+)',
+        'uspa_competition': r'_([^_]+?)_(\d+)\s*$',
+    }
+
+    success_count = 0
+    for video_id in video_ids:
+        video = get_video(video_id)
+        if not video:
+            continue
+        title = video.get('title', '')
+        team = ''
+        round_num = ''
+
+        if label_format == 'auto':
+            for fmt, pat in patterns.items():
+                m = re.search(pat, title)
+                if m:
+                    if fmt == 'round_only':
+                        round_num = m.group(1)
+                    else:
+                        team = m.group(1)
+                        round_num = m.group(2)
+                    break
+        elif label_format == 'round_only':
+            m = re.search(patterns['round_only'], title)
+            if m:
+                round_num = m.group(1)
+        elif label_format in patterns:
+            m = re.search(patterns[label_format], title)
+            if m:
+                team = m.group(1)
+                round_num = m.group(2)
+
+        video['team'] = team
+        video['round_num'] = round_num
+        save_video(video)
+        success_count += 1
+
+    return jsonify({
+        'success': True,
+        'message': f'Applied label format to {success_count} video(s)',
+        'updated_count': success_count
+    })
+
+
 @app.route('/admin/bulk-fix-titles', methods=['POST'])
 @admin_required
 def bulk_fix_titles():
