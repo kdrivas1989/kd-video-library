@@ -4336,50 +4336,63 @@ Emma Chen,open,Canopy Piloting,10,CHN
 def admin_dashboard():
     """Video upload dashboard (admin, chief_judge, doc, librarian)."""
     try:
-        videos = get_all_videos()
-        total_videos = len(videos)
-        total_views = sum(v.get('views', 0) for v in videos)
         events = get_all_events()
-
-        # Count videos per category
-        category_counts = {}
-        for cat_id in CATEGORIES:
-            category_counts[cat_id] = 0
-        for video in videos:
-            cat = video.get('category', 'uncategorized')
-            if cat in category_counts:
-                category_counts[cat] += 1
-            else:
-                category_counts['uncategorized'] = category_counts.get('uncategorized', 0) + 1
-
-        # Count videos per event folder
-        event_counts = {}
-        for video in videos:
-            evt = video.get('event', '')
-            if evt:
-                event_counts[evt] = event_counts.get(evt, 0) + 1
     except Exception as e:
         print(f"Admin dashboard error: {e}")
-        videos = []
-        total_videos = 0
-        total_views = 0
         events = []
-        category_counts = {}
-        event_counts = {}
 
     is_admin = session.get('role') == 'admin'
 
     return render_template('admin.html',
-                         videos=videos,
-                         all_video_count=total_videos,
+                         videos=[],
+                         all_video_count=0,
                          categories=CATEGORIES,
-                         total_videos=total_videos,
-                         total_views=total_views,
-                         category_counts=category_counts,
-                         event_counts=event_counts,
+                         total_videos=0,
+                         total_views=0,
+                         category_counts={},
+                         event_counts={},
                          events=events,
                          dropbox_app_key=DROPBOX_APP_KEY,
                          is_admin=is_admin)
+
+
+@app.route('/admin/api/videos')
+@admin_required
+def admin_api_videos():
+    """Paginated video list API for admin dashboard."""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    category = request.args.get('category', '')
+    event = request.args.get('event', '')
+
+    per_page = min(per_page, 200)
+
+    videos = get_all_videos()
+    total = len(videos)
+
+    # Apply filters
+    if category:
+        videos = [v for v in videos if v.get('category') == category]
+    if event == '__none__':
+        videos = [v for v in videos if not (v.get('event') or '').strip()]
+    elif event:
+        videos = [v for v in videos if v.get('event') == event]
+
+    filtered_total = len(videos)
+
+    # Paginate
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_videos = videos[start:end]
+
+    return jsonify({
+        'videos': page_videos,
+        'total': total,
+        'filtered_total': filtered_total,
+        'page': page,
+        'per_page': per_page,
+        'has_more': end < filtered_total
+    })
 
 
 @app.route('/admin/users')

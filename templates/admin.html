@@ -345,7 +345,7 @@
         <!-- Video List -->
         <div class="bg-gray-800 rounded-lg p-6">
             <h2 class="text-xl font-bold mb-1">Manage Videos</h2>
-            <p class="text-gray-400 text-sm mb-4">{{ videos|length }} video{{ 's' if videos|length != 1 }}</p>
+            <p class="text-gray-400 text-sm mb-4" id="videoCountLabel">Loading...</p>
             <!-- Filters -->
             <div class="flex flex-wrap gap-4 mb-4">
                 <div>
@@ -459,123 +459,14 @@
                 </div>
             </div>
             <div class="space-y-3 max-h-[800px] overflow-y-auto" id="videoListContainer">
-                {% if videos %}
-                {% for video in videos %}
-                <div class="bg-gray-700 rounded-lg p-4 video-list-item" data-video-id="{{ video.id }}" data-event="{{ video.event|default('', true) }}" data-category="{{ video.category|default('uncategorized', true) }}">
-                    <!-- Card View (default) -->
-                    <div class="card-view-content flex gap-4">
-                        <input type="checkbox" class="video-checkbox w-4 h-4 rounded flex-shrink-0 mt-2" data-video-id="{{ video.id }}">
-                        <div class="w-32 h-20 bg-gray-600 rounded flex-shrink-0 overflow-hidden">
-                            {% if video.thumbnail %}
-                            <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="w-full h-full object-cover">
-                            {% endif %}
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center gap-2">
-                                <input type="text" value="{{ video.title }}"
-                                    class="video-title-input flex-1 font-semibold text-white bg-transparent border-b border-transparent hover:border-gray-500 focus:border-blue-500 focus:outline-none px-1 py-0.5"
-                                    data-original="{{ video.title }}"
-                                    onchange="bufferChange('{{ video.id }}', 'title', this.value, this)"
-                                    onkeydown="if(event.key==='Enter'){this.blur();}">
-                            </div>
-                            <div class="flex items-center gap-2 mt-1 text-sm text-gray-400">
-                                <select onchange="bufferChange('{{ video.id }}', 'category', this.value, this); updateSubcategoryDropdown(this)"
-                                    class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-blue-500"
-                                    data-video-id="{{ video.id }}" data-original="{{ video.category }}">
-                                    {% for cat_id, cat in categories.items() %}
-                                    <option value="{{ cat_id }}" {% if cat_id == video.category %}selected{% endif %}>{{ cat.abbrev }}</option>
-                                    {% endfor %}
-                                </select>
-                                <select onchange="bufferChange('{{ video.id }}', 'subcategory', this.value, this)"
-                                    class="bg-gray-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-gray-500 subcategory-select"
-                                    data-video-id="{{ video.id }}" data-original="{{ video.subcategory|default('', true) }}" data-current="{{ video.subcategory|default('', true) }}"
-                                    {% if not categories.get(video.category, {}).get('subcategories') %}style="display:none"{% endif %}>
-                                    <option value="">--</option>
-                                    {% if categories.get(video.category, {}).get('subcategories') %}
-                                    {% for sub in categories.get(video.category, {}).get('subcategories', []) %}
-                                    <option value="{{ sub.id }}" {% if sub.id == video.subcategory %}selected{% endif %}>{{ sub.name }}</option>
-                                    {% endfor %}
-                                    {% endif %}
-                                </select>
-                                <span>{{ video.views }} views</span>
-                                <span class="text-gray-500">|</span>
-                                <input type="text" value="{{ video.event|default('', true) }}"
-                                    list="eventList_{{ video.id }}"
-                                    placeholder="No category"
-                                    class="bg-cyan-700 text-white px-2 py-0.5 rounded text-xs w-32 event-input"
-                                    data-video-id="{{ video.id }}" data-original="{{ video.event|default('', true) }}"
-                                    onchange="bufferChange('{{ video.id }}', 'event', this.value, this)">
-                                <datalist id="eventList_{{ video.id }}">
-                                    {% for event in events %}
-                                    <option value="{{ event }}">
-                                    {% endfor %}
-                                </datalist>
-                            </div>
-                            <div class="flex gap-2 mt-3">
-                                <button onclick="editVideo('{{ video.id }}')"
-                                    class="text-blue-400 hover:text-blue-300 text-sm">Details</button>
-                                <button onclick="deleteVideo('{{ video.id }}')"
-                                    class="text-red-400 hover:text-red-300 text-sm">Delete</button>
-                                <a href="/video/{{ video.id }}" target="_blank"
-                                    class="text-gray-400 hover:text-gray-300 text-sm">View</a>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- List View (hidden by default) -->
-                    <div class="list-view-content hidden">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" class="video-checkbox w-4 h-4 rounded" data-video-id="{{ video.id }}">
-                            <input type="text" value="{{ video.title }}"
-                                class="video-title-input flex-1 text-white bg-transparent border-b border-transparent hover:border-gray-500 focus:border-blue-500 focus:outline-none px-1 py-0.5 text-sm"
-                                data-original="{{ video.title }}"
-                                onchange="bufferChange('{{ video.id }}', 'title', this.value, this)"
-                                onkeydown="if(event.key==='Enter'){this.blur();}">
-                            <select onchange="bufferChange('{{ video.id }}', 'category', this.value, this); updateSubcategoryDropdown(this)"
-                                class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-blue-500 w-20"
-                                data-video-id="{{ video.id }}" data-original="{{ video.category }}">
-                                {% for cat_id, cat in categories.items() %}
-                                <option value="{{ cat_id }}" {% if cat_id == video.category %}selected{% endif %}>{{ cat.abbrev }}</option>
-                                {% endfor %}
-                            </select>
-                            <select onchange="bufferChange('{{ video.id }}', 'subcategory', this.value, this)"
-                                class="bg-gray-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-gray-500 subcategory-select"
-                                data-video-id="{{ video.id }}" data-original="{{ video.subcategory|default('', true) }}" data-current="{{ video.subcategory|default('', true) }}"
-                                {% if not categories.get(video.category, {}).get('subcategories') %}style="display:none"{% endif %}>
-                                <option value="">--</option>
-                                {% if categories.get(video.category, {}).get('subcategories') %}
-                                {% for sub in categories.get(video.category, {}).get('subcategories', []) %}
-                                <option value="{{ sub.id }}" {% if sub.id == video.subcategory %}selected{% endif %}>{{ sub.name }}</option>
-                                {% endfor %}
-                                {% endif %}
-                            </select>
-                            <input type="text" value="{{ video.event|default('', true) }}"
-                                list="eventListL_{{ video.id }}"
-                                placeholder="No discipline"
-                                class="bg-cyan-700 text-white px-2 py-0.5 rounded text-xs w-32 event-input"
-                                data-video-id="{{ video.id }}" data-original="{{ video.event|default('', true) }}"
-                                onchange="bufferChange('{{ video.id }}', 'event', this.value, this)">
-                            <datalist id="eventListL_{{ video.id }}">
-                                {% for event in events %}
-                                <option value="{{ event }}">
-                                {% endfor %}
-                            </datalist>
-                            <div class="flex gap-2 w-32 justify-center">
-                                <button onclick="editVideo('{{ video.id }}')"
-                                    class="text-blue-400 hover:text-blue-300 text-xs">Details</button>
-                                <button onclick="deleteVideo('{{ video.id }}')"
-                                    class="text-red-400 hover:text-red-300 text-xs">Delete</button>
-                                <a href="/video/{{ video.id }}" target="_blank"
-                                    class="text-gray-400 hover:text-gray-300 text-xs">View</a>
-                            </div>
-                        </div>
-                    </div>
+                <div class="text-center py-8 text-gray-500" id="videoListLoading">
+                    <p>Loading videos...</p>
                 </div>
-                {% endfor %}
-                {% else %}
-                <div class="text-center py-8 text-gray-500">
-                    <p>No videos yet. Upload videos using the sections above.</p>
-                </div>
-                {% endif %}
+            </div>
+            <div class="flex items-center justify-between mt-4" id="paginationControls" style="display:none">
+                <button onclick="loadVideosPage(currentPage - 1)" id="prevPageBtn" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm" disabled>Previous</button>
+                <span id="pageInfo" class="text-gray-400 text-sm"></span>
+                <button onclick="loadVideosPage(currentPage + 1)" id="nextPageBtn" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm">Next</button>
             </div>
         </div>
     </div>
@@ -3726,39 +3617,118 @@
             }
         }
 
-        // Filter videos by event
+        // Pagination state
+        let currentPage = 1;
+        const perPage = 50;
+        const allEvents = {{ events | tojson }};
+
         function filterVideos() {
-            const eventFilter = document.getElementById('filterEventSelect').value;
-            const categoryFilter = document.getElementById('filterCategorySelect').value;
-            const videos = document.querySelectorAll('.video-list-item');
-            let visibleCount = 0;
+            currentPage = 1;
+            loadVideosPage(1);
+        }
+        function filterVideosByEvent() { filterVideos(); }
 
-            videos.forEach(video => {
-                const videoEvent = video.dataset.event || '';
-                const videoCategory = video.dataset.category || '';
-                let show = true;
+        function renderVideoCard(video) {
+            const cats = categories;
+            const cat = cats[video.category] || {};
+            const subcats = cat.subcategories || [];
+            const thumb = video.thumbnail ? `<img src="${video.thumbnail}" alt="" class="w-full h-full object-cover">` : '';
 
-                // Apply category filter
-                if (categoryFilter) {
-                    show = videoCategory === categoryFilter;
-                }
+            let catOptions = '';
+            for (const [cid, c] of Object.entries(cats)) {
+                catOptions += `<option value="${cid}" ${cid === video.category ? 'selected' : ''}>${c.abbrev}</option>`;
+            }
 
-                // Apply event filter
-                if (show && eventFilter === '__none__') {
-                    show = !videoEvent;
-                } else if (show && eventFilter) {
-                    show = videoEvent === eventFilter;
-                }
+            let subOptions = '<option value="">--</option>';
+            for (const sub of subcats) {
+                subOptions += `<option value="${sub.id}" ${sub.id === (video.subcategory || '') ? 'selected' : ''}>${sub.name}</option>`;
+            }
+            const subDisplay = subcats.length ? '' : 'display:none';
 
-                video.style.display = show ? '' : 'none';
-                if (show) visibleCount++;
-            });
+            let eventOptions = '';
+            for (const evt of allEvents) {
+                eventOptions += `<option value="${evt}">`;
+            }
 
-            document.getElementById('videoFilterCount').textContent = `${visibleCount} video${visibleCount !== 1 ? 's' : ''} shown`;
+            return `<div class="bg-gray-700 rounded-lg p-4 video-list-item" data-video-id="${video.id}" data-event="${video.event || ''}" data-category="${video.category || 'uncategorized'}">
+                <div class="card-view-content flex gap-4">
+                    <input type="checkbox" class="video-checkbox w-4 h-4 rounded flex-shrink-0 mt-2" data-video-id="${video.id}">
+                    <div class="w-32 h-20 bg-gray-600 rounded flex-shrink-0 overflow-hidden">${thumb}</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <input type="text" value="${(video.title || '').replace(/"/g, '&quot;')}"
+                                class="video-title-input flex-1 font-semibold text-white bg-transparent border-b border-transparent hover:border-gray-500 focus:border-blue-500 focus:outline-none px-1 py-0.5"
+                                data-original="${(video.title || '').replace(/"/g, '&quot;')}"
+                                onchange="bufferChange('${video.id}', 'title', this.value, this)"
+                                onkeydown="if(event.key==='Enter'){this.blur();}">
+                        </div>
+                        <div class="flex items-center gap-2 mt-1 text-sm text-gray-400">
+                            <select onchange="bufferChange('${video.id}', 'category', this.value, this); updateSubcategoryDropdown(this)"
+                                class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-blue-500"
+                                data-video-id="${video.id}" data-original="${video.category}">${catOptions}</select>
+                            <select onchange="bufferChange('${video.id}', 'subcategory', this.value, this)"
+                                class="bg-gray-600 text-white px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-gray-500 subcategory-select"
+                                data-video-id="${video.id}" data-original="${video.subcategory || ''}" data-current="${video.subcategory || ''}"
+                                style="${subDisplay}">${subOptions}</select>
+                            <span>${video.views || 0} views</span>
+                            <span class="text-gray-500">|</span>
+                            <input type="text" value="${(video.event || '').replace(/"/g, '&quot;')}"
+                                list="eventList_${video.id}" placeholder="No event"
+                                class="bg-cyan-700 text-white px-2 py-0.5 rounded text-xs w-32 event-input"
+                                data-video-id="${video.id}" data-original="${(video.event || '').replace(/"/g, '&quot;')}"
+                                onchange="bufferChange('${video.id}', 'event', this.value, this)">
+                            <datalist id="eventList_${video.id}">${eventOptions}</datalist>
+                        </div>
+                        <div class="flex gap-2 mt-3">
+                            <button onclick="editVideo('${video.id}')" class="text-blue-400 hover:text-blue-300 text-sm">Details</button>
+                            <button onclick="deleteVideo('${video.id}')" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                            <a href="/video/${video.id}" target="_blank" class="text-gray-400 hover:text-gray-300 text-sm">View</a>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
         }
 
-        // Legacy alias
-        function filterVideosByEvent() { filterVideos(); }
+        async function loadVideosPage(page) {
+            if (page < 1) return;
+            currentPage = page;
+
+            const category = document.getElementById('filterCategorySelect').value;
+            const event = document.getElementById('filterEventSelect').value;
+
+            const params = new URLSearchParams({ page, per_page: perPage });
+            if (category) params.set('category', category);
+            if (event) params.set('event', event);
+
+            const container = document.getElementById('videoListContainer');
+            container.innerHTML = '<div class="text-center py-8 text-gray-500"><p>Loading...</p></div>';
+
+            try {
+                const resp = await fetch(`/admin/api/videos?${params}`);
+                const data = await resp.json();
+
+                document.getElementById('videoCountLabel').textContent = `${data.filtered_total} video${data.filtered_total !== 1 ? 's' : ''}${data.filtered_total !== data.total ? ` (of ${data.total} total)` : ''}`;
+                document.getElementById('videoFilterCount').textContent = `Page ${data.page} of ${Math.ceil(data.filtered_total / perPage) || 1}`;
+
+                if (data.videos.length === 0) {
+                    container.innerHTML = '<div class="text-center py-8 text-gray-500"><p>No videos found.</p></div>';
+                } else {
+                    container.innerHTML = data.videos.map(renderVideoCard).join('');
+                }
+
+                // Pagination controls
+                const controls = document.getElementById('paginationControls');
+                controls.style.display = 'flex';
+                document.getElementById('prevPageBtn').disabled = page <= 1;
+                document.getElementById('nextPageBtn').disabled = !data.has_more;
+                document.getElementById('pageInfo').textContent = `Page ${page} of ${Math.ceil(data.filtered_total / perPage) || 1}`;
+            } catch (e) {
+                container.innerHTML = '<div class="text-center py-8 text-red-400"><p>Error loading videos.</p></div>';
+            }
+        }
+
+        // Load first page on startup
+        document.addEventListener('DOMContentLoaded', () => loadVideosPage(1));
 
         // Create a new event folder and add it to the datalist
         async function createNewEvent() {
