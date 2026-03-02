@@ -404,6 +404,7 @@
                             <option value="{{ event }}">
                             {% endfor %}
                         </datalist>
+                        <button onclick="createNewEvent()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm">+ New</button>
                         <button onclick="bulkAssignEvent()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm">Assign to Visible</button>
                         <button id="bulkSaveBtn" onclick="bulkSaveAllChanges()" class="hidden bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -3786,6 +3787,37 @@
 
         // Legacy alias
         function filterVideosByEvent() { filterVideos(); }
+
+        // Create a new event folder and add it to the datalist
+        async function createNewEvent() {
+            const name = document.getElementById('bulkEventInput').value.trim();
+            if (!name) {
+                alert('Enter an event name first');
+                return;
+            }
+            try {
+                const response = await fetch('/admin/create-event-folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    const datalist = document.getElementById('bulkEventList');
+                    const exists = Array.from(datalist.options).some(opt => opt.value === name);
+                    if (!exists) {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        datalist.appendChild(option);
+                    }
+                    alert(`Event "${name}" created!`);
+                } else {
+                    alert(result.error || 'Failed to create event');
+                }
+            } catch (e) {
+                alert('Error creating event: ' + e.message);
+            }
+        }
 
         // Bulk assign event to visible videos
         async function bulkAssignEvent() {
