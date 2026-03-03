@@ -1276,6 +1276,13 @@ def is_admin():
     user_roles = get_user_roles(user_role) if ',' in str(user_role) else [user_role]
     return 'admin' in user_roles
 
+def is_judge_only():
+    """Check if current user has only judge role (no elevated roles)."""
+    user_role = session.get('role', '')
+    roles = get_user_roles(user_role) if ',' in str(user_role) else [user_role]
+    elevated = {'jwg', 'chief_judge', 'doc', 'librarian', 'admin'}
+    return bool(roles) and not any(r in elevated for r in roles)
+
 def role_required(required_role):
     """Decorator to require a minimum role level."""
     def decorator(f):
@@ -3929,6 +3936,12 @@ def index():
     user_role = session.get('role', '')
     username = session.get('username')
 
+    # Judges only see their assigned videos
+    if is_judge_only() and username:
+        assigned = get_assignments_for_user(username)
+        assigned_ids = {a['video_id'] for a in assigned}
+        recent_videos = [v for v in recent_videos if v['id'] in assigned_ids]
+
     # Get assigned categories for the current user (for filtering)
     assigned_categories = get_user_assigned_categories(username)
 
@@ -3961,6 +3974,12 @@ def category(cat_id):
     current_event = request.args.get('event')
 
     videos = get_videos_by_category(cat_id, subcategory)
+
+    # Judges only see their assigned videos
+    if is_judge_only() and username:
+        assigned = get_assignments_for_user(username)
+        assigned_ids = {a['video_id'] for a in assigned}
+        videos = [v for v in videos if v['id'] in assigned_ids]
 
     # Group videos by event
     videos_by_event = {}
@@ -4037,6 +4056,13 @@ def video(video_id):
 
     if not video:
         return "Video not found", 404
+
+    # Judges can only access videos assigned to them
+    if is_judge_only():
+        assigned = get_assignments_for_user(session.get('username'))
+        assigned_ids = {a['video_id'] for a in assigned}
+        if video_id not in assigned_ids:
+            return "You don't have access to this video.", 403
 
     # Determine video source
     # Check pCloud first
