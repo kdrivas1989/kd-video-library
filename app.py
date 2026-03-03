@@ -13874,13 +13874,38 @@ if SOCKETIO_ENABLED:
         }
         join_room(room_code)
 
+        # Build video info for the joining judge
+        video_info = None
+        video = room.get('video')
+        if not video and room.get('video_id'):
+            video = get_video(room['video_id'])
+            if video:
+                if video.get('video_type') == 'pcloud' and video.get('local_file'):
+                    video['video_src'] = f'/pcloud/stream/{video["local_file"]}'
+                    video['is_direct_url'] = True
+                elif video.get('url') and is_direct_video_url(video.get('url', '')):
+                    video['video_src'] = video['url']
+                    video['is_direct_url'] = True
+                elif video.get('video_type') == 'local' and video.get('local_file'):
+                    video['video_src'] = f'/static/videos/{video["local_file"]}'
+                    video['is_direct_url'] = True
+                elif video.get('url'):
+                    video['embed_url'] = get_video_embed_url(video.get('url', ''))
+                    video['is_direct_url'] = False
+        if video:
+            if video.get('is_direct_url') and video.get('video_src'):
+                video_info = {'video_src': video['video_src'], 'is_direct_url': True}
+            elif video.get('embed_url'):
+                video_info = {'embed_url': video['embed_url'], 'is_direct_url': False}
+
         # Send existing scores to the joining judge
         emit('ws_scoring_joined', {
             'judge_num': judge_num,
             'scoring_type': room['scoring_type'],
             'state': room['state'],
             'scores': room['scores'].get(judge_num, {}),
-            'completion': _ws_scoring_completion(room)
+            'completion': _ws_scoring_completion(room),
+            'video': video_info
         })
 
         # Notify all in room

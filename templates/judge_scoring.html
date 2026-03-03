@@ -389,6 +389,18 @@
                     });
                 }
 
+                // Load video if not already present
+                if (data.video && !document.getElementById('judgeScoringVideo') && !document.getElementById('judgeScoringEmbed')) {
+                    const container = document.getElementById('videoContainer');
+                    if (container) {
+                        if (data.video.is_direct_url && data.video.video_src) {
+                            container.innerHTML = '<video id="judgeScoringVideo" class="w-full rounded-lg" preload="metadata" controlsList="noplaybackrate nodownload"><source src="' + data.video.video_src + '" type="video/mp4"></video>';
+                        } else if (data.video.embed_url) {
+                            container.innerHTML = '<iframe id="judgeScoringEmbed" src="' + data.video.embed_url + '" class="w-full aspect-video rounded-lg" frameborder="0" allowfullscreen></iframe>';
+                        }
+                    }
+                }
+
                 updateCompletionSummary();
                 addStatus('Joined as J' + myJudgeNum, 'success');
             });
