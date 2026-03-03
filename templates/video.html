@@ -1259,23 +1259,49 @@
                             </div>
                         </div>
 
-                        <!-- Camerawork Score -->
+                        <!-- Camerawork Score (Quality 0-7 + Progressive 0-3) -->
                         <div class="bg-gray-900 rounded-lg p-3">
                             <div class="mb-2">
                                 <span class="text-gray-400 text-sm">Camera</span>
                             </div>
-                            <div id="wsFreeCamSingle" class="flex flex-col gap-1">
-                                <input type="number" id="wsFreeCamSingleInput" min="0" max="10" step="0.1" placeholder="Score"
-                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                            <!-- Single judge mode -->
+                            <div id="wsFreeCamSingle" class="flex flex-col gap-2">
+                                <div>
+                                    <label class="text-gray-500 text-xs">Quality (0-7)</label>
+                                    <input type="number" id="wsFreeCamQualitySingle" min="0" max="7" step="0.1" placeholder="0-7"
+                                        class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                </div>
+                                <div>
+                                    <label class="text-gray-500 text-xs">Progressive (0-3)</label>
+                                    <input type="number" id="wsFreeCamProgressiveSingle" min="0" max="3" step="0.1" placeholder="0-3"
+                                        class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                </div>
                                 <span class="text-yellow-400 font-bold text-center" id="wsFreeCamAvgSingle">0.0</span>
                             </div>
-                            <div id="wsFreeCamPanel" class="hidden flex flex-col gap-1">
-                                <input type="number" id="wsFreeCamJ1" min="0" max="10" step="0.1" placeholder="J1"
-                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
-                                <input type="number" id="wsFreeCamJ2" min="0" max="10" step="0.1" placeholder="J2"
-                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
-                                <input type="number" id="wsFreeCamJ3" min="0" max="10" step="0.1" placeholder="J3"
-                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                            <!-- Panel judge mode -->
+                            <div id="wsFreeCamPanel" class="hidden flex flex-col gap-2">
+                                <div>
+                                    <label class="text-gray-500 text-xs">Quality (0-7)</label>
+                                    <div class="flex flex-col gap-1 mt-1">
+                                        <input type="number" id="wsFreeCamQualityJ1" min="0" max="7" step="0.1" placeholder="J1"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                        <input type="number" id="wsFreeCamQualityJ2" min="0" max="7" step="0.1" placeholder="J2"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                        <input type="number" id="wsFreeCamQualityJ3" min="0" max="7" step="0.1" placeholder="J3"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-gray-500 text-xs">Progressive (0-3)</label>
+                                    <div class="flex flex-col gap-1 mt-1">
+                                        <input type="number" id="wsFreeCamProgressiveJ1" min="0" max="3" step="0.1" placeholder="J1"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                        <input type="number" id="wsFreeCamProgressiveJ2" min="0" max="3" step="0.1" placeholder="J2"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                        <input type="number" id="wsFreeCamProgressiveJ3" min="0" max="3" step="0.1" placeholder="J3"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                    </div>
+                                </div>
                                 <span class="text-yellow-400 font-bold text-center" id="wsFreeCamAvg">0.0</span>
                             </div>
                         </div>
@@ -3353,6 +3379,26 @@
             const diveScore = document.getElementById('wsFreeDiveFinal').textContent;
             const camScore = document.getElementById('wsFreeCamFinal').textContent;
 
+            // Get Quality and Progressive breakdown
+            let camQuality, camProgressive;
+            if (wsFreeSingleJudge) {
+                camQuality = parseFloat(document.getElementById('wsFreeCamQualitySingle').value) || 0;
+                camProgressive = parseFloat(document.getElementById('wsFreeCamProgressiveSingle').value) || 0;
+            } else {
+                const qScores = [
+                    parseFloat(document.getElementById('wsFreeCamQualityJ1').value),
+                    parseFloat(document.getElementById('wsFreeCamQualityJ2').value),
+                    parseFloat(document.getElementById('wsFreeCamQualityJ3').value)
+                ];
+                camQuality = parseFloat(calculateJudgeAverage(qScores));
+                const pScores = [
+                    parseFloat(document.getElementById('wsFreeCamProgressiveJ1').value),
+                    parseFloat(document.getElementById('wsFreeCamProgressiveJ2').value),
+                    parseFloat(document.getElementById('wsFreeCamProgressiveJ3').value)
+                ];
+                camProgressive = parseFloat(calculateJudgeAverage(pScores));
+            }
+
             const scoreData = {
                 id: Date.now(),
                 round: roundLabel,
@@ -3361,6 +3407,8 @@
                 style: parseFloat(styleScore),
                 dive: parseFloat(diveScore),
                 camerawork: parseFloat(camScore),
+                camQuality: camQuality,
+                camProgressive: camProgressive,
                 nv: wsFreeNV,
                 workingTime: workingTime,
                 timestamp: new Date().toLocaleString()
@@ -5017,17 +5065,19 @@
         let wsFreeNV = false;
 
         function calculateWsFree() {
-            let styleAvg, diveAvg, camAvg;
+            let styleAvg, diveAvg, camQualityAvg, camProgressiveAvg, camTotal;
 
             if (wsFreeSingleJudge) {
                 // Single judge mode
                 styleAvg = parseFloat(document.getElementById('wsFreeStyleSingleInput').value) || 0;
                 diveAvg = parseFloat(document.getElementById('wsFreeDiveSingleInput').value) || 0;
-                camAvg = parseFloat(document.getElementById('wsFreeCamSingleInput').value) || 0;
+                camQualityAvg = parseFloat(document.getElementById('wsFreeCamQualitySingle').value) || 0;
+                camProgressiveAvg = parseFloat(document.getElementById('wsFreeCamProgressiveSingle').value) || 0;
+                camTotal = parseFloat((camQualityAvg + camProgressiveAvg).toFixed(1));
 
                 document.getElementById('wsFreeStyleAvgSingle').textContent = styleAvg.toFixed(1);
                 document.getElementById('wsFreeDiveAvgSingle').textContent = diveAvg.toFixed(1);
-                document.getElementById('wsFreeCamAvgSingle').textContent = camAvg.toFixed(1);
+                document.getElementById('wsFreeCamAvgSingle').textContent = camTotal.toFixed(1);
             } else {
                 // 3 judge panel mode
                 const styleScores = [
@@ -5046,13 +5096,22 @@
                 diveAvg = calculateJudgeAverage(diveScores);
                 document.getElementById('wsFreeDiveAvg').textContent = diveAvg;
 
-                const camScores = [
-                    parseFloat(document.getElementById('wsFreeCamJ1').value),
-                    parseFloat(document.getElementById('wsFreeCamJ2').value),
-                    parseFloat(document.getElementById('wsFreeCamJ3').value)
+                const camQualityScores = [
+                    parseFloat(document.getElementById('wsFreeCamQualityJ1').value),
+                    parseFloat(document.getElementById('wsFreeCamQualityJ2').value),
+                    parseFloat(document.getElementById('wsFreeCamQualityJ3').value)
                 ];
-                camAvg = calculateJudgeAverage(camScores);
-                document.getElementById('wsFreeCamAvg').textContent = camAvg;
+                camQualityAvg = parseFloat(calculateJudgeAverage(camQualityScores));
+
+                const camProgressiveScores = [
+                    parseFloat(document.getElementById('wsFreeCamProgressiveJ1').value),
+                    parseFloat(document.getElementById('wsFreeCamProgressiveJ2').value),
+                    parseFloat(document.getElementById('wsFreeCamProgressiveJ3').value)
+                ];
+                camProgressiveAvg = parseFloat(calculateJudgeAverage(camProgressiveScores));
+
+                camTotal = parseFloat((camQualityAvg + camProgressiveAvg).toFixed(1));
+                document.getElementById('wsFreeCamAvg').textContent = camTotal.toFixed(1);
             }
 
             // Final scores
@@ -5067,7 +5126,7 @@
             } else {
                 document.getElementById('wsFreeStyleFinal').textContent = styleAvg;
                 document.getElementById('wsFreeDiveFinal').textContent = diveAvg;
-                document.getElementById('wsFreeCamFinal').textContent = camAvg;
+                document.getElementById('wsFreeCamFinal').textContent = camTotal.toFixed(1);
                 ['wsFreeStyleFinal', 'wsFreeDiveFinal', 'wsFreeCamFinal'].forEach(id => {
                     document.getElementById(id).classList.remove('text-red-400');
                     document.getElementById(id).classList.add('text-green-400');
