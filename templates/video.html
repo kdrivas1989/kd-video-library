@@ -174,6 +174,16 @@
 
                 <!-- Scoring & Judging Panel -->
                 <div class="bg-gray-800 rounded-lg p-4 mb-6">
+                    <!-- WS Compulsory/Free toggle (shown for wingsuit events) -->
+                    <div id="wsRoutineToggle" class="hidden mb-3 pb-3 border-b border-gray-700 flex items-center gap-4">
+                        <span class="text-gray-400 text-sm">Routine:</span>
+                        <div class="flex rounded overflow-hidden">
+                            <button type="button" id="btnWsCompulsory" onclick="setWsRoutineType('compulsory')"
+                                class="px-3 py-1 text-sm bg-blue-600 text-white">Compulsory</button>
+                            <button type="button" id="btnWsFree" onclick="setWsRoutineType('free')"
+                                class="px-3 py-1 text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">Free</button>
+                        </div>
+                    </div>
                     <div class="flex items-center justify-between flex-wrap gap-4">
                         <div class="flex items-center gap-2">
                             <span class="text-gray-400 text-sm">Speed:</span>
@@ -3663,6 +3673,7 @@
             document.getElementById('wingsuitSection').classList.add('hidden');
             document.getElementById('wsCompulsorySection').classList.add('hidden');
             document.getElementById('wsFreeSection').classList.add('hidden');
+            document.getElementById('wsRoutineToggle').classList.add('hidden');
 
             if (isSpeedEvent) {
                 document.getElementById('durationLabel').textContent = 'Speed competition';
@@ -3675,10 +3686,22 @@
                 document.getElementById('speedInfo').classList.remove('hidden');
                 document.getElementById('timerBtn').textContent = 'Start (X)';
                 document.getElementById('wingsuitSection').classList.remove('hidden');
+                document.getElementById('wsRoutineToggle').classList.remove('hidden');
+                // Sync toggle buttons with current event type
+                const btnComp = document.getElementById('btnWsCompulsory');
+                const btnFree = document.getElementById('btnWsFree');
                 if (eventType === 'ws-compulsory') {
                     document.getElementById('wsCompulsorySection').classList.remove('hidden');
+                    btnComp.classList.remove('bg-gray-700', 'text-gray-300');
+                    btnComp.classList.add('bg-blue-600', 'text-white');
+                    btnFree.classList.remove('bg-blue-600', 'text-white');
+                    btnFree.classList.add('bg-gray-700', 'text-gray-300');
                 } else {
                     document.getElementById('wsFreeSection').classList.remove('hidden');
+                    btnFree.classList.remove('bg-gray-700', 'text-gray-300');
+                    btnFree.classList.add('bg-blue-600', 'text-white');
+                    btnComp.classList.remove('bg-blue-600', 'text-white');
+                    btnComp.classList.add('bg-gray-700', 'text-gray-300');
                 }
                 // Set up mode-specific defaults
                 updateWsMode();
@@ -4288,6 +4311,12 @@
             document.getElementById('timerDisplay').textContent = display;
             document.getElementById('timerDisplay').classList.remove('text-gray-400');
             document.getElementById('timerDisplay').classList.add('text-white');
+        }
+
+        function setWsRoutineType(type) {
+            const select = document.getElementById('eventType');
+            select.value = (type === 'free') ? 'ws-free' : 'ws-compulsory';
+            updateEventType();
         }
 
         // FlySight CSV Parsing
