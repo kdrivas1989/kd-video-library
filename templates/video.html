@@ -3695,6 +3695,12 @@
             resetTimer();
         }
 
+        // FlySight variables (must be declared before init calls updateWsMode)
+        let flysightDataRaw = null; // Raw MSL data
+        let flysightData = null;    // Adjusted for ground elevation (AGL)
+        let wsWorkingTime = 0;
+        let wsCompetitionMode = false; // false = library/practice, true = competition
+
         // Initialize event type on page load (after all functions and constants are declared)
         try {
             autoSelectEventType();
@@ -4276,11 +4282,6 @@
         }
 
         // FlySight CSV Parsing
-        let flysightDataRaw = null; // Raw MSL data
-        let flysightData = null;    // Adjusted for ground elevation (AGL)
-        let wsWorkingTime = 0;
-        let wsCompetitionMode = false; // false = library/practice, true = competition
-
         function updateWsMode() {
             const selectedMode = document.querySelector('input[name="wsMode"]:checked').value;
             wsCompetitionMode = (selectedMode === 'competition');
