@@ -34,7 +34,7 @@
         <div id="videoContainer" class="mb-4">
             {% if video %}
             {% if video.is_direct_url %}
-            <video id="judgeScoringVideo" class="w-full rounded-lg" preload="metadata"
+            <video id="judgeScoringVideo" class="w-full rounded-lg" preload="auto"
                 controlsList="noplaybackrate nodownload">
                 {% if '.webm' in video.video_src|lower %}
                 <source src="{{ video.video_src }}" type="video/webm">
@@ -336,7 +336,7 @@
         // Pre-connect socket on page load so it's ready when user clicks Join
         function initSocket() {
             socket = io(window.location.origin, {
-                transports: ['polling', 'websocket'],
+                transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionAttempts: 10,
                 reconnectionDelay: 1000
@@ -394,7 +394,7 @@
                     const container = document.getElementById('videoContainer');
                     if (container) {
                         if (data.video.is_direct_url && data.video.video_src) {
-                            container.innerHTML = '<video id="judgeScoringVideo" class="w-full rounded-lg" preload="metadata" controlsList="noplaybackrate nodownload"><source src="' + data.video.video_src + '" type="video/mp4"></video>';
+                            container.innerHTML = '<video id="judgeScoringVideo" class="w-full rounded-lg" preload="auto" controlsList="noplaybackrate nodownload"><source src="' + data.video.video_src + '" type="video/mp4"></video>';
                         } else if (data.video.embed_url) {
                             container.innerHTML = '<iframe id="judgeScoringEmbed" src="' + data.video.embed_url + '" class="w-full aspect-video rounded-lg" frameborder="0" allowfullscreen></iframe>';
                         }
@@ -453,7 +453,7 @@
                 const container = document.getElementById('videoContainer');
                 if (!container) return;
                 if (data.is_direct_url && data.video_src) {
-                    container.innerHTML = '<video id="judgeScoringVideo" class="w-full rounded-lg" preload="metadata" controlsList="noplaybackrate nodownload"><source src="' + data.video_src + '" type="video/mp4"></video>';
+                    container.innerHTML = '<video id="judgeScoringVideo" class="w-full rounded-lg" preload="auto" controlsList="noplaybackrate nodownload"><source src="' + data.video_src + '" type="video/mp4"></video>';
                 } else if (data.embed_url) {
                     container.innerHTML = '<iframe id="judgeScoringEmbed" src="' + data.embed_url + '" class="w-full aspect-video rounded-lg" frameborder="0" allowfullscreen></iframe>';
                 }
