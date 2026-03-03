@@ -202,6 +202,7 @@
                         {% else %}
                         <span>{{ category.abbrev }}</span>
                         {% endif %}
+                        {% if video.round_num %}<span class="bg-yellow-700 text-yellow-200 px-1.5 py-0.5 rounded text-xs font-mono">R{{ video.round_num }}</span>{% endif %}
                         <span>{{ video.views }} views</span>
                     </div>
                 </div>
@@ -323,6 +324,7 @@
                                     {% else %}
                                     <span>{{ category.abbrev }}</span>
                                     {% endif %}
+                                    {% if video.round_num %}<span class="bg-yellow-700 text-yellow-200 px-1 py-0.5 rounded text-xs font-mono">R{{ video.round_num }}</span>{% endif %}
                                     <span>{{ video.views }} views</span>
                                 </div>
                             </div>
@@ -411,6 +413,7 @@
                                     {% else %}
                                     <span>{{ category.abbrev }}</span>
                                     {% endif %}
+                                    {% if video.round_num %}<span class="bg-yellow-700 text-yellow-200 px-1 py-0.5 rounded text-xs font-mono">R{{ video.round_num }}</span>{% endif %}
                                     <span>{{ video.views }} views</span>
                                 </div>
                             </div>
@@ -473,6 +476,7 @@
                         {% else %}
                         <span>{{ category.abbrev }}</span>
                         {% endif %}
+                        {% if video.round_num %}<span class="bg-yellow-700 text-yellow-200 px-1.5 py-0.5 rounded text-xs font-mono">R{{ video.round_num }}</span>{% endif %}
                         <span>{{ video.views }} views</span>
                     </div>
                 </div>
