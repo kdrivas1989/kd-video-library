@@ -212,6 +212,7 @@
         let myName = '';
         let isLocked = false;
         let submitTimeout = null;
+        let socketReady = false;
 
         const FIELD_CONFIG = {
             'ws-free': {
@@ -332,17 +333,8 @@
             }
         }
 
-        function joinRoom() {
-            myName = document.getElementById('judgeName').value.trim();
-            myJudgeNum = parseInt(document.getElementById('judgePosition').value);
-
-            if (!myName) {
-                showJoinError('Please enter your name');
-                return;
-            }
-
-            addStatus('Connecting to server...', 'info');
-
+        // Pre-connect socket on page load so it's ready when user clicks Join
+        function initSocket() {
             socket = io(window.location.origin, {
                 transports: ['polling', 'websocket'],
                 reconnection: true,
@@ -351,33 +343,29 @@
             });
 
             socket.on('connect_error', (err) => {
-                showJoinError('Connection failed: ' + err.message);
-                addStatus('Connection error: ' + err.message, 'error');
+                document.getElementById('connectionDot').classList.remove('bg-green-500');
+                document.getElementById('connectionDot').classList.add('bg-red-500');
             });
 
             socket.on('connect', () => {
+                socketReady = true;
                 document.getElementById('connectionDot').classList.remove('bg-gray-500', 'bg-red-500');
                 document.getElementById('connectionDot').classList.add('bg-green-500');
-
-                socket.emit('ws_scoring_join', {
-                    room_code: roomCode,
-                    judge_num: myJudgeNum,
-                    judge_name: myName
-                });
+                // If already joined (reconnect), re-join the room
+                if (myJudgeNum && myName) {
+                    socket.emit('ws_scoring_join', {
+                        room_code: roomCode,
+                        judge_num: myJudgeNum,
+                        judge_name: myName
+                    });
+                }
             });
 
             socket.on('disconnect', () => {
+                socketReady = false;
                 document.getElementById('connectionDot').classList.remove('bg-green-500');
                 document.getElementById('connectionDot').classList.add('bg-red-500');
                 addStatus('Disconnected - reconnecting...', 'error');
-            });
-
-            socket.on('reconnect', () => {
-                socket.emit('ws_scoring_join', {
-                    room_code: roomCode,
-                    judge_num: myJudgeNum,
-                    judge_name: myName
-                });
             });
 
             socket.on('ws_scoring_joined', (data) => {
@@ -386,11 +374,9 @@
                 document.getElementById('myJudgeLabel').textContent = 'J' + myJudgeNum;
                 document.getElementById('myJudgeName').textContent = myName;
 
-                // Set scoring type from server (dynamic, not server-rendered)
                 setScoringType(data.scoring_type);
                 updateState(data.state);
 
-                // Repopulate existing scores
                 if (data.scores) {
                     Object.entries(data.scores).forEach(([field, value]) => {
                         if (value !== null && value !== undefined) {
@@ -416,7 +402,6 @@
                 updateState(data.state);
             });
 
-            // Event judge switched scoring type
             socket.on('ws_scoring_type_changed', (data) => {
                 setScoringType(data.scoring_type);
                 clearAllInputs();
@@ -427,7 +412,6 @@
 
             socket.on('ws_scoring_reset_all', (data) => {
                 updateState(data.state);
-                // Sync scoring type in case it changed
                 if (data.scoring_type) {
                     setScoringType(data.scoring_type);
                 }
@@ -438,7 +422,7 @@
                 addStatus('Scores reset by event judge', 'warning');
             });
 
-            // Video sync events from event judge (use dynamic lookup so it works even if video loaded after join)
+            // Video sync events from event judge
             socket.on('ws_scoring_video_play', (data) => {
                 const v = document.getElementById('judgeScoringVideo');
                 if (v) { v.currentTime = data.time; v.play().catch(() => {}); }
@@ -452,7 +436,7 @@
                 if (v) { v.currentTime = data.time; }
             });
 
-            // Event judge attached a new video — dynamically create the player
+            // Event judge attached a new video
             socket.on('ws_scoring_video_attached', (data) => {
                 const container = document.getElementById('videoContainer');
                 if (!container) return;
@@ -462,6 +446,41 @@
                     container.innerHTML = '<iframe id="judgeScoringEmbed" src="' + data.embed_url + '" class="w-full aspect-video rounded-lg" frameborder="0" allowfullscreen></iframe>';
                 }
                 addStatus('Video loaded by event judge', 'info');
+            });
+        }
+
+        // Start socket connection immediately on page load
+        initSocket();
+
+        function joinRoom() {
+            myName = document.getElementById('judgeName').value.trim();
+            myJudgeNum = parseInt(document.getElementById('judgePosition').value);
+
+            if (!myName) {
+                showJoinError('Please enter your name');
+                return;
+            }
+
+            if (!socketReady) {
+                addStatus('Connecting to server...', 'info');
+                // Wait for socket to connect, then join
+                const waitForSocket = setInterval(() => {
+                    if (socketReady) {
+                        clearInterval(waitForSocket);
+                        socket.emit('ws_scoring_join', {
+                            room_code: roomCode,
+                            judge_num: myJudgeNum,
+                            judge_name: myName
+                        });
+                    }
+                }, 200);
+                return;
+            }
+
+            socket.emit('ws_scoring_join', {
+                room_code: roomCode,
+                judge_num: myJudgeNum,
+                judge_name: myName
             });
         }
 
