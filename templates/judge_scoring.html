@@ -213,6 +213,7 @@
         let isLocked = false;
         let submitTimeout = null;
         let socketReady = false;
+        let hasJoined = false;
 
         const FIELD_CONFIG = {
             'ws-free': {
@@ -364,7 +365,6 @@
                 socketReady = false;
                 document.getElementById('connectionDot').classList.remove('bg-green-500');
                 document.getElementById('connectionDot').classList.add('bg-red-500');
-                addStatus('Disconnected - reconnecting...', 'error');
             });
 
             socket.on('ws_scoring_joined', (data) => {
@@ -401,7 +401,11 @@
                 }
 
                 updateCompletionSummary();
-                addStatus('Joined as J' + myJudgeNum, 'success');
+                if (!hasJoined) {
+                    clearStatus();
+                    addStatus('Joined as J' + myJudgeNum, 'success');
+                    hasJoined = true;
+                }
             });
 
             socket.on('ws_scoring_error', (data) => {
@@ -473,7 +477,6 @@
             }
 
             if (!socketReady) {
-                addStatus('Connecting to server...', 'info');
                 // Wait for socket to connect, then join
                 const waitForSocket = setInterval(() => {
                     if (socketReady) {
@@ -571,6 +574,13 @@
             el.textContent = msg;
             el.classList.remove('hidden');
             setTimeout(() => el.classList.add('hidden'), 5000);
+        }
+
+        function clearStatus() {
+            ['statusMessages', 'globalStatus'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = '';
+            });
         }
 
         function addStatus(message, type) {
