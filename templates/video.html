@@ -5779,6 +5779,10 @@
                 document.getElementById('cpFreeSingleJudge').classList.add('hidden');
                 document.getElementById('cpFreePanelJudge').classList.remove('hidden');
                 document.getElementById('cpScoringPanel').classList.remove('hidden');
+                // Auto-create room if not already started
+                if (!cpScoringRoomCode) {
+                    createCpScoringRoom();
+                }
             }
             calculateCpFreestyle();
         }
