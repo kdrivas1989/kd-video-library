@@ -570,13 +570,13 @@ def normalize_event_type(input_str):
 # SocketIO for real-time sync viewing
 try:
     from flask_socketio import SocketIO, emit, join_room, leave_room
-    # Configure SocketIO to work in both development and production
-    # async_mode='threading' works without additional dependencies
-    # cors_allowed_origins="*" allows connections from any origin
+    # Auto-detect async mode: use gevent in production (gunicorn), threading in development
+    import sys
+    _async_mode = 'gevent' if 'gunicorn' in sys.modules else 'threading'
     socketio = SocketIO(
         app,
         cors_allowed_origins="*",
-        async_mode='threading',
+        async_mode=_async_mode,
         ping_timeout=60,
         ping_interval=25,
         logger=False,
