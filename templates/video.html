@@ -280,332 +280,6 @@
                                     class="px-3 py-1 text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">3-Judge Panel</button>
                             </div>
                         </div>
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="flex items-center gap-3">
-                                <span class="text-gray-400 text-sm">Scoring:</span>
-                                <span class="text-xs text-gray-500">X = point (+1) | C = bust (0 pts) | Q = omission (-1)</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <!-- Panel Mode Toggle -->
-                                <select id="panelSize" onchange="updatePanelMode()" class="px-2 py-1 rounded bg-gray-700 text-white text-sm">
-                                    <option value="1">Solo</option>
-                                    <option value="3">3 Panel</option>
-                                    <option value="5">5 Panel</option>
-                                </select>
-                                <span id="currentJudgeLabel" class="text-xs text-cyan-400 hidden">J1</span>
-                                <button onclick="toggleNV()" id="nvBtn" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm">
-                                    NV
-                                </button>
-                                <button onclick="clearScoring()" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm">
-                                    Clear
-                                </button>
-                            </div>
-                        </div>
-                        <!-- Judge Names Dropdown (panel mode only) -->
-                        <div id="judgeNamesRow" class="hidden mb-3 flex items-center gap-2 flex-wrap">
-                            <span class="text-gray-400 text-sm">Judges:</span>
-                            <select id="judgeName1" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm" onchange="updateJudgeSelection(1)">
-                                <option value="">Select Judge 1</option>
-                                {% for user in users %}
-                                <option value="{{ user.name }}">{{ user.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <select id="judgeName2" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm" onchange="updateJudgeSelection(2)">
-                                <option value="">Select Judge 2</option>
-                                {% for user in users %}
-                                <option value="{{ user.name }}">{{ user.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <select id="judgeName3" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm" onchange="updateJudgeSelection(3)">
-                                <option value="">Select Judge 3</option>
-                                {% for user in users %}
-                                <option value="{{ user.name }}">{{ user.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <select id="judgeName4" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm hidden" onchange="updateJudgeSelection(4)">
-                                <option value="">Select Judge 4</option>
-                                {% for user in users %}
-                                <option value="{{ user.name }}">{{ user.name }}</option>
-                                {% endfor %}
-                            </select>
-                            <select id="judgeName5" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm hidden" onchange="updateJudgeSelection(5)">
-                                <option value="">Select Judge 5</option>
-                                {% for user in users %}
-                                <option value="{{ user.name }}">{{ user.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <!-- Sync Panel Session (panel mode only) -->
-                        <div id="syncPanelRow" class="hidden mb-3 p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
-                            <div class="flex items-center justify-between flex-wrap gap-2">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-blue-400 text-sm font-medium">Sync Session:</span>
-                                    <span id="syncSessionId" class="text-xs text-gray-400 font-mono">Not connected</span>
-                                    <button id="copySessionIdBtn" onclick="copySessionId()" class="hidden px-2 py-1 rounded bg-gray-600 hover:bg-gray-500 text-xs">
-                                        Copy ID
-                                    </button>
-                                </div>
-                                <div id="syncNotConnected" class="flex items-center gap-2 flex-wrap">
-                                    <!-- Role Selection -->
-                                    <div class="flex items-center gap-2">
-                                        <select id="syncRoleSelect" onchange="updateSyncRoleUI()" class="px-2 py-1 rounded bg-gray-700 text-white text-sm">
-                                            <option value="event">I am the Event Judge</option>
-                                            <option value="panel">I am a Panel Judge</option>
-                                        </select>
-                                    </div>
-                                    <!-- Event Judge: Create session -->
-                                    <div id="eventJudgeControls" class="flex items-center gap-2">
-                                        <button onclick="createSyncSession()" class="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
-                                            Create Session
-                                        </button>
-                                    </div>
-                                    <!-- Panel Judges: Join session -->
-                                    <div id="panelJudgeControls" class="hidden flex items-center gap-2">
-                                        <select id="myJudgeNum" class="px-2 py-1 rounded bg-gray-700 text-white text-sm">
-                                            <option value="1">Judge 1</option>
-                                            <option value="2">Judge 2</option>
-                                            <option value="3">Judge 3</option>
-                                        </select>
-                                        <input type="text" id="joinSessionId" placeholder="Session ID" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm">
-                                        <button onclick="joinSyncSession()" class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-sm">
-                                            Join
-                                        </button>
-                                    </div>
-                                </div>
-                                <div id="syncConnected" class="hidden flex items-center gap-2 flex-wrap">
-                                    <div id="syncJudgesList" class="flex items-center gap-1">
-                                        <!-- Judge connection indicators -->
-                                    </div>
-                                    <span class="text-gray-500">|</span>
-                                    <span id="syncStateDisplay" class="text-yellow-400 text-xs">Waiting...</span>
-                                    <button id="syncReadyBtn" onclick="markJudgeReady()" class="hidden px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
-                                        Ready
-                                    </button>
-                                    <button id="syncStartVideoBtn" onclick="eventJudgeStartVideo()" class="hidden px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-sm font-medium">
-                                        Start Video
-                                    </button>
-                                    <button id="syncResetBtn" onclick="eventJudgeReset()" class="hidden px-3 py-1 rounded bg-orange-600 hover:bg-orange-700 text-sm font-medium">
-                                        Reset
-                                    </button>
-                                    <button onclick="leaveSyncSession()" class="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-sm">
-                                        Leave
-                                    </button>
-                                </div>
-                            </div>
-                            <div id="syncStatus" class="text-xs text-green-400 mt-2 hidden"></div>
-                        </div>
-                        <div class="bg-gray-900 rounded-lg p-3 mb-3 min-h-[40px] font-mono text-xl tracking-widest" id="scoringTimeline">
-                            <span class="text-gray-500">Press X, C, or Q to score...</span>
-                        </div>
-                        <div class="flex items-center justify-between text-sm">
-                            <div class="flex items-center gap-4">
-                                <span class="text-gray-400">Points (X): <span id="xCount" class="text-green-400 font-bold">0</span></span>
-                                <span class="text-gray-400">Busts (C): <span id="cCount" class="text-red-400 font-bold">0</span></span>
-                                <span class="text-gray-400">Omissions (Q): <span id="qCount" class="text-orange-400 font-bold">0</span></span>
-                            </div>
-                            <div class="text-lg flex items-center gap-3">
-                                <span id="nvIndicator" class="text-red-500 font-bold hidden">NV PENALTY</span>
-                                <span class="text-gray-400">Total:</span>
-                                <span id="totalScore" class="text-yellow-400 font-bold ml-2">0</span>
-                                <span id="scoreComparison" class="text-cyan-400 text-sm hidden"></span>
-                            </div>
-                        </div>
-                        <!-- Save Score Button -->
-                        <div id="saveScoreSection" class="hidden mt-3 pt-3 border-t border-gray-700">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    {% if competition_context %}
-                                    <span class="text-gray-400 text-sm">Round {{ competition_context.round_num }}</span>
-                                    <input type="hidden" id="scoreRoundLabel" value="Round {{ competition_context.round_num }}">
-                                    {% else %}
-                                    <input type="text" id="scoreRoundLabel" placeholder="Round #"
-                                        class="w-24 px-3 py-1 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    {% endif %}
-                                    <button onclick="saveCurrentScore()" class="px-4 py-1 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
-                                        Save Score
-                                    </button>
-                                </div>
-                                <span id="saveScoreStatus" class="text-sm text-gray-500"></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Saved Scores Display -->
-                    <div class="mt-4 pt-4 border-t border-gray-700">
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="text-gray-400 text-sm font-medium">Saved Scores (Practice)</span>
-                            <button onclick="clearSavedScores()" class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs">
-                                Clear All
-                            </button>
-                        </div>
-                        <div id="savedScoresList" class="space-y-2 max-h-48 overflow-y-auto">
-                            <div class="text-gray-500 text-sm text-center py-2">No saved scores yet</div>
-                        </div>
-                    </div>
-
-                    <!-- Timer Controls -->
-                    <div class="flex items-center justify-between flex-wrap gap-4 mt-4 pt-4 border-t border-gray-700">
-                        <div class="flex items-center gap-3">
-                            <span class="text-gray-400 text-sm">Discipline:</span>
-                            <select id="eventType" onchange="updateEventType()"
-                                class="px-3 py-1 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <optgroup label="Formation Skydiving">
-                                    <option value="2way-mfs" data-duration="35">2-Way MFS (35s)</option>
-                                    <option value="4way-vfs" data-duration="35">4-Way VFS (35s)</option>
-                                    <option value="4way-fs" data-duration="35" selected>4-Way FS (35s)</option>
-                                    <option value="8way" data-duration="50">8-Way (50s)</option>
-                                    <option value="10way" data-duration="0">10-Way Speed</option>
-                                    <option value="16way" data-duration="50">16-Way (50s)</option>
-                                </optgroup>
-                                <optgroup label="Canopy Formation">
-                                    <option value="2way-cf-seq" data-duration="60">2-Way CF Sequential (60s)</option>
-                                    <option value="4way-cf-seq" data-duration="120">4-Way CF Sequential (120s)</option>
-                                    <option value="4way-cf-rot" data-duration="90">4-Way CF Rotation (90s)</option>
-                                </optgroup>
-                                <optgroup label="Artistic Events">
-                                    <option value="freestyle" data-duration="45">Freestyle (45s)</option>
-                                    <option value="freefly" data-duration="43">Freeflying (43s)</option>
-                                </optgroup>
-                                <optgroup label="Wingsuit Acrobatic">
-                                    <option value="ws-compulsory" data-duration="0">WS Compulsory Round</option>
-                                    <option value="ws-free" data-duration="0">WS Free Round</option>
-                                </optgroup>
-                            </select>
-                            <select id="eventClass" onchange="updateFormations()"
-                                class="px-3 py-1 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="open">Open</option>
-                                <option value="advanced">Advanced</option>
-                                <option value="intermediate">Intermediate</option>
-                                <option value="beginner">Beginner</option>
-                            </select>
-                            <span id="durationLabel" class="text-gray-400 text-sm">35s working time</span>
-                        </div>
-                    </div>
-
-                    <!-- Formations/Draw Input -->
-                    <div id="formationsSection" class="mt-3 pt-3 border-t border-gray-700">
-                        <div class="flex items-center gap-3 flex-wrap">
-                            <span class="text-gray-400 text-sm">Draw:</span>
-                            <input type="text" id="formationsInput" placeholder="e.g., A2BC1D"
-                                oninput="updateFormations()"
-                                class="w-48 px-3 py-1 rounded bg-gray-700 text-white text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <div id="formationsDisplay" class="flex items-center gap-1 text-lg font-mono"></div>
-                        </div>
-                        <div class="flex items-center gap-3 flex-wrap mt-2">
-                            <span class="text-gray-400 text-sm">Max: <span id="maxPoints" class="text-cyan-400 font-bold">0</span> pts</span>
-                            <span class="text-gray-500">|</span>
-                            <span class="text-gray-400 text-sm">Score: <span id="currentScore" class="text-green-400 font-bold">0</span> pts</span>
-                            <span class="text-gray-500">|</span>
-                            <span class="text-gray-400 text-sm">Time: <span id="workingTimeDisplay" class="text-yellow-400 font-bold">0:00</span></span>
-                            <span class="text-gray-500">|</span>
-                            <button onclick="submitAssignmentScore()" class="px-4 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm font-medium">
-                                Submit Score
-                            </button>
-                            <span id="drawInfo" class="text-xs text-gray-500"></span>
-                            <span id="drawValidation" class="text-xs"></span>
-                        </div>
-                    </div>
-
-                    <div id="speedInfo" class="text-xs text-gray-500 hidden mt-2">
-                        10-Way Speed: X to start, X again to stop. Max score: 35.00s. Freeze 6s after completion.
-                    </div>
-
-                    <!-- Multi-Judge Scoring Panel -->
-                    <div id="multiJudgePanel" class="mt-4 pt-4 border-t border-gray-700">
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="text-gray-400 text-sm font-medium">Judge Panel</span>
-                            <div class="flex items-center gap-2">
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" id="multiJudgeMode" onchange="toggleMultiJudgeMode()"
-                                        class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-blue-600">
-                                    <span class="text-gray-400 text-sm">Multi-Judge Mode</span>
-                                </label>
-                                <select id="judgeCount" onchange="updateJudgeCount()" class="px-2 py-1 rounded bg-gray-700 text-white text-sm hidden">
-                                    <option value="3">3 Judges</option>
-                                    <option value="5" selected>5 Judges</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- FS/VFS Multi-Judge Panel -->
-                        <div id="fsMultiJudgePanel" class="hidden">
-                            <p class="text-xs text-gray-500 mb-3">Enter each judge's point count. Average will be calculated automatically.</p>
-                            <div class="grid grid-cols-5 gap-2 mb-3" id="fsJudgeInputs">
-                                <div class="text-center">
-                                    <label class="text-xs text-gray-500">J1</label>
-                                    <input type="number" id="fsJ1" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
-                                </div>
-                                <div class="text-center">
-                                    <label class="text-xs text-gray-500">J2</label>
-                                    <input type="number" id="fsJ2" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
-                                </div>
-                                <div class="text-center">
-                                    <label class="text-xs text-gray-500">J3</label>
-                                    <input type="number" id="fsJ3" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
-                                </div>
-                                <div class="text-center">
-                                    <label class="text-xs text-gray-500">J4</label>
-                                    <input type="number" id="fsJ4" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
-                                </div>
-                                <div class="text-center">
-                                    <label class="text-xs text-gray-500">J5</label>
-                                    <input type="number" id="fsJ5" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
-                                </div>
-                            </div>
-                            <div class="flex items-center justify-between bg-gray-900 rounded p-3">
-                                <div class="flex items-center gap-4">
-                                    <span class="text-gray-400 text-sm">Average:</span>
-                                    <span id="fsJudgeAverage" class="text-2xl font-mono font-bold text-yellow-400">0.0</span>
-                                </div>
-                                <div class="flex items-center gap-4">
-                                    <span class="text-gray-400 text-sm">Spread:</span>
-                                    <span id="fsJudgeSpread" class="font-mono text-gray-300">0</span>
-                                    <span id="fsSpreadWarning" class="text-red-400 text-sm hidden">⚠️ Large spread</span>
-                                </div>
-                                <button onclick="saveFsScore()" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-medium">
-                                    Save Score
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- CF Multi-Judge Panel -->
-                        <div id="cfMultiJudgePanel" class="hidden">
-                            <p class="text-xs text-gray-500 mb-3">Enter each judge's formation count for CF events.</p>
-                            <div class="grid grid-cols-5 gap-2 mb-3" id="cfJudgeInputs">
-                                <div class="text-center">
-                                    <label class="text-xs text-gray-500">J1</label>
-                                    <input type="number" id="cfJ1" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
-                                </div>
-                                <div class="text-center">
-                                    <label class="text-xs text-gray-500">J2</label>
-                                    <input type="number" id="cfJ2" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
-                                </div>
-                                <div class="text-center">
-                                    <label class="text-xs text-gray-500">J3</label>
-                                    <input type="number" id="cfJ3" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
-                                </div>
-                                <div class="text-center">
-                                    <label class="text-xs text-gray-500">J4</label>
-                                    <input type="number" id="cfJ4" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
-                                </div>
-                                <div class="text-center">
-                                    <label class="text-xs text-gray-500">J5</label>
-                                    <input type="number" id="cfJ5" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
-                                </div>
-                            </div>
-                            <div class="flex items-center justify-between bg-gray-900 rounded p-3">
-                                <div class="flex items-center gap-4">
-                                    <span class="text-gray-400 text-sm">Average:</span>
-                                    <span id="cfJudgeAverage" class="text-2xl font-mono font-bold text-yellow-400">0.0</span>
-                                </div>
-                                <div class="flex items-center gap-4">
-                                    <span class="text-gray-400 text-sm">Spread:</span>
-                                    <span id="cfJudgeSpread" class="font-mono text-gray-300">0</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- USPA Artistic Events Multi-Judge Panel -->
                         <div id="artisticMultiJudgePanel" class="hidden">
                             <!-- Routine Type & Discipline Selector -->
                             <div class="mb-4 pb-4 border-b border-gray-700">
@@ -1003,6 +677,330 @@
                                 </button>
                             </div>
                             {% endif %}
+                        </div>
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-3">
+                                <span class="text-gray-400 text-sm">Scoring:</span>
+                                <span class="text-xs text-gray-500">X = point (+1) | C = bust (0 pts) | Q = omission (-1)</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <!-- Panel Mode Toggle -->
+                                <select id="panelSize" onchange="updatePanelMode()" class="px-2 py-1 rounded bg-gray-700 text-white text-sm">
+                                    <option value="1">Solo</option>
+                                    <option value="3">3 Panel</option>
+                                    <option value="5">5 Panel</option>
+                                </select>
+                                <span id="currentJudgeLabel" class="text-xs text-cyan-400 hidden">J1</span>
+                                <button onclick="toggleNV()" id="nvBtn" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm">
+                                    NV
+                                </button>
+                                <button onclick="clearScoring()" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Judge Names Dropdown (panel mode only) -->
+                        <div id="judgeNamesRow" class="hidden mb-3 flex items-center gap-2 flex-wrap">
+                            <span class="text-gray-400 text-sm">Judges:</span>
+                            <select id="judgeName1" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm" onchange="updateJudgeSelection(1)">
+                                <option value="">Select Judge 1</option>
+                                {% for user in users %}
+                                <option value="{{ user.name }}">{{ user.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select id="judgeName2" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm" onchange="updateJudgeSelection(2)">
+                                <option value="">Select Judge 2</option>
+                                {% for user in users %}
+                                <option value="{{ user.name }}">{{ user.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select id="judgeName3" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm" onchange="updateJudgeSelection(3)">
+                                <option value="">Select Judge 3</option>
+                                {% for user in users %}
+                                <option value="{{ user.name }}">{{ user.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select id="judgeName4" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm hidden" onchange="updateJudgeSelection(4)">
+                                <option value="">Select Judge 4</option>
+                                {% for user in users %}
+                                <option value="{{ user.name }}">{{ user.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select id="judgeName5" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm hidden" onchange="updateJudgeSelection(5)">
+                                <option value="">Select Judge 5</option>
+                                {% for user in users %}
+                                <option value="{{ user.name }}">{{ user.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <!-- Sync Panel Session (panel mode only) -->
+                        <div id="syncPanelRow" class="hidden mb-3 p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
+                            <div class="flex items-center justify-between flex-wrap gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-blue-400 text-sm font-medium">Sync Session:</span>
+                                    <span id="syncSessionId" class="text-xs text-gray-400 font-mono">Not connected</span>
+                                    <button id="copySessionIdBtn" onclick="copySessionId()" class="hidden px-2 py-1 rounded bg-gray-600 hover:bg-gray-500 text-xs">
+                                        Copy ID
+                                    </button>
+                                </div>
+                                <div id="syncNotConnected" class="flex items-center gap-2 flex-wrap">
+                                    <!-- Role Selection -->
+                                    <div class="flex items-center gap-2">
+                                        <select id="syncRoleSelect" onchange="updateSyncRoleUI()" class="px-2 py-1 rounded bg-gray-700 text-white text-sm">
+                                            <option value="event">I am the Event Judge</option>
+                                            <option value="panel">I am a Panel Judge</option>
+                                        </select>
+                                    </div>
+                                    <!-- Event Judge: Create session -->
+                                    <div id="eventJudgeControls" class="flex items-center gap-2">
+                                        <button onclick="createSyncSession()" class="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
+                                            Create Session
+                                        </button>
+                                    </div>
+                                    <!-- Panel Judges: Join session -->
+                                    <div id="panelJudgeControls" class="hidden flex items-center gap-2">
+                                        <select id="myJudgeNum" class="px-2 py-1 rounded bg-gray-700 text-white text-sm">
+                                            <option value="1">Judge 1</option>
+                                            <option value="2">Judge 2</option>
+                                            <option value="3">Judge 3</option>
+                                        </select>
+                                        <input type="text" id="joinSessionId" placeholder="Session ID" class="w-32 px-2 py-1 rounded bg-gray-700 text-white text-sm">
+                                        <button onclick="joinSyncSession()" class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-sm">
+                                            Join
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="syncConnected" class="hidden flex items-center gap-2 flex-wrap">
+                                    <div id="syncJudgesList" class="flex items-center gap-1">
+                                        <!-- Judge connection indicators -->
+                                    </div>
+                                    <span class="text-gray-500">|</span>
+                                    <span id="syncStateDisplay" class="text-yellow-400 text-xs">Waiting...</span>
+                                    <button id="syncReadyBtn" onclick="markJudgeReady()" class="hidden px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
+                                        Ready
+                                    </button>
+                                    <button id="syncStartVideoBtn" onclick="eventJudgeStartVideo()" class="hidden px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-sm font-medium">
+                                        Start Video
+                                    </button>
+                                    <button id="syncResetBtn" onclick="eventJudgeReset()" class="hidden px-3 py-1 rounded bg-orange-600 hover:bg-orange-700 text-sm font-medium">
+                                        Reset
+                                    </button>
+                                    <button onclick="leaveSyncSession()" class="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-sm">
+                                        Leave
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="syncStatus" class="text-xs text-green-400 mt-2 hidden"></div>
+                        </div>
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3 min-h-[40px] font-mono text-xl tracking-widest" id="scoringTimeline">
+                            <span class="text-gray-500">Press X, C, or Q to score...</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <div class="flex items-center gap-4">
+                                <span class="text-gray-400">Points (X): <span id="xCount" class="text-green-400 font-bold">0</span></span>
+                                <span class="text-gray-400">Busts (C): <span id="cCount" class="text-red-400 font-bold">0</span></span>
+                                <span class="text-gray-400">Omissions (Q): <span id="qCount" class="text-orange-400 font-bold">0</span></span>
+                            </div>
+                            <div class="text-lg flex items-center gap-3">
+                                <span id="nvIndicator" class="text-red-500 font-bold hidden">NV PENALTY</span>
+                                <span class="text-gray-400">Total:</span>
+                                <span id="totalScore" class="text-yellow-400 font-bold ml-2">0</span>
+                                <span id="scoreComparison" class="text-cyan-400 text-sm hidden"></span>
+                            </div>
+                        </div>
+                        <!-- Save Score Button -->
+                        <div id="saveScoreSection" class="hidden mt-3 pt-3 border-t border-gray-700">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    {% if competition_context %}
+                                    <span class="text-gray-400 text-sm">Round {{ competition_context.round_num }}</span>
+                                    <input type="hidden" id="scoreRoundLabel" value="Round {{ competition_context.round_num }}">
+                                    {% else %}
+                                    <input type="text" id="scoreRoundLabel" placeholder="Round #"
+                                        class="w-24 px-3 py-1 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    {% endif %}
+                                    <button onclick="saveCurrentScore()" class="px-4 py-1 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
+                                        Save Score
+                                    </button>
+                                </div>
+                                <span id="saveScoreStatus" class="text-sm text-gray-500"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Saved Scores Display -->
+                    <div class="mt-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-gray-400 text-sm font-medium">Saved Scores (Practice)</span>
+                            <button onclick="clearSavedScores()" class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs">
+                                Clear All
+                            </button>
+                        </div>
+                        <div id="savedScoresList" class="space-y-2 max-h-48 overflow-y-auto">
+                            <div class="text-gray-500 text-sm text-center py-2">No saved scores yet</div>
+                        </div>
+                    </div>
+
+                    <!-- Timer Controls -->
+                    <div class="flex items-center justify-between flex-wrap gap-4 mt-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-center gap-3">
+                            <span class="text-gray-400 text-sm">Discipline:</span>
+                            <select id="eventType" onchange="updateEventType()"
+                                class="px-3 py-1 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <optgroup label="Formation Skydiving">
+                                    <option value="2way-mfs" data-duration="35">2-Way MFS (35s)</option>
+                                    <option value="4way-vfs" data-duration="35">4-Way VFS (35s)</option>
+                                    <option value="4way-fs" data-duration="35" selected>4-Way FS (35s)</option>
+                                    <option value="8way" data-duration="50">8-Way (50s)</option>
+                                    <option value="10way" data-duration="0">10-Way Speed</option>
+                                    <option value="16way" data-duration="50">16-Way (50s)</option>
+                                </optgroup>
+                                <optgroup label="Canopy Formation">
+                                    <option value="2way-cf-seq" data-duration="60">2-Way CF Sequential (60s)</option>
+                                    <option value="4way-cf-seq" data-duration="120">4-Way CF Sequential (120s)</option>
+                                    <option value="4way-cf-rot" data-duration="90">4-Way CF Rotation (90s)</option>
+                                </optgroup>
+                                <optgroup label="Artistic Events">
+                                    <option value="freestyle" data-duration="45">Freestyle (45s)</option>
+                                    <option value="freefly" data-duration="43">Freeflying (43s)</option>
+                                </optgroup>
+                                <optgroup label="Wingsuit Acrobatic">
+                                    <option value="ws-compulsory" data-duration="0">WS Compulsory Round</option>
+                                    <option value="ws-free" data-duration="0">WS Free Round</option>
+                                </optgroup>
+                            </select>
+                            <select id="eventClass" onchange="updateFormations()"
+                                class="px-3 py-1 rounded bg-gray-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="open">Open</option>
+                                <option value="advanced">Advanced</option>
+                                <option value="intermediate">Intermediate</option>
+                                <option value="beginner">Beginner</option>
+                            </select>
+                            <span id="durationLabel" class="text-gray-400 text-sm">35s working time</span>
+                        </div>
+                    </div>
+
+                    <!-- Formations/Draw Input -->
+                    <div id="formationsSection" class="mt-3 pt-3 border-t border-gray-700">
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <span class="text-gray-400 text-sm">Draw:</span>
+                            <input type="text" id="formationsInput" placeholder="e.g., A2BC1D"
+                                oninput="updateFormations()"
+                                class="w-48 px-3 py-1 rounded bg-gray-700 text-white text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <div id="formationsDisplay" class="flex items-center gap-1 text-lg font-mono"></div>
+                        </div>
+                        <div class="flex items-center gap-3 flex-wrap mt-2">
+                            <span class="text-gray-400 text-sm">Max: <span id="maxPoints" class="text-cyan-400 font-bold">0</span> pts</span>
+                            <span class="text-gray-500">|</span>
+                            <span class="text-gray-400 text-sm">Score: <span id="currentScore" class="text-green-400 font-bold">0</span> pts</span>
+                            <span class="text-gray-500">|</span>
+                            <span class="text-gray-400 text-sm">Time: <span id="workingTimeDisplay" class="text-yellow-400 font-bold">0:00</span></span>
+                            <span class="text-gray-500">|</span>
+                            <button onclick="submitAssignmentScore()" class="px-4 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-sm font-medium">
+                                Submit Score
+                            </button>
+                            <span id="drawInfo" class="text-xs text-gray-500"></span>
+                            <span id="drawValidation" class="text-xs"></span>
+                        </div>
+                    </div>
+
+                    <div id="speedInfo" class="text-xs text-gray-500 hidden mt-2">
+                        10-Way Speed: X to start, X again to stop. Max score: 35.00s. Freeze 6s after completion.
+                    </div>
+
+                    <!-- Multi-Judge Scoring Panel -->
+                    <div id="multiJudgePanel" class="mt-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-gray-400 text-sm font-medium">Judge Panel</span>
+                            <div class="flex items-center gap-2">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="multiJudgeMode" onchange="toggleMultiJudgeMode()"
+                                        class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-blue-600">
+                                    <span class="text-gray-400 text-sm">Multi-Judge Mode</span>
+                                </label>
+                                <select id="judgeCount" onchange="updateJudgeCount()" class="px-2 py-1 rounded bg-gray-700 text-white text-sm hidden">
+                                    <option value="3">3 Judges</option>
+                                    <option value="5" selected>5 Judges</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- FS/VFS Multi-Judge Panel -->
+                        <div id="fsMultiJudgePanel" class="hidden">
+                            <p class="text-xs text-gray-500 mb-3">Enter each judge's point count. Average will be calculated automatically.</p>
+                            <div class="grid grid-cols-5 gap-2 mb-3" id="fsJudgeInputs">
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J1</label>
+                                    <input type="number" id="fsJ1" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J2</label>
+                                    <input type="number" id="fsJ2" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J3</label>
+                                    <input type="number" id="fsJ3" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J4</label>
+                                    <input type="number" id="fsJ4" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J5</label>
+                                    <input type="number" id="fsJ5" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateFsAverage()">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between bg-gray-900 rounded p-3">
+                                <div class="flex items-center gap-4">
+                                    <span class="text-gray-400 text-sm">Average:</span>
+                                    <span id="fsJudgeAverage" class="text-2xl font-mono font-bold text-yellow-400">0.0</span>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <span class="text-gray-400 text-sm">Spread:</span>
+                                    <span id="fsJudgeSpread" class="font-mono text-gray-300">0</span>
+                                    <span id="fsSpreadWarning" class="text-red-400 text-sm hidden">⚠️ Large spread</span>
+                                </div>
+                                <button onclick="saveFsScore()" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-medium">
+                                    Save Score
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- CF Multi-Judge Panel -->
+                        <div id="cfMultiJudgePanel" class="hidden">
+                            <p class="text-xs text-gray-500 mb-3">Enter each judge's formation count for CF events.</p>
+                            <div class="grid grid-cols-5 gap-2 mb-3" id="cfJudgeInputs">
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J1</label>
+                                    <input type="number" id="cfJ1" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J2</label>
+                                    <input type="number" id="cfJ2" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J3</label>
+                                    <input type="number" id="cfJ3" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J4</label>
+                                    <input type="number" id="cfJ4" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
+                                </div>
+                                <div class="text-center">
+                                    <label class="text-xs text-gray-500">J5</label>
+                                    <input type="number" id="cfJ5" min="0" max="99" class="w-full px-2 py-2 rounded bg-gray-700 text-white text-center font-mono" onchange="calculateCfAverage()">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between bg-gray-900 rounded p-3">
+                                <div class="flex items-center gap-4">
+                                    <span class="text-gray-400 text-sm">Average:</span>
+                                    <span id="cfJudgeAverage" class="text-2xl font-mono font-bold text-yellow-400">0.0</span>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <span class="text-gray-400 text-sm">Spread:</span>
+                                    <span id="cfJudgeSpread" class="font-mono text-gray-300">0</span>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Save Multi-Judge Score -->
