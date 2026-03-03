@@ -3719,13 +3719,16 @@
                 return;
             }
 
-            // Competition mode: require FlySight data
+            // Competition mode without FlySight: warn but allow timer to start with default working time
             if (wsCompetitionMode && (!flysightData || flysightData.length === 0)) {
                 document.getElementById('wsCompetitionWarning').classList.remove('hidden');
-                document.getElementById('timerStatus').textContent = 'FlySight required';
+                document.getElementById('timerStatus').textContent = 'No FlySight - using default 90s';
                 document.getElementById('timerStatus').classList.remove('text-gray-500', 'text-green-400');
-                document.getElementById('timerStatus').classList.add('text-red-400');
-                return;
+                document.getElementById('timerStatus').classList.add('text-yellow-400');
+                // Fall through to start timer with default working time
+                if (wsWorkingTime <= 0) {
+                    wsWorkingTime = 90;
+                }
             }
 
             // Capture video time when working time starts (for replay)
@@ -5250,13 +5253,11 @@
         }
 
         function setArtisticRoutineType(type) {
-            console.log('[VideoLib] setArtisticRoutineType:', type);
             artisticRoutineType = type;
             const btnFree = document.getElementById('btnFreeRoutine');
             const btnComp = document.getElementById('btnCompulsoryRoutine');
             const freePanel = document.getElementById('artFreeRoutinePanel');
             const compPanel = document.getElementById('artCompulsoryPanel');
-            console.log('[VideoLib] panels found:', !!freePanel, !!compPanel);
 
             if (type === 'free') {
                 btnFree.classList.remove('bg-gray-700', 'text-gray-300');
@@ -6044,8 +6045,6 @@
             if (row) row.classList.add('hidden');
         }
 
-        // Diagnostic: verify key functions loaded
-        console.log('[VideoLib] Script loaded OK. startTimer=' + typeof startTimer + ', setCurrentAsStart=' + typeof setCurrentAsStart + ', handleKeyboardShortcut=' + typeof handleKeyboardShortcut);
     </script>
 
     <!-- Confirm Score Modal -->
