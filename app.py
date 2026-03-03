@@ -5014,6 +5014,35 @@ def update_assignment_status_route(assignment_id):
     return jsonify({'success': True})
 
 
+@app.route('/assignment/<assignment_id>/score', methods=['POST'])
+@judge_required
+def submit_assignment_score(assignment_id):
+    """Submit a score for an assignment."""
+    data = request.json
+    score = data.get('score', 0)
+    score_data = data.get('score_data', '{}')
+
+    try:
+        if USE_SUPABASE:
+            supabase.table('video_assignments').update({
+                'practice_score': score,
+                'practice_score_data': score_data,
+                'status': 'completed',
+                'scored_at': datetime.utcnow().isoformat()
+            }).eq('id', assignment_id).execute()
+        else:
+            db = get_sqlite_db()
+            db.execute(
+                'UPDATE video_assignments SET status = ?, notes = ?, scored_at = ? WHERE id = ?',
+                ('completed', score_data, datetime.utcnow().isoformat(), assignment_id)
+            )
+            db.commit()
+
+        return jsonify({'success': True, 'message': f'Score {score} submitted'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 def download_and_convert_video(url, video_id):
     """Download video from URL and convert to MP4 if needed."""
     import urllib.request
