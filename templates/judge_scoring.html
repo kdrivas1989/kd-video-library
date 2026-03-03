@@ -25,6 +25,27 @@
 
     <div class="container mx-auto px-4 py-6 max-w-lg">
 
+        {% if video %}
+        <!-- Video Player (synced by event judge) -->
+        <div class="mb-4">
+            {% if video.is_direct_url %}
+            <video id="judgeScoringVideo" class="w-full rounded-lg" preload="metadata"
+                controlsList="noplaybackrate nodownload">
+                {% if '.webm' in video.video_src|lower %}
+                <source src="{{ video.video_src }}" type="video/webm">
+                {% elif '.ogg' in video.video_src|lower or '.ogv' in video.video_src|lower %}
+                <source src="{{ video.video_src }}" type="video/ogg">
+                {% else %}
+                <source src="{{ video.video_src }}" type="video/mp4">
+                {% endif %}
+            </video>
+            {% elif video.embed_url %}
+            <iframe id="judgeScoringEmbed" src="{{ video.embed_url }}"
+                class="w-full aspect-video rounded-lg" frameborder="0" allowfullscreen></iframe>
+            {% endif %}
+        </div>
+        {% endif %}
+
         <!-- Join Form -->
         <div id="joinForm" class="bg-gray-800 rounded-lg p-6">
             <h2 class="text-lg font-bold mb-4">Join Scoring Session</h2>
@@ -355,6 +376,22 @@
                 document.getElementById('lockedOverlay').classList.add('hidden');
                 addStatus('Scores reset by event judge', 'warning');
             });
+
+            // Video sync events from event judge
+            const syncVideo = document.getElementById('judgeScoringVideo');
+            if (syncVideo) {
+                socket.on('ws_scoring_video_play', (data) => {
+                    syncVideo.currentTime = data.time;
+                    syncVideo.play().catch(() => {});
+                });
+                socket.on('ws_scoring_video_pause', (data) => {
+                    syncVideo.pause();
+                    syncVideo.currentTime = data.time;
+                });
+                socket.on('ws_scoring_video_seek', (data) => {
+                    syncVideo.currentTime = data.time;
+                });
+            }
         }
 
         function getScoreInput(field) {

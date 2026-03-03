@@ -13157,7 +13157,7 @@ def generate_room_code():
 @app.route('/ws-scoring/create', methods=['POST'])
 @login_required
 def create_ws_scoring_room():
-    """Create a WS scoring room (requires login). Room is persistent — no video_id coupling."""
+    """Create a WS scoring room (requires login)."""
     data = request.json
     scoring_type = data.get('scoring_type', 'ws-free')
 
@@ -13176,6 +13176,26 @@ def create_ws_scoring_room():
         'created_at': datetime.now().isoformat()
     }
 
+    # Attach video if provided
+    video_id = data.get('video_id')
+    if video_id:
+        video = get_video(video_id)
+        if video:
+            if video.get('video_type') == 'pcloud' and video.get('local_file'):
+                video['video_src'] = f'/pcloud/stream/{video["local_file"]}'
+                video['is_direct_url'] = True
+            elif video.get('url') and is_direct_video_url(video.get('url', '')):
+                video['video_src'] = video['url']
+                video['is_direct_url'] = True
+            elif video.get('video_type') == 'local' and video.get('local_file'):
+                video['video_src'] = f'/static/videos/{video["local_file"]}'
+                video['is_direct_url'] = True
+            elif video.get('url'):
+                video['embed_url'] = get_video_embed_url(video.get('url', ''))
+                video['is_direct_url'] = False
+        ws_scoring_rooms[room_code]['video_id'] = video_id
+        ws_scoring_rooms[room_code]['video'] = video
+
     _save_ws_rooms()
     return jsonify({'success': True, 'room_code': room_code})
 
@@ -13187,9 +13207,29 @@ def ws_scoring_join_page(room_code):
         return "Room not found", 404
 
     room = ws_scoring_rooms[room_code]
+
+    # Resolve video data (re-fetch from DB if only video_id was persisted)
+    video = room.get('video')
+    if not video and room.get('video_id'):
+        video = get_video(room['video_id'])
+        if video:
+            if video.get('video_type') == 'pcloud' and video.get('local_file'):
+                video['video_src'] = f'/pcloud/stream/{video["local_file"]}'
+                video['is_direct_url'] = True
+            elif video.get('url') and is_direct_video_url(video.get('url', '')):
+                video['video_src'] = video['url']
+                video['is_direct_url'] = True
+            elif video.get('video_type') == 'local' and video.get('local_file'):
+                video['video_src'] = f'/static/videos/{video["local_file"]}'
+                video['is_direct_url'] = True
+            elif video.get('url'):
+                video['embed_url'] = get_video_embed_url(video.get('url', ''))
+                video['is_direct_url'] = False
+
     return render_template('judge_scoring.html',
                          room_code=room_code,
-                         event_judge_name=room['event_judge_name'])
+                         event_judge_name=room['event_judge_name'],
+                         video=video)
 
 
 @app.route('/ws-scoring/<room_code>/status')
@@ -13357,6 +13397,8 @@ if SOCKETIO_ENABLED:
             for code, room in ws_scoring_rooms.items():
                 r = dict(room)
                 r['judges'] = {k: {'name': v.get('name', ''), 'connected': False} for k, v in r.get('judges', {}).items()}
+                # Strip full video object — only persist video_id (re-fetched on load)
+                r.pop('video', None)
                 saveable[code] = r
             with open(WS_ROOMS_FILE, 'w') as f:
                 json.dump(saveable, f)
@@ -13935,6 +13977,25 @@ if SOCKETIO_ENABLED:
             'state': room['state'],
             'scores': room['scores']
         }, room=room_code)
+
+    # Video sync events — event judge broadcasts play/pause/seek to judges
+    @socketio.on('ws_scoring_video_play')
+    def on_ws_scoring_video_play(data):
+        room_code = data.get('room_code')
+        if room_code in ws_scoring_rooms:
+            emit('ws_scoring_video_play', {'time': data.get('time', 0)}, room=room_code, include_self=False)
+
+    @socketio.on('ws_scoring_video_pause')
+    def on_ws_scoring_video_pause(data):
+        room_code = data.get('room_code')
+        if room_code in ws_scoring_rooms:
+            emit('ws_scoring_video_pause', {'time': data.get('time', 0)}, room=room_code, include_self=False)
+
+    @socketio.on('ws_scoring_video_seek')
+    def on_ws_scoring_video_seek(data):
+        room_code = data.get('room_code')
+        if room_code in ws_scoring_rooms:
+            emit('ws_scoring_video_seek', {'time': data.get('time', 0)}, room=room_code, include_self=False)
 
 
 # ==================== ARTISTIC EVENTS SCORING ====================

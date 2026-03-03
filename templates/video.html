@@ -1981,6 +1981,23 @@
                     }, 100);
                 }
             });
+
+            // Sync video playback to CP scoring room judges
+            video.addEventListener('play', () => {
+                if (cpScoringRoomCode && cpScoringSocket) {
+                    cpScoringSocket.emit('ws_scoring_video_play', {room_code: cpScoringRoomCode, time: video.currentTime});
+                }
+            });
+            video.addEventListener('pause', () => {
+                if (cpScoringRoomCode && cpScoringSocket) {
+                    cpScoringSocket.emit('ws_scoring_video_pause', {room_code: cpScoringRoomCode, time: video.currentTime});
+                }
+            });
+            video.addEventListener('seeked', () => {
+                if (cpScoringRoomCode && cpScoringSocket) {
+                    cpScoringSocket.emit('ws_scoring_video_seek', {room_code: cpScoringRoomCode, time: video.currentTime});
+                }
+            });
         }
 
         // Check for replay auto-start on Vimeo videos
@@ -5913,7 +5930,7 @@
             fetch('/ws-scoring/create', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({scoring_type: 'cp-freestyle'})
+                body: JSON.stringify({scoring_type: 'cp-freestyle', video_id: videoId})
             })
             .then(r => r.json())
             .then(data => {
