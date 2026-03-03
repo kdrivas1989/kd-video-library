@@ -4178,16 +4178,6 @@ def login():
     return render_template('login.html', error=error)
 
 
-@app.route('/emergency-reset-kd2026')
-def emergency_reset():
-    """Temporary one-time password reset. REMOVE AFTER USE."""
-    user = get_user_by_email('kdrivas1989@gmail.com')
-    if user:
-        user['password'] = 'temppass2026'
-        save_user(user)
-        return "Password reset to 'temppass2026'. Log in and change it immediately. DELETE THIS ROUTE."
-    return "User not found", 404
-
 
 @app.route('/change-password', methods=['GET', 'POST'])
 def change_password():

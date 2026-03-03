@@ -848,6 +848,274 @@
                     </div>
                     </div><!-- End fsScoringControls -->
 
+                    <!-- CP Freestyle Scoring (hidden by default) -->
+                    <div id="cpFreestyleSection" class="hidden mt-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-gray-400 text-sm font-medium">CP Freestyle Scoring</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500 text-xs">Judges:</span>
+                                <select id="cpFreeJudgeCount" onchange="toggleCpFreeJudgeMode()" class="px-2 py-1 rounded bg-gray-700 text-white text-xs">
+                                    <option value="1" selected>Single</option>
+                                    <option value="5">5 Panel</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- CP Freestyle Real-Time Scoring Panel -->
+                        <div id="cpScoringPanel" class="hidden mb-3 bg-gray-900 border border-purple-600 rounded-lg p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-purple-400 text-sm font-medium">Real-Time Scoring</span>
+                                <span class="text-xs text-purple-300 font-medium">CP Freestyle</span>
+                            </div>
+                            <div id="cpScoringNotStarted">
+                                <button onclick="createCpScoringRoom()" class="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
+                                    Start Judge Session
+                                </button>
+                            </div>
+                            <div id="cpScoringStarted" class="hidden">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-gray-400 text-xs">Code:</span>
+                                    <span id="cpRoomCode" class="text-white font-mono text-sm font-bold"></span>
+                                    <button onclick="copyCpRoomLink(this)" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs">Copy Link</button>
+                                </div>
+                                <div class="flex items-center gap-3 mb-2" id="cpJudgeIndicators">
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ1Dot"></span><span class="text-gray-500 text-xs" id="cpJ1Name">J1</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ1Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ2Dot"></span><span class="text-gray-500 text-xs" id="cpJ2Name">J2</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ2Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ3Dot"></span><span class="text-gray-500 text-xs" id="cpJ3Name">J3</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ3Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ4Dot"></span><span class="text-gray-500 text-xs" id="cpJ4Name">J4</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ4Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ5Dot"></span><span class="text-gray-500 text-xs" id="cpJ5Name">J5</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ5Check">&#10003;</span></span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="lockCpScoring()" class="flex-1 py-1 rounded bg-red-600 hover:bg-red-700 text-xs font-medium">Lock Scores</button>
+                                    <button onclick="resetCpScoring()" class="flex-1 py-1 rounded bg-gray-600 hover:bg-gray-700 text-xs font-medium">Reset</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Judge Scores (0-10) -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="mb-2">
+                                <span class="text-gray-400 text-sm">Judge Scores <span class="text-gray-600">(0.0 - 10.0)</span></span>
+                            </div>
+                            <!-- Single judge mode -->
+                            <div id="cpFreeSingleJudge" class="flex items-center gap-2">
+                                <input type="number" id="cpFreeScoreSingle" min="0" max="10" step="0.1" placeholder="Score"
+                                    class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                <span class="text-gray-400">=</span>
+                                <span id="cpFreeAvgSingle" class="text-yellow-400 font-bold">0.0</span>
+                            </div>
+                            <!-- 5-judge panel mode -->
+                            <div id="cpFreePanelJudge" class="hidden">
+                                <div class="grid grid-cols-5 gap-2">
+                                    <div class="text-center">
+                                        <label class="text-gray-500 text-xs block mb-1">J1</label>
+                                        <input type="number" id="cpFreeJ1" min="0" max="10" step="0.1" placeholder="0.0"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-gray-500 text-xs block mb-1">J2</label>
+                                        <input type="number" id="cpFreeJ2" min="0" max="10" step="0.1" placeholder="0.0"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-gray-500 text-xs block mb-1">J3</label>
+                                        <input type="number" id="cpFreeJ3" min="0" max="10" step="0.1" placeholder="0.0"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-gray-500 text-xs block mb-1">J4</label>
+                                        <input type="number" id="cpFreeJ4" min="0" max="10" step="0.1" placeholder="0.0"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-gray-500 text-xs block mb-1">J5</label>
+                                        <input type="number" id="cpFreeJ5" min="0" max="10" step="0.1" placeholder="0.0"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                    </div>
+                                </div>
+                                <div class="text-right mt-2 text-sm">
+                                    Avg: <span id="cpFreeAvgPanel" class="text-yellow-400 font-bold font-mono">0.000</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Move & DOD (Degree of Difficulty) -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="text-gray-400 text-sm">Move</span>
+                                <select id="cpFreeMove" onchange="onCpMoveSelect(this)"
+                                    class="flex-1 px-2 py-1 rounded bg-gray-700 text-white text-sm">
+                                    <option value="">-- Select Move --</option>
+                                    <option value="custom">Custom (manual entry)</option>
+                                    <optgroup label="Base Moves (Group 1)">
+                                        <option data-dod="1.2">Crane (1.2)</option>
+                                        <option data-dod="1.3">Can-Can (1.3)</option>
+                                        <option data-dod="1.3">Cross-up (1.3)</option>
+                                        <option data-dod="1.4">Nac-Nac (1.4)</option>
+                                        <option data-dod="1.5">T (1.5)</option>
+                                        <option data-dod="1.6">Flex Head (1.6)</option>
+                                        <option data-dod="1.9">Method (1.9)</option>
+                                    </optgroup>
+                                    <optgroup label="Base Moves (Group 2)">
+                                        <option data-dod="2.1">Superman (2.1)</option>
+                                        <option data-dod="2.3">Walnut (2.3)</option>
+                                        <option data-dod="2.6">Boomerang (2.6)</option>
+                                        <option data-dod="2.7">Lazy Boy (2.7)</option>
+                                    </optgroup>
+                                    <optgroup label="Base Moves (Group 3)">
+                                        <option data-dod="3.5">Switchblade (3.5)</option>
+                                        <option data-dod="3.8">Switchcow (3.8)</option>
+                                    </optgroup>
+                                    <optgroup label="Base Moves (Group 4)">
+                                        <option data-dod="4.3">Blind Man (4.3)</option>
+                                        <option data-dod="4.6">Blindboom (4.6)</option>
+                                        <option data-dod="4.7">Cowboy (4.7)</option>
+                                        <option data-dod="4.8">Ghost Rider (4.8)</option>
+                                        <option data-dod="4.8">Tick Jockey (4.8)</option>
+                                    </optgroup>
+                                    <optgroup label="Fusions">
+                                        <option data-dod="2.6">CraneSuper (2.6)</option>
+                                        <option data-dod="2.8">SuperWalnut (2.8)</option>
+                                        <option data-dod="3.0">CraneBoom (3.0)</option>
+                                        <option data-dod="3.1">NacSuper (3.1)</option>
+                                        <option data-dod="3.6">BoomSuper (3.6)</option>
+                                        <option data-dod="3.6">BoomMeth (3.6)</option>
+                                        <option data-dod="4.1">LazySwitch (4.1)</option>
+                                        <option data-dod="4.2">SwitchNac (4.2)</option>
+                                        <option data-dod="4.3">LazySwitchcow (4.3)</option>
+                                        <option data-dod="5.0">SwitchSuper (5.0)</option>
+                                        <option data-dod="5.0">CowCan (5.0)</option>
+                                        <option data-dod="5.1">BoomSwitch (5.1)</option>
+                                        <option data-dod="5.3">BoomCow (5.3)</option>
+                                        <option data-dod="5.4">BoomSwitchcow (5.4)</option>
+                                        <option data-dod="5.5">TickSuper (5.5)</option>
+                                        <option data-dod="6.3">BlindSwitch (6.3)</option>
+                                        <option data-dod="6.8">BlindSwitchCow (6.8)</option>
+                                        <option data-dod="7.6">BlindTick (7.6)</option>
+                                    </optgroup>
+                                    <optgroup label="Sequential Combinations">
+                                        <option data-dod="2.3">Crane + Superman (2.3)</option>
+                                        <option data-dod="2.6">Superman + Cross-up (2.6)</option>
+                                        <option data-dod="2.6">Superman + Walnut (2.6)</option>
+                                        <option data-dod="2.9">Boomerang + Can-Can (2.9)</option>
+                                        <option data-dod="3.1">NacNac + Superman (3.1)</option>
+                                        <option data-dod="3.2">Boomerang + Superman (3.2)</option>
+                                        <option data-dod="3.2">Superman + Boomerang (3.2)</option>
+                                        <option data-dod="3.3">BoomNac + Superman (3.3)</option>
+                                        <option data-dod="3.4">Boomerang + Method (3.4)</option>
+                                        <option data-dod="3.5">Method + Superman (3.5)</option>
+                                        <option data-dod="3.6">Nac-Nac + Lazy Boy (3.6)</option>
+                                        <option data-dod="3.6">Method + Lazy Boy (3.6)</option>
+                                        <option data-dod="4.0">Crane + Switchblade (4.0)</option>
+                                        <option data-dod="4.0">Flex Head + Lazy Boy (4.0)</option>
+                                        <option data-dod="4.0">Switchblade + Nac Nac (4.0)</option>
+                                        <option data-dod="4.0">T + Crane + Superman (4.0)</option>
+                                        <option data-dod="4.3">Lazy Boy + Switchcow (4.3)</option>
+                                        <option data-dod="4.4">Switchblade + Method (4.4)</option>
+                                        <option data-dod="4.4">Method + Switchblade (4.4)</option>
+                                        <option data-dod="4.6">Superman + Switchblade (4.6)</option>
+                                        <option data-dod="4.6">Switchblade + Superman (4.6)</option>
+                                        <option data-dod="4.7">Boomerang + Switchblade (4.7)</option>
+                                        <option data-dod="4.7">Lazy Boy + Superman (4.7)</option>
+                                        <option data-dod="4.8">Boomerang + Lazy Boy (4.8)</option>
+                                        <option data-dod="4.8">Lazy Boy + Switchblade (4.8)</option>
+                                        <option data-dod="4.9">Superman + Lazy Boy (4.9)</option>
+                                        <option data-dod="4.9">Method + Blindman (4.9)</option>
+                                        <option data-dod="5.1">Superman + Walnut + Lazy Boy (5.1)</option>
+                                        <option data-dod="5.3">Tick Jockey + Superman (5.3)</option>
+                                        <option data-dod="5.3">Method + Cowboy (5.3)</option>
+                                        <option data-dod="5.4">Blind Man + Superman (5.4)</option>
+                                        <option data-dod="5.4">Switchblade + Lazy Boy (5.4)</option>
+                                        <option data-dod="5.6">Superman + Tick Jockey (5.6)</option>
+                                        <option data-dod="5.6">Cowboy + Superman (5.6)</option>
+                                        <option data-dod="5.7">Ghost Rider + Superman (5.7)</option>
+                                        <option data-dod="5.7">Boomerang + Tick Jockey (5.7)</option>
+                                        <option data-dod="5.8">BoomMeth + Lazy Boy (5.8)</option>
+                                        <option data-dod="5.9">Lazy Boy + Tick Jockey (5.9)</option>
+                                        <option data-dod="5.9">Double Cowboy (5.9)</option>
+                                        <option data-dod="6.0">Lazy Boy + Ghost Rider (6.0)</option>
+                                        <option data-dod="6.2">BoomCow + Superman (6.2)</option>
+                                        <option data-dod="6.3">Blind Man + Lazy Boy (6.3)</option>
+                                        <option data-dod="6.4">Boomerang + Blind Man (6.4)</option>
+                                        <option data-dod="6.4">Lazyghost + Method (6.4)</option>
+                                        <option data-dod="6.4">Lazyswitch + Superman (6.4)</option>
+                                        <option data-dod="6.5">Ghost Rider + Lazy Boy (6.5)</option>
+                                        <option data-dod="6.8">BoomSuper + Tick Jockey (6.8)</option>
+                                        <option data-dod="6.8">Blind Man + Jesus (6.8)</option>
+                                        <option data-dod="6.8">Boomerang + Lazyswitch (6.8)</option>
+                                        <option data-dod="6.9">Wingover + Lazy Boy (6.9)</option>
+                                        <option data-dod="6.9">Blind Man + Switchblade (6.9)</option>
+                                        <option data-dod="7.0">Tick Jockey + Lazy Boy (7.0)</option>
+                                        <option data-dod="7.1">Blind Man + Switchcow (7.1)</option>
+                                        <option data-dod="7.2">Boomerang + Blindman + Superman (7.2)</option>
+                                        <option data-dod="7.2">Method + Cowboy + Superman (7.2)</option>
+                                        <option data-dod="7.3">BoomSwitch + Lazy Boy (7.3)</option>
+                                        <option data-dod="7.3">Switchblade + Ghost Rider (7.3)</option>
+                                        <option data-dod="7.3">Switchblade + Lazy Boy + Superman (7.3)</option>
+                                        <option data-dod="7.5">Boomerang + Switchblade + Lazy Boy (7.5)</option>
+                                        <option data-dod="7.6">Switchblade + Blind Man (7.6)</option>
+                                        <option data-dod="8.2">Switchblade + Ghost Rider + Lazy Boy (8.2)</option>
+                                        <option data-dod="8.3">BlindBoom + Cowboy (8.3)</option>
+                                        <option data-dod="8.7">Blind Man + Miracle Man + Switchblade (8.7)</option>
+                                        <option data-dod="8.7">Miracle Man + Ghost Rider + Lazy Boy (8.7)</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-gray-400 text-sm">DOD</span>
+                                <input type="number" id="cpFreeDOD" min="1.0" max="10.0" step="0.1" placeholder="1.0" value=""
+                                    class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                <input type="text" id="cpFreeMoveName" placeholder="Move name"
+                                    class="flex-1 px-2 py-1 rounded bg-gray-700 text-white text-sm hidden">
+                            </div>
+                        </div>
+
+                        <!-- Penalties (each judge can indicate) -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="mb-2">
+                                <span class="text-gray-400 text-sm">Penalties <span class="text-gray-600">(applied when 3+ judges indicate)</span></span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="cpPenaltyME" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
+                                    <span class="text-sm text-gray-300">ME <span class="text-gray-500 text-xs">(Missed Entry - no water contact)</span></span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="cpPenaltyMF" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
+                                    <span class="text-sm text-gray-300">MF <span class="text-gray-500 text-xs">(Move Failure)</span></span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="cpPenaltyWL" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
+                                    <span class="text-sm text-gray-300">WL <span class="text-gray-500 text-xs">(Water Landing)</span></span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="cpPenaltyMV" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
+                                    <span class="text-sm text-gray-300">MV <span class="text-gray-500 text-xs">(Move Variation - repeated)</span></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Result Summary -->
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="flex items-center gap-3">
+                                <span id="cpResultBadge" class="hidden px-2 py-1 rounded text-xs font-bold"></span>
+                            </div>
+                            <div class="text-sm">
+                                <span class="text-gray-400">Score: </span>
+                                <span id="cpFreeScoreFinal" class="text-green-400 font-bold font-mono">0.000</span>
+                            </div>
+                        </div>
+
+                        <!-- Save CP Freestyle Score -->
+                        <div class="mt-3 pt-3 border-t border-gray-700 flex items-center justify-between">
+                            <input type="text" id="cpFreeRoundLabel" placeholder="Round #"
+                                class="w-24 px-3 py-1 rounded bg-gray-700 text-white text-sm">
+                            <button onclick="saveCpFreestyleScore()" class="px-4 py-1 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
+                                Save Score
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Saved Scores Display -->
                     <div class="mt-4 pt-4 border-t border-gray-700">
                         <div class="flex items-center justify-between mb-3">
@@ -1371,273 +1639,6 @@
                         </div>
                     </div>
 
-                    <!-- CP Freestyle Scoring (hidden by default) -->
-                    <div id="cpFreestyleSection" class="hidden mt-4 pt-4 border-t border-gray-700">
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="text-gray-400 text-sm font-medium">CP Freestyle Scoring</span>
-                            <div class="flex items-center gap-2">
-                                <span class="text-gray-500 text-xs">Judges:</span>
-                                <select id="cpFreeJudgeCount" onchange="toggleCpFreeJudgeMode()" class="px-2 py-1 rounded bg-gray-700 text-white text-xs">
-                                    <option value="1" selected>Single</option>
-                                    <option value="5">5 Panel</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- CP Freestyle Real-Time Scoring Panel -->
-                        <div id="cpScoringPanel" class="hidden mb-3 bg-gray-900 border border-purple-600 rounded-lg p-3">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-purple-400 text-sm font-medium">Real-Time Scoring</span>
-                                <span class="text-xs text-purple-300 font-medium">CP Freestyle</span>
-                            </div>
-                            <div id="cpScoringNotStarted">
-                                <button onclick="createCpScoringRoom()" class="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
-                                    Start Judge Session
-                                </button>
-                            </div>
-                            <div id="cpScoringStarted" class="hidden">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="text-gray-400 text-xs">Code:</span>
-                                    <span id="cpRoomCode" class="text-white font-mono text-sm font-bold"></span>
-                                    <button onclick="copyCpRoomLink(this)" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs">Copy Link</button>
-                                </div>
-                                <div class="flex items-center gap-3 mb-2" id="cpJudgeIndicators">
-                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ1Dot"></span><span class="text-gray-500 text-xs" id="cpJ1Name">J1</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ1Check">&#10003;</span></span>
-                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ2Dot"></span><span class="text-gray-500 text-xs" id="cpJ2Name">J2</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ2Check">&#10003;</span></span>
-                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ3Dot"></span><span class="text-gray-500 text-xs" id="cpJ3Name">J3</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ3Check">&#10003;</span></span>
-                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ4Dot"></span><span class="text-gray-500 text-xs" id="cpJ4Name">J4</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ4Check">&#10003;</span></span>
-                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ5Dot"></span><span class="text-gray-500 text-xs" id="cpJ5Name">J5</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ5Check">&#10003;</span></span>
-                                </div>
-                                <div class="flex gap-2">
-                                    <button onclick="lockCpScoring()" class="flex-1 py-1 rounded bg-red-600 hover:bg-red-700 text-xs font-medium">Lock Scores</button>
-                                    <button onclick="resetCpScoring()" class="flex-1 py-1 rounded bg-gray-600 hover:bg-gray-700 text-xs font-medium">Reset</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Judge Scores (0-10) -->
-                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
-                            <div class="mb-2">
-                                <span class="text-gray-400 text-sm">Judge Scores <span class="text-gray-600">(0.0 - 10.0)</span></span>
-                            </div>
-                            <!-- Single judge mode -->
-                            <div id="cpFreeSingleJudge" class="flex items-center gap-2">
-                                <input type="number" id="cpFreeScoreSingle" min="0" max="10" step="0.1" placeholder="Score"
-                                    class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
-                                <span class="text-gray-400">=</span>
-                                <span id="cpFreeAvgSingle" class="text-yellow-400 font-bold">0.0</span>
-                            </div>
-                            <!-- 5-judge panel mode -->
-                            <div id="cpFreePanelJudge" class="hidden">
-                                <div class="grid grid-cols-5 gap-2">
-                                    <div class="text-center">
-                                        <label class="text-gray-500 text-xs block mb-1">J1</label>
-                                        <input type="number" id="cpFreeJ1" min="0" max="10" step="0.1" placeholder="0.0"
-                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
-                                    </div>
-                                    <div class="text-center">
-                                        <label class="text-gray-500 text-xs block mb-1">J2</label>
-                                        <input type="number" id="cpFreeJ2" min="0" max="10" step="0.1" placeholder="0.0"
-                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
-                                    </div>
-                                    <div class="text-center">
-                                        <label class="text-gray-500 text-xs block mb-1">J3</label>
-                                        <input type="number" id="cpFreeJ3" min="0" max="10" step="0.1" placeholder="0.0"
-                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
-                                    </div>
-                                    <div class="text-center">
-                                        <label class="text-gray-500 text-xs block mb-1">J4</label>
-                                        <input type="number" id="cpFreeJ4" min="0" max="10" step="0.1" placeholder="0.0"
-                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
-                                    </div>
-                                    <div class="text-center">
-                                        <label class="text-gray-500 text-xs block mb-1">J5</label>
-                                        <input type="number" id="cpFreeJ5" min="0" max="10" step="0.1" placeholder="0.0"
-                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
-                                    </div>
-                                </div>
-                                <div class="text-right mt-2 text-sm">
-                                    Avg: <span id="cpFreeAvgPanel" class="text-yellow-400 font-bold font-mono">0.000</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Move & DOD (Degree of Difficulty) -->
-                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
-                            <div class="flex items-center gap-3 mb-2">
-                                <span class="text-gray-400 text-sm">Move</span>
-                                <select id="cpFreeMove" onchange="onCpMoveSelect(this)"
-                                    class="flex-1 px-2 py-1 rounded bg-gray-700 text-white text-sm">
-                                    <option value="">-- Select Move --</option>
-                                    <option value="custom">Custom (manual entry)</option>
-                                    <optgroup label="Base Moves (Group 1)">
-                                        <option data-dod="1.2">Crane (1.2)</option>
-                                        <option data-dod="1.3">Can-Can (1.3)</option>
-                                        <option data-dod="1.3">Cross-up (1.3)</option>
-                                        <option data-dod="1.4">Nac-Nac (1.4)</option>
-                                        <option data-dod="1.5">T (1.5)</option>
-                                        <option data-dod="1.6">Flex Head (1.6)</option>
-                                        <option data-dod="1.9">Method (1.9)</option>
-                                    </optgroup>
-                                    <optgroup label="Base Moves (Group 2)">
-                                        <option data-dod="2.1">Superman (2.1)</option>
-                                        <option data-dod="2.3">Walnut (2.3)</option>
-                                        <option data-dod="2.6">Boomerang (2.6)</option>
-                                        <option data-dod="2.7">Lazy Boy (2.7)</option>
-                                    </optgroup>
-                                    <optgroup label="Base Moves (Group 3)">
-                                        <option data-dod="3.5">Switchblade (3.5)</option>
-                                        <option data-dod="3.8">Switchcow (3.8)</option>
-                                    </optgroup>
-                                    <optgroup label="Base Moves (Group 4)">
-                                        <option data-dod="4.3">Blind Man (4.3)</option>
-                                        <option data-dod="4.6">Blindboom (4.6)</option>
-                                        <option data-dod="4.7">Cowboy (4.7)</option>
-                                        <option data-dod="4.8">Ghost Rider (4.8)</option>
-                                        <option data-dod="4.8">Tick Jockey (4.8)</option>
-                                    </optgroup>
-                                    <optgroup label="Fusions">
-                                        <option data-dod="2.6">CraneSuper (2.6)</option>
-                                        <option data-dod="2.8">SuperWalnut (2.8)</option>
-                                        <option data-dod="3.0">CraneBoom (3.0)</option>
-                                        <option data-dod="3.1">NacSuper (3.1)</option>
-                                        <option data-dod="3.6">BoomSuper (3.6)</option>
-                                        <option data-dod="3.6">BoomMeth (3.6)</option>
-                                        <option data-dod="4.1">LazySwitch (4.1)</option>
-                                        <option data-dod="4.2">SwitchNac (4.2)</option>
-                                        <option data-dod="4.3">LazySwitchcow (4.3)</option>
-                                        <option data-dod="5.0">SwitchSuper (5.0)</option>
-                                        <option data-dod="5.0">CowCan (5.0)</option>
-                                        <option data-dod="5.1">BoomSwitch (5.1)</option>
-                                        <option data-dod="5.3">BoomCow (5.3)</option>
-                                        <option data-dod="5.4">BoomSwitchcow (5.4)</option>
-                                        <option data-dod="5.5">TickSuper (5.5)</option>
-                                        <option data-dod="6.3">BlindSwitch (6.3)</option>
-                                        <option data-dod="6.8">BlindSwitchCow (6.8)</option>
-                                        <option data-dod="7.6">BlindTick (7.6)</option>
-                                    </optgroup>
-                                    <optgroup label="Sequential Combinations">
-                                        <option data-dod="2.3">Crane + Superman (2.3)</option>
-                                        <option data-dod="2.6">Superman + Cross-up (2.6)</option>
-                                        <option data-dod="2.6">Superman + Walnut (2.6)</option>
-                                        <option data-dod="2.9">Boomerang + Can-Can (2.9)</option>
-                                        <option data-dod="3.1">NacNac + Superman (3.1)</option>
-                                        <option data-dod="3.2">Boomerang + Superman (3.2)</option>
-                                        <option data-dod="3.2">Superman + Boomerang (3.2)</option>
-                                        <option data-dod="3.3">BoomNac + Superman (3.3)</option>
-                                        <option data-dod="3.4">Boomerang + Method (3.4)</option>
-                                        <option data-dod="3.5">Method + Superman (3.5)</option>
-                                        <option data-dod="3.6">Nac-Nac + Lazy Boy (3.6)</option>
-                                        <option data-dod="3.6">Method + Lazy Boy (3.6)</option>
-                                        <option data-dod="4.0">Crane + Switchblade (4.0)</option>
-                                        <option data-dod="4.0">Flex Head + Lazy Boy (4.0)</option>
-                                        <option data-dod="4.0">Switchblade + Nac Nac (4.0)</option>
-                                        <option data-dod="4.0">T + Crane + Superman (4.0)</option>
-                                        <option data-dod="4.3">Lazy Boy + Switchcow (4.3)</option>
-                                        <option data-dod="4.4">Switchblade + Method (4.4)</option>
-                                        <option data-dod="4.4">Method + Switchblade (4.4)</option>
-                                        <option data-dod="4.6">Superman + Switchblade (4.6)</option>
-                                        <option data-dod="4.6">Switchblade + Superman (4.6)</option>
-                                        <option data-dod="4.7">Boomerang + Switchblade (4.7)</option>
-                                        <option data-dod="4.7">Lazy Boy + Superman (4.7)</option>
-                                        <option data-dod="4.8">Boomerang + Lazy Boy (4.8)</option>
-                                        <option data-dod="4.8">Lazy Boy + Switchblade (4.8)</option>
-                                        <option data-dod="4.9">Superman + Lazy Boy (4.9)</option>
-                                        <option data-dod="4.9">Method + Blindman (4.9)</option>
-                                        <option data-dod="5.1">Superman + Walnut + Lazy Boy (5.1)</option>
-                                        <option data-dod="5.3">Tick Jockey + Superman (5.3)</option>
-                                        <option data-dod="5.3">Method + Cowboy (5.3)</option>
-                                        <option data-dod="5.4">Blind Man + Superman (5.4)</option>
-                                        <option data-dod="5.4">Switchblade + Lazy Boy (5.4)</option>
-                                        <option data-dod="5.6">Superman + Tick Jockey (5.6)</option>
-                                        <option data-dod="5.6">Cowboy + Superman (5.6)</option>
-                                        <option data-dod="5.7">Ghost Rider + Superman (5.7)</option>
-                                        <option data-dod="5.7">Boomerang + Tick Jockey (5.7)</option>
-                                        <option data-dod="5.8">BoomMeth + Lazy Boy (5.8)</option>
-                                        <option data-dod="5.9">Lazy Boy + Tick Jockey (5.9)</option>
-                                        <option data-dod="5.9">Double Cowboy (5.9)</option>
-                                        <option data-dod="6.0">Lazy Boy + Ghost Rider (6.0)</option>
-                                        <option data-dod="6.2">BoomCow + Superman (6.2)</option>
-                                        <option data-dod="6.3">Blind Man + Lazy Boy (6.3)</option>
-                                        <option data-dod="6.4">Boomerang + Blind Man (6.4)</option>
-                                        <option data-dod="6.4">Lazyghost + Method (6.4)</option>
-                                        <option data-dod="6.4">Lazyswitch + Superman (6.4)</option>
-                                        <option data-dod="6.5">Ghost Rider + Lazy Boy (6.5)</option>
-                                        <option data-dod="6.8">BoomSuper + Tick Jockey (6.8)</option>
-                                        <option data-dod="6.8">Blind Man + Jesus (6.8)</option>
-                                        <option data-dod="6.8">Boomerang + Lazyswitch (6.8)</option>
-                                        <option data-dod="6.9">Wingover + Lazy Boy (6.9)</option>
-                                        <option data-dod="6.9">Blind Man + Switchblade (6.9)</option>
-                                        <option data-dod="7.0">Tick Jockey + Lazy Boy (7.0)</option>
-                                        <option data-dod="7.1">Blind Man + Switchcow (7.1)</option>
-                                        <option data-dod="7.2">Boomerang + Blindman + Superman (7.2)</option>
-                                        <option data-dod="7.2">Method + Cowboy + Superman (7.2)</option>
-                                        <option data-dod="7.3">BoomSwitch + Lazy Boy (7.3)</option>
-                                        <option data-dod="7.3">Switchblade + Ghost Rider (7.3)</option>
-                                        <option data-dod="7.3">Switchblade + Lazy Boy + Superman (7.3)</option>
-                                        <option data-dod="7.5">Boomerang + Switchblade + Lazy Boy (7.5)</option>
-                                        <option data-dod="7.6">Switchblade + Blind Man (7.6)</option>
-                                        <option data-dod="8.2">Switchblade + Ghost Rider + Lazy Boy (8.2)</option>
-                                        <option data-dod="8.3">BlindBoom + Cowboy (8.3)</option>
-                                        <option data-dod="8.7">Blind Man + Miracle Man + Switchblade (8.7)</option>
-                                        <option data-dod="8.7">Miracle Man + Ghost Rider + Lazy Boy (8.7)</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <span class="text-gray-400 text-sm">DOD</span>
-                                <input type="number" id="cpFreeDOD" min="1.0" max="10.0" step="0.1" placeholder="1.0" value=""
-                                    class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
-                                <input type="text" id="cpFreeMoveName" placeholder="Move name"
-                                    class="flex-1 px-2 py-1 rounded bg-gray-700 text-white text-sm hidden">
-                            </div>
-                        </div>
-
-                        <!-- Penalties (each judge can indicate) -->
-                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
-                            <div class="mb-2">
-                                <span class="text-gray-400 text-sm">Penalties <span class="text-gray-600">(applied when 3+ judges indicate)</span></span>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" id="cpPenaltyME" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
-                                    <span class="text-sm text-gray-300">ME <span class="text-gray-500 text-xs">(Missed Entry - no water contact)</span></span>
-                                </label>
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" id="cpPenaltyMF" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
-                                    <span class="text-sm text-gray-300">MF <span class="text-gray-500 text-xs">(Move Failure)</span></span>
-                                </label>
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" id="cpPenaltyWL" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
-                                    <span class="text-sm text-gray-300">WL <span class="text-gray-500 text-xs">(Water Landing)</span></span>
-                                </label>
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" id="cpPenaltyMV" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
-                                    <span class="text-sm text-gray-300">MV <span class="text-gray-500 text-xs">(Move Variation - repeated)</span></span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- Result Summary -->
-                        <div class="flex items-center justify-between mb-1">
-                            <div class="flex items-center gap-3">
-                                <span id="cpResultBadge" class="hidden px-2 py-1 rounded text-xs font-bold"></span>
-                            </div>
-                            <div class="text-sm">
-                                <span class="text-gray-400">Score: </span>
-                                <span id="cpFreeScoreFinal" class="text-green-400 font-bold font-mono">0.000</span>
-                            </div>
-                        </div>
-
-                        <!-- Save CP Freestyle Score -->
-                        <div class="mt-3 pt-3 border-t border-gray-700 flex items-center justify-between">
-                            <input type="text" id="cpFreeRoundLabel" placeholder="Round #"
-                                class="w-24 px-3 py-1 rounded bg-gray-700 text-white text-sm">
-                            <button onclick="saveCpFreestyleScore()" class="px-4 py-1 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
-                                Save Score
-                            </button>
-                        </div>
-                    </div>
 
                 {% endif %}
                 </div>
