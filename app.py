@@ -13175,6 +13175,7 @@ def create_ws_scoring_room():
         'created_at': datetime.now().isoformat()
     }
 
+    _save_ws_rooms()
     return jsonify({'success': True, 'room_code': room_code})
 
 
@@ -13344,8 +13345,38 @@ if SOCKETIO_ENABLED:
                 'state': room['state']
             }, room=room_id)
 
-    # WS real-time multi-judge scoring rooms
-    ws_scoring_rooms = {}
+    # WS real-time multi-judge scoring rooms - persisted to file
+    WS_ROOMS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ws_scoring_rooms.json')
+
+    def _save_ws_rooms():
+        """Persist ws_scoring_rooms to disk."""
+        try:
+            # Strip non-serializable socket state from judges before saving
+            saveable = {}
+            for code, room in ws_scoring_rooms.items():
+                r = dict(room)
+                r['judges'] = {k: {'name': v.get('name', ''), 'connected': False} for k, v in r.get('judges', {}).items()}
+                saveable[code] = r
+            with open(WS_ROOMS_FILE, 'w') as f:
+                json.dump(saveable, f)
+        except Exception as e:
+            print(f"[WS_ROOMS] Error saving rooms: {e}")
+
+    def _load_ws_rooms():
+        """Load ws_scoring_rooms from disk."""
+        try:
+            if os.path.exists(WS_ROOMS_FILE):
+                with open(WS_ROOMS_FILE, 'r') as f:
+                    rooms = json.load(f)
+                # Convert score keys back to ints
+                for code, room in rooms.items():
+                    room['scores'] = {int(k): v for k, v in room.get('scores', {}).items()}
+                return rooms
+        except Exception as e:
+            print(f"[WS_ROOMS] Error loading rooms: {e}")
+        return {}
+
+    ws_scoring_rooms = _load_ws_rooms()
 
     # Panel judging sessions for synchronized multi-judge scoring
     panel_sessions = {}
@@ -13825,6 +13856,7 @@ if SOCKETIO_ENABLED:
             'all_scores': room['scores'],
             'completion': completion
         }, room=room_code)
+        _save_ws_rooms()
 
     @socketio.on('ws_scoring_lock')
     def on_ws_scoring_lock(data):
@@ -13856,6 +13888,7 @@ if SOCKETIO_ENABLED:
             'state': 'complete',
             'completion': completion
         }, room=room_code)
+        _save_ws_rooms()
 
     @socketio.on('ws_scoring_reset')
     def on_ws_scoring_reset(data):
@@ -13877,6 +13910,7 @@ if SOCKETIO_ENABLED:
             'scoring_type': room['scoring_type'],
             'completion': _ws_scoring_completion(room)
         }, room=room_code)
+        _save_ws_rooms()
 
     @socketio.on('ws_scoring_leave')
     def on_ws_scoring_leave(data):

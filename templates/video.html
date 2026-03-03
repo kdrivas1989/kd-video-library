@@ -1462,15 +1462,134 @@
                             </div>
                         </div>
 
-                        <!-- DOD (Degree of Difficulty) -->
+                        <!-- Move & DOD (Degree of Difficulty) -->
                         <div class="bg-gray-900 rounded-lg p-3 mb-3">
-                            <div class="flex items-center gap-3">
-                                <span class="text-gray-400 text-sm">Degree of Difficulty (DOD)</span>
-                                <input type="number" id="cpFreeDOD" min="1.0" max="5.0" step="0.1" placeholder="1.0" value=""
-                                    class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
-                                <span class="text-gray-400 text-sm ml-2">Move</span>
-                                <input type="text" id="cpFreeMoveName" placeholder="e.g. Horseshoe"
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="text-gray-400 text-sm">Move</span>
+                                <select id="cpFreeMove" onchange="onCpMoveSelect(this)"
                                     class="flex-1 px-2 py-1 rounded bg-gray-700 text-white text-sm">
+                                    <option value="">-- Select Move --</option>
+                                    <option value="custom">Custom (manual entry)</option>
+                                    <optgroup label="Base Moves (Group 1)">
+                                        <option data-dod="1.2">Crane (1.2)</option>
+                                        <option data-dod="1.3">Can-Can (1.3)</option>
+                                        <option data-dod="1.3">Cross-up (1.3)</option>
+                                        <option data-dod="1.4">Nac-Nac (1.4)</option>
+                                        <option data-dod="1.5">T (1.5)</option>
+                                        <option data-dod="1.6">Flex Head (1.6)</option>
+                                        <option data-dod="1.9">Method (1.9)</option>
+                                    </optgroup>
+                                    <optgroup label="Base Moves (Group 2)">
+                                        <option data-dod="2.1">Superman (2.1)</option>
+                                        <option data-dod="2.3">Walnut (2.3)</option>
+                                        <option data-dod="2.6">Boomerang (2.6)</option>
+                                        <option data-dod="2.7">Lazy Boy (2.7)</option>
+                                    </optgroup>
+                                    <optgroup label="Base Moves (Group 3)">
+                                        <option data-dod="3.5">Switchblade (3.5)</option>
+                                        <option data-dod="3.8">Switchcow (3.8)</option>
+                                    </optgroup>
+                                    <optgroup label="Base Moves (Group 4)">
+                                        <option data-dod="4.3">Blind Man (4.3)</option>
+                                        <option data-dod="4.6">Blindboom (4.6)</option>
+                                        <option data-dod="4.7">Cowboy (4.7)</option>
+                                        <option data-dod="4.8">Ghost Rider (4.8)</option>
+                                        <option data-dod="4.8">Tick Jockey (4.8)</option>
+                                    </optgroup>
+                                    <optgroup label="Fusions">
+                                        <option data-dod="2.6">CraneSuper (2.6)</option>
+                                        <option data-dod="2.8">SuperWalnut (2.8)</option>
+                                        <option data-dod="3.0">CraneBoom (3.0)</option>
+                                        <option data-dod="3.1">NacSuper (3.1)</option>
+                                        <option data-dod="3.6">BoomSuper (3.6)</option>
+                                        <option data-dod="3.6">BoomMeth (3.6)</option>
+                                        <option data-dod="4.1">LazySwitch (4.1)</option>
+                                        <option data-dod="4.2">SwitchNac (4.2)</option>
+                                        <option data-dod="4.3">LazySwitchcow (4.3)</option>
+                                        <option data-dod="5.0">SwitchSuper (5.0)</option>
+                                        <option data-dod="5.0">CowCan (5.0)</option>
+                                        <option data-dod="5.1">BoomSwitch (5.1)</option>
+                                        <option data-dod="5.3">BoomCow (5.3)</option>
+                                        <option data-dod="5.4">BoomSwitchcow (5.4)</option>
+                                        <option data-dod="5.5">TickSuper (5.5)</option>
+                                        <option data-dod="6.3">BlindSwitch (6.3)</option>
+                                        <option data-dod="6.8">BlindSwitchCow (6.8)</option>
+                                        <option data-dod="7.6">BlindTick (7.6)</option>
+                                    </optgroup>
+                                    <optgroup label="Sequential Combinations">
+                                        <option data-dod="2.3">Crane + Superman (2.3)</option>
+                                        <option data-dod="2.6">Superman + Cross-up (2.6)</option>
+                                        <option data-dod="2.6">Superman + Walnut (2.6)</option>
+                                        <option data-dod="2.9">Boomerang + Can-Can (2.9)</option>
+                                        <option data-dod="3.1">NacNac + Superman (3.1)</option>
+                                        <option data-dod="3.2">Boomerang + Superman (3.2)</option>
+                                        <option data-dod="3.2">Superman + Boomerang (3.2)</option>
+                                        <option data-dod="3.3">BoomNac + Superman (3.3)</option>
+                                        <option data-dod="3.4">Boomerang + Method (3.4)</option>
+                                        <option data-dod="3.5">Method + Superman (3.5)</option>
+                                        <option data-dod="3.6">Nac-Nac + Lazy Boy (3.6)</option>
+                                        <option data-dod="3.6">Method + Lazy Boy (3.6)</option>
+                                        <option data-dod="4.0">Crane + Switchblade (4.0)</option>
+                                        <option data-dod="4.0">Flex Head + Lazy Boy (4.0)</option>
+                                        <option data-dod="4.0">Switchblade + Nac Nac (4.0)</option>
+                                        <option data-dod="4.0">T + Crane + Superman (4.0)</option>
+                                        <option data-dod="4.3">Lazy Boy + Switchcow (4.3)</option>
+                                        <option data-dod="4.4">Switchblade + Method (4.4)</option>
+                                        <option data-dod="4.4">Method + Switchblade (4.4)</option>
+                                        <option data-dod="4.6">Superman + Switchblade (4.6)</option>
+                                        <option data-dod="4.6">Switchblade + Superman (4.6)</option>
+                                        <option data-dod="4.7">Boomerang + Switchblade (4.7)</option>
+                                        <option data-dod="4.7">Lazy Boy + Superman (4.7)</option>
+                                        <option data-dod="4.8">Boomerang + Lazy Boy (4.8)</option>
+                                        <option data-dod="4.8">Lazy Boy + Switchblade (4.8)</option>
+                                        <option data-dod="4.9">Superman + Lazy Boy (4.9)</option>
+                                        <option data-dod="4.9">Method + Blindman (4.9)</option>
+                                        <option data-dod="5.1">Superman + Walnut + Lazy Boy (5.1)</option>
+                                        <option data-dod="5.3">Tick Jockey + Superman (5.3)</option>
+                                        <option data-dod="5.3">Method + Cowboy (5.3)</option>
+                                        <option data-dod="5.4">Blind Man + Superman (5.4)</option>
+                                        <option data-dod="5.4">Switchblade + Lazy Boy (5.4)</option>
+                                        <option data-dod="5.6">Superman + Tick Jockey (5.6)</option>
+                                        <option data-dod="5.6">Cowboy + Superman (5.6)</option>
+                                        <option data-dod="5.7">Ghost Rider + Superman (5.7)</option>
+                                        <option data-dod="5.7">Boomerang + Tick Jockey (5.7)</option>
+                                        <option data-dod="5.8">BoomMeth + Lazy Boy (5.8)</option>
+                                        <option data-dod="5.9">Lazy Boy + Tick Jockey (5.9)</option>
+                                        <option data-dod="5.9">Double Cowboy (5.9)</option>
+                                        <option data-dod="6.0">Lazy Boy + Ghost Rider (6.0)</option>
+                                        <option data-dod="6.2">BoomCow + Superman (6.2)</option>
+                                        <option data-dod="6.3">Blind Man + Lazy Boy (6.3)</option>
+                                        <option data-dod="6.4">Boomerang + Blind Man (6.4)</option>
+                                        <option data-dod="6.4">Lazyghost + Method (6.4)</option>
+                                        <option data-dod="6.4">Lazyswitch + Superman (6.4)</option>
+                                        <option data-dod="6.5">Ghost Rider + Lazy Boy (6.5)</option>
+                                        <option data-dod="6.8">BoomSuper + Tick Jockey (6.8)</option>
+                                        <option data-dod="6.8">Blind Man + Jesus (6.8)</option>
+                                        <option data-dod="6.8">Boomerang + Lazyswitch (6.8)</option>
+                                        <option data-dod="6.9">Wingover + Lazy Boy (6.9)</option>
+                                        <option data-dod="6.9">Blind Man + Switchblade (6.9)</option>
+                                        <option data-dod="7.0">Tick Jockey + Lazy Boy (7.0)</option>
+                                        <option data-dod="7.1">Blind Man + Switchcow (7.1)</option>
+                                        <option data-dod="7.2">Boomerang + Blindman + Superman (7.2)</option>
+                                        <option data-dod="7.2">Method + Cowboy + Superman (7.2)</option>
+                                        <option data-dod="7.3">BoomSwitch + Lazy Boy (7.3)</option>
+                                        <option data-dod="7.3">Switchblade + Ghost Rider (7.3)</option>
+                                        <option data-dod="7.3">Switchblade + Lazy Boy + Superman (7.3)</option>
+                                        <option data-dod="7.5">Boomerang + Switchblade + Lazy Boy (7.5)</option>
+                                        <option data-dod="7.6">Switchblade + Blind Man (7.6)</option>
+                                        <option data-dod="8.2">Switchblade + Ghost Rider + Lazy Boy (8.2)</option>
+                                        <option data-dod="8.3">BlindBoom + Cowboy (8.3)</option>
+                                        <option data-dod="8.7">Blind Man + Miracle Man + Switchblade (8.7)</option>
+                                        <option data-dod="8.7">Miracle Man + Ghost Rider + Lazy Boy (8.7)</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-gray-400 text-sm">DOD</span>
+                                <input type="number" id="cpFreeDOD" min="1.0" max="10.0" step="0.1" placeholder="1.0" value=""
+                                    class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                <input type="text" id="cpFreeMoveName" placeholder="Move name"
+                                    class="flex-1 px-2 py-1 rounded bg-gray-700 text-white text-sm hidden">
                             </div>
                         </div>
 
@@ -5657,6 +5776,19 @@
             calculateCpFreestyle();
         }
 
+        function onCpMoveSelect(select) {
+            const option = select.selectedOptions[0];
+            if (select.value === 'custom') {
+                document.getElementById('cpFreeMoveName').classList.remove('hidden');
+                document.getElementById('cpFreeMoveName').value = '';
+                document.getElementById('cpFreeDOD').value = '';
+            } else if (option && option.dataset.dod) {
+                document.getElementById('cpFreeDOD').value = option.dataset.dod;
+                document.getElementById('cpFreeMoveName').classList.add('hidden');
+                calculateCpFreestyle();
+            }
+        }
+
         function calculateCpFreestyle() {
             let avg;
             const penalties = {
@@ -5723,7 +5855,10 @@
             const roundLabel = document.getElementById('cpFreeRoundLabel').value || 'Round ' + (savedScores.length + 1);
             const finalScore = document.getElementById('cpFreeScoreFinal').textContent;
             const dod = parseFloat(document.getElementById('cpFreeDOD').value) || 1.0;
-            const moveName = document.getElementById('cpFreeMoveName').value.trim();
+            const moveSelect = document.getElementById('cpFreeMove');
+            const moveName = moveSelect.value === 'custom'
+                ? document.getElementById('cpFreeMoveName').value.trim()
+                : (moveSelect.selectedOptions[0]?.text?.replace(/\s*\([\d.]+\)\s*$/, '') || '');
 
             // Collect judge scores
             let judgeScores = {};
