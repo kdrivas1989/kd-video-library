@@ -290,6 +290,37 @@
                                     class="px-3 py-1 text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">3-Judge Panel</button>
                             </div>
                         </div>
+                        <!-- AE Real-Time Scoring Panel -->
+                        <div id="aeScoringRealtime" class="hidden mb-3 bg-gray-900 border border-purple-600 rounded-lg p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-purple-400 text-sm font-medium">Real-Time Scoring</span>
+                                <span class="text-xs text-purple-300 font-medium">Artistic Events</span>
+                            </div>
+                            <div id="aeScoringNotStarted">
+                                <button onclick="connectAeScoringRoom()" class="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
+                                    Connect to AE1
+                                </button>
+                            </div>
+                            <div id="aeScoringStarted" class="hidden">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-gray-400 text-xs">Code:</span>
+                                    <span id="aeRoomCode" class="text-white font-mono text-sm font-bold"></span>
+                                    <button onclick="copyAeRoomLink(this)" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs">Copy Link</button>
+                                </div>
+                                <div class="flex items-center gap-3 mb-2" id="aeJudgeIndicators">
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="aeRtJ1Dot"></span><span class="text-gray-500 text-xs" id="aeRtJ1Name">J1</span><span class="hidden text-green-400 text-xs ml-0.5" id="aeRtJ1Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="aeRtJ2Dot"></span><span class="text-gray-500 text-xs" id="aeRtJ2Name">J2</span><span class="hidden text-green-400 text-xs ml-0.5" id="aeRtJ2Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="aeRtJ3Dot"></span><span class="text-gray-500 text-xs" id="aeRtJ3Name">J3</span><span class="hidden text-green-400 text-xs ml-0.5" id="aeRtJ3Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="aeRtJ4Dot"></span><span class="text-gray-500 text-xs" id="aeRtJ4Name">J4</span><span class="hidden text-green-400 text-xs ml-0.5" id="aeRtJ4Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="aeRtJ5Dot"></span><span class="text-gray-500 text-xs" id="aeRtJ5Name">J5</span><span class="hidden text-green-400 text-xs ml-0.5" id="aeRtJ5Check">&#10003;</span></span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="lockAeScoring()" class="flex-1 py-1 rounded bg-red-600 hover:bg-red-700 text-xs font-medium">Lock Scores</button>
+                                    <button onclick="resetAeScoring()" class="flex-1 py-1 rounded bg-gray-600 hover:bg-gray-700 text-xs font-medium">Reset</button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div id="artisticMultiJudgePanel" class="hidden">
                             <!-- Routine Type & Discipline Selector -->
                             <div class="mb-4 pb-4 border-b border-gray-700">
@@ -872,8 +903,8 @@
                                 <span class="text-xs text-purple-300 font-medium">CP Freestyle</span>
                             </div>
                             <div id="cpScoringNotStarted">
-                                <button onclick="createCpScoringRoom()" class="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
-                                    Start Judge Session
+                                <button onclick="connectCpScoringRoom()" class="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
+                                    Connect to CP1
                                 </button>
                             </div>
                             <div id="cpScoringStarted" class="hidden">
@@ -1220,6 +1251,42 @@
                             </div>
                         </div>
 
+                        <!-- FS Real-Time Scoring Panel -->
+                        <div id="fsScoringRealtime" class="hidden mb-3 bg-gray-900 border border-purple-600 rounded-lg p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-purple-400 text-sm font-medium">Real-Time Scoring</span>
+                                <span class="text-xs text-purple-300 font-medium">FS Points</span>
+                            </div>
+                            <div id="fsScoringNotStarted">
+                                <div class="flex gap-2">
+                                    <button onclick="connectFsScoringRoom('FS1')" class="flex-1 py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
+                                        Connect Panel 1 (FS1)
+                                    </button>
+                                    <button onclick="connectFsScoringRoom('FS2')" class="flex-1 py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
+                                        Connect Panel 2 (FS2)
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="fsScoringStarted" class="hidden">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-gray-400 text-xs">Code:</span>
+                                    <span id="fsRoomCode" class="text-white font-mono text-sm font-bold"></span>
+                                    <button onclick="copyFsRoomLink(this)" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs">Copy Link</button>
+                                </div>
+                                <div class="flex items-center gap-3 mb-2" id="fsJudgeIndicators">
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="fsRtJ1Dot"></span><span class="text-gray-500 text-xs" id="fsRtJ1Name">J1</span><span class="hidden text-green-400 text-xs ml-0.5" id="fsRtJ1Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="fsRtJ2Dot"></span><span class="text-gray-500 text-xs" id="fsRtJ2Name">J2</span><span class="hidden text-green-400 text-xs ml-0.5" id="fsRtJ2Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="fsRtJ3Dot"></span><span class="text-gray-500 text-xs" id="fsRtJ3Name">J3</span><span class="hidden text-green-400 text-xs ml-0.5" id="fsRtJ3Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="fsRtJ4Dot"></span><span class="text-gray-500 text-xs" id="fsRtJ4Name">J4</span><span class="hidden text-green-400 text-xs ml-0.5" id="fsRtJ4Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="fsRtJ5Dot"></span><span class="text-gray-500 text-xs" id="fsRtJ5Name">J5</span><span class="hidden text-green-400 text-xs ml-0.5" id="fsRtJ5Check">&#10003;</span></span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="lockFsScoring()" class="flex-1 py-1 rounded bg-red-600 hover:bg-red-700 text-xs font-medium">Lock Scores</button>
+                                    <button onclick="resetFsScoring()" class="flex-1 py-1 rounded bg-gray-600 hover:bg-gray-700 text-xs font-medium">Reset</button>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- FS/VFS Multi-Judge Panel -->
                         <div id="fsMultiJudgePanel" class="hidden">
                             <p class="text-xs text-gray-500 mb-3">Enter each judge's point count. Average will be calculated automatically.</p>
@@ -1258,6 +1325,42 @@
                                 <button onclick="saveFsScore()" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-medium">
                                     Save Score
                                 </button>
+                            </div>
+                        </div>
+
+                        <!-- CF Real-Time Scoring Panel -->
+                        <div id="cfScoringRealtime" class="hidden mb-3 bg-gray-900 border border-purple-600 rounded-lg p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-purple-400 text-sm font-medium">Real-Time Scoring</span>
+                                <span class="text-xs text-purple-300 font-medium">CF Points</span>
+                            </div>
+                            <div id="cfScoringNotStarted">
+                                <div class="flex gap-2">
+                                    <button onclick="connectCfScoringRoom('CF1')" class="flex-1 py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
+                                        Connect Panel 1 (CF1)
+                                    </button>
+                                    <button onclick="connectCfScoringRoom('CF2')" class="flex-1 py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
+                                        Connect Panel 2 (CF2)
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="cfScoringStarted" class="hidden">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-gray-400 text-xs">Code:</span>
+                                    <span id="cfRoomCode" class="text-white font-mono text-sm font-bold"></span>
+                                    <button onclick="copyCfRoomLink(this)" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs">Copy Link</button>
+                                </div>
+                                <div class="flex items-center gap-3 mb-2" id="cfJudgeIndicators">
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cfRtJ1Dot"></span><span class="text-gray-500 text-xs" id="cfRtJ1Name">J1</span><span class="hidden text-green-400 text-xs ml-0.5" id="cfRtJ1Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cfRtJ2Dot"></span><span class="text-gray-500 text-xs" id="cfRtJ2Name">J2</span><span class="hidden text-green-400 text-xs ml-0.5" id="cfRtJ2Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cfRtJ3Dot"></span><span class="text-gray-500 text-xs" id="cfRtJ3Name">J3</span><span class="hidden text-green-400 text-xs ml-0.5" id="cfRtJ3Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cfRtJ4Dot"></span><span class="text-gray-500 text-xs" id="cfRtJ4Name">J4</span><span class="hidden text-green-400 text-xs ml-0.5" id="cfRtJ4Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cfRtJ5Dot"></span><span class="text-gray-500 text-xs" id="cfRtJ5Name">J5</span><span class="hidden text-green-400 text-xs ml-0.5" id="cfRtJ5Check">&#10003;</span></span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="lockCfScoring()" class="flex-1 py-1 rounded bg-red-600 hover:bg-red-700 text-xs font-medium">Lock Scores</button>
+                                    <button onclick="resetCfScoring()" class="flex-1 py-1 rounded bg-gray-600 hover:bg-gray-700 text-xs font-medium">Reset</button>
+                                </div>
                             </div>
                         </div>
 
@@ -1408,8 +1511,8 @@
                                 <span id="wsScoringTypeIndicator" class="text-xs text-purple-300 font-medium"></span>
                             </div>
                             <div id="wsScoringNotStarted">
-                                <button onclick="createWsScoringRoom()" class="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
-                                    Start Judge Session
+                                <button onclick="connectWsScoringRoom()" class="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
+                                    Connect to WS1
                                 </button>
                             </div>
                             <div id="wsScoringStarted" class="hidden">
@@ -1907,6 +2010,13 @@
         const videoId = '{{ video.id }}';
         const currentAssignmentId = {% if current_assignment %}'{{ current_assignment.id }}'{% else %}null{% endif %};
 
+        // Scoring room socket/code variables (declared early for video sync access)
+        var wsScoringRoomCode = null, wsScoringSocket = null;
+        var cpScoringRoomCode = null, cpScoringSocket = null;
+        var fsScoringRoomCode = null, fsScoringSocket = null;
+        var cfScoringRoomCode = null, cfScoringSocket = null;
+        var aeScoringRoomCode = null, aeScoringSocket = null;
+
         // Related videos for auto-navigation after saving score
         const relatedVideos = [
             {% for rv in related_videos %}
@@ -1982,22 +2092,25 @@
                 }
             });
 
-            // Sync video playback to CP scoring room judges
-            video.addEventListener('play', () => {
-                if (cpScoringRoomCode && cpScoringSocket) {
-                    cpScoringSocket.emit('ws_scoring_video_play', {room_code: cpScoringRoomCode, time: video.currentTime});
-                }
-            });
-            video.addEventListener('pause', () => {
-                if (cpScoringRoomCode && cpScoringSocket) {
-                    cpScoringSocket.emit('ws_scoring_video_pause', {room_code: cpScoringRoomCode, time: video.currentTime});
-                }
-            });
-            video.addEventListener('seeked', () => {
-                if (cpScoringRoomCode && cpScoringSocket) {
-                    cpScoringSocket.emit('ws_scoring_video_seek', {room_code: cpScoringRoomCode, time: video.currentTime});
-                }
-            });
+            // Sync video playback to all scoring room judges
+            function emitVideoSync(eventName) {
+                const t = video.currentTime;
+                const rooms = [
+                    {code: cpScoringRoomCode, socket: cpScoringSocket},
+                    {code: wsScoringRoomCode, socket: wsScoringSocket},
+                    {code: fsScoringRoomCode, socket: fsScoringSocket},
+                    {code: cfScoringRoomCode, socket: cfScoringSocket},
+                    {code: aeScoringRoomCode, socket: aeScoringSocket}
+                ];
+                rooms.forEach(r => {
+                    if (r.code && r.socket) {
+                        r.socket.emit(eventName, {room_code: r.code, time: t});
+                    }
+                });
+            }
+            video.addEventListener('play', () => emitVideoSync('ws_scoring_video_play'));
+            video.addEventListener('pause', () => emitVideoSync('ws_scoring_video_pause'));
+            video.addEventListener('seeked', () => emitVideoSync('ws_scoring_video_seek'));
         }
 
         // Check for replay auto-start on Vimeo videos
@@ -5358,33 +5471,24 @@
         // ============================================
         // WS REAL-TIME SCORING ROOM FUNCTIONS
         // ============================================
-        let wsScoringSocket = null;
-        let wsScoringRoomCode = null;
+        // wsScoringSocket and wsScoringRoomCode declared at top for video sync
         let wsScoringType = 'ws-free';
 
-        function createWsScoringRoom() {
-            // Determine initial type from which section is visible
+        function connectWsScoringRoom() {
             const compSection = document.getElementById('wsCompulsorySection');
             const initialType = (compSection && !compSection.classList.contains('hidden')) ? 'ws-compulsory' : 'ws-free';
             wsScoringType = initialType;
-
-            fetch('/ws-scoring/create', {
+            wsScoringRoomCode = 'WS1';
+            document.getElementById('wsScoringNotStarted').classList.add('hidden');
+            document.getElementById('wsScoringStarted').classList.remove('hidden');
+            document.getElementById('wsRoomCode').textContent = wsScoringRoomCode;
+            updateWsScoringTypeToggle(initialType);
+            initWsScoringSocket();
+            // Attach current video to the permanent room
+            fetch('/scoring/attach-video', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({scoring_type: initialType})
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    wsScoringRoomCode = data.room_code;
-
-                    document.getElementById('wsScoringNotStarted').classList.add('hidden');
-                    document.getElementById('wsScoringStarted').classList.remove('hidden');
-                    document.getElementById('wsRoomCode').textContent = data.room_code;
-                    updateWsScoringTypeToggle(initialType);
-
-                    initWsScoringSocket();
-                }
+                body: JSON.stringify({room_code: wsScoringRoomCode, video_id: videoId})
             });
         }
 
@@ -5578,7 +5682,7 @@
 
         function copyWsRoomLink(btn) {
             const code = document.getElementById('wsRoomCode').textContent;
-            const link = window.location.origin + '/ws-scoring/join/' + code;
+            const link = window.location.origin + '/scoring/join/' + code;
             navigator.clipboard.writeText(link).then(() => {
                 const orig = btn.textContent;
                 btn.textContent = 'Copied!';
@@ -5776,8 +5880,7 @@
         // CP FREESTYLE SCORING FUNCTIONS
         // ============================================
         let cpFreeSingleJudge = true;
-        let cpScoringSocket = null;
-        let cpScoringRoomCode = null;
+        // cpScoringSocket and cpScoringRoomCode declared at top for video sync
 
         function truncTo3(val) {
             // Truncate to 3 decimal places (no rounding)
@@ -5798,7 +5901,7 @@
                 document.getElementById('cpScoringPanel').classList.remove('hidden');
                 // Auto-create room if not already started
                 if (!cpScoringRoomCode) {
-                    createCpScoringRoom();
+                    connectCpScoringRoom();
                 }
             }
             calculateCpFreestyle();
@@ -5926,21 +6029,17 @@
         }
 
         // CP Freestyle real-time scoring room functions
-        function createCpScoringRoom() {
-            fetch('/ws-scoring/create', {
+        function connectCpScoringRoom() {
+            cpScoringRoomCode = 'CP1';
+            document.getElementById('cpScoringNotStarted').classList.add('hidden');
+            document.getElementById('cpScoringStarted').classList.remove('hidden');
+            document.getElementById('cpRoomCode').textContent = cpScoringRoomCode;
+            initCpScoringSocket();
+            // Attach current video to the permanent room
+            fetch('/scoring/attach-video', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({scoring_type: 'cp-freestyle', video_id: videoId})
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    cpScoringRoomCode = data.room_code;
-                    document.getElementById('cpScoringNotStarted').classList.add('hidden');
-                    document.getElementById('cpScoringStarted').classList.remove('hidden');
-                    document.getElementById('cpRoomCode').textContent = data.room_code;
-                    initCpScoringSocket();
-                }
+                body: JSON.stringify({room_code: cpScoringRoomCode, video_id: videoId})
             });
         }
 
@@ -6054,7 +6153,7 @@
 
         function copyCpRoomLink(btn) {
             const code = document.getElementById('cpRoomCode').textContent;
-            const link = window.location.origin + '/ws-scoring/join/' + code;
+            const link = window.location.origin + '/scoring/join/' + code;
             navigator.clipboard.writeText(link).then(() => {
                 const orig = btn.textContent;
                 btn.textContent = 'Copied!';
@@ -6080,6 +6179,390 @@
                     if (el) el.value = '';
                 }
                 calculateCpFreestyle();
+            }
+        }
+
+        // ============================================
+        // FS REAL-TIME SCORING ROOM FUNCTIONS
+        // ============================================
+        // fsScoringSocket and fsScoringRoomCode declared at top for video sync
+
+        function connectFsScoringRoom(code) {
+            fsScoringRoomCode = code;
+            document.getElementById('fsScoringNotStarted').classList.add('hidden');
+            document.getElementById('fsScoringStarted').classList.remove('hidden');
+            document.getElementById('fsRoomCode').textContent = code;
+            initFsScoringSocket();
+            fetch('/scoring/attach-video', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({room_code: fsScoringRoomCode, video_id: videoId})
+            });
+        }
+
+        function initFsScoringSocket() {
+            if (fsScoringSocket) return;
+            fsScoringSocket = io(window.location.origin, {
+                transports: ['polling', 'websocket'],
+                reconnection: true,
+                reconnectionAttempts: 10,
+                reconnectionDelay: 1000
+            });
+            fsScoringSocket.on('connect', () => {
+                if (fsScoringRoomCode) {
+                    fsScoringSocket.emit('ws_scoring_event_judge_join', {
+                        room_code: fsScoringRoomCode
+                    });
+                }
+            });
+            fsScoringSocket.on('ws_scoring_room_update', (data) => {
+                updateFsJudgeIndicators(data.judges, data.completion);
+                if (data.scores) applyFsScores(data.scores);
+            });
+            fsScoringSocket.on('ws_scoring_score_update', (data) => {
+                updateFsScoreField(data.judge_num, data.field, data.value);
+                if (data.completion) updateFsCompletionIndicators(data.completion);
+            });
+            fsScoringSocket.on('ws_scoring_state_change', (data) => {
+                if (data.completion) updateFsCompletionIndicators(data.completion);
+            });
+            fsScoringSocket.on('ws_scoring_reset_all', () => {
+                for (let j = 1; j <= 5; j++) {
+                    const el = document.getElementById('fsJ' + j);
+                    if (el) el.value = '';
+                }
+                calculateFsAverage();
+            });
+            fsScoringSocket.on('ws_scoring_error', (data) => {
+                console.error('FS Scoring error:', data.message);
+                alert('Scoring error: ' + data.message);
+            });
+        }
+
+        function updateFsScoreField(judgeNum, field, value) {
+            if (field !== 'points') return;
+            const input = document.getElementById('fsJ' + judgeNum);
+            if (input) {
+                input.value = (value !== null && value !== undefined) ? Math.round(value) : '';
+                calculateFsAverage();
+            }
+        }
+
+        function applyFsScores(scores) {
+            for (const [judgeNum, judgeScores] of Object.entries(scores)) {
+                for (const [field, value] of Object.entries(judgeScores)) {
+                    updateFsScoreField(parseInt(judgeNum), field, value);
+                }
+            }
+        }
+
+        function updateFsJudgeIndicators(judges, completion) {
+            for (let j = 1; j <= 5; j++) {
+                const dot = document.getElementById('fsRtJ' + j + 'Dot');
+                const nameEl = document.getElementById('fsRtJ' + j + 'Name');
+                if (!dot || !nameEl) continue;
+                const jStr = String(j);
+                if (judges[jStr] && judges[jStr].connected) {
+                    dot.classList.remove('bg-gray-500');
+                    dot.classList.add('bg-green-500');
+                    nameEl.classList.remove('text-gray-500');
+                    nameEl.classList.add('text-green-400');
+                    nameEl.textContent = judges[jStr].name || ('J' + j);
+                } else {
+                    dot.classList.remove('bg-green-500');
+                    dot.classList.add('bg-gray-500');
+                    nameEl.classList.remove('text-green-400');
+                    nameEl.classList.add('text-gray-500');
+                    nameEl.textContent = judges[jStr] ? judges[jStr].name : ('J' + j);
+                }
+            }
+            if (completion) updateFsCompletionIndicators(completion);
+        }
+
+        function updateFsCompletionIndicators(completion) {
+            for (let j = 1; j <= 5; j++) {
+                const checkEl = document.getElementById('fsRtJ' + j + 'Check');
+                if (!checkEl) continue;
+                const jData = completion[j] || completion[String(j)];
+                if (jData && jData.complete) {
+                    checkEl.classList.remove('hidden');
+                } else {
+                    checkEl.classList.add('hidden');
+                }
+            }
+        }
+
+        function copyFsRoomLink(btn) {
+            const code = document.getElementById('fsRoomCode').textContent;
+            const link = window.location.origin + '/scoring/join/' + code;
+            navigator.clipboard.writeText(link).then(() => {
+                const orig = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = orig, 2000);
+            });
+        }
+
+        function lockFsScoring() {
+            if (fsScoringSocket && fsScoringRoomCode) {
+                fsScoringSocket.emit('ws_scoring_lock', { room_code: fsScoringRoomCode });
+            }
+        }
+
+        function resetFsScoring() {
+            if (fsScoringSocket && fsScoringRoomCode) {
+                fsScoringSocket.emit('ws_scoring_reset', { room_code: fsScoringRoomCode });
+                for (let j = 1; j <= 5; j++) {
+                    const el = document.getElementById('fsJ' + j);
+                    if (el) el.value = '';
+                }
+                calculateFsAverage();
+            }
+        }
+
+        // ============================================
+        // CF REAL-TIME SCORING ROOM FUNCTIONS
+        // ============================================
+        // cfScoringSocket and cfScoringRoomCode declared at top for video sync
+
+        function connectCfScoringRoom(code) {
+            cfScoringRoomCode = code;
+            document.getElementById('cfScoringNotStarted').classList.add('hidden');
+            document.getElementById('cfScoringStarted').classList.remove('hidden');
+            document.getElementById('cfRoomCode').textContent = code;
+            initCfScoringSocket();
+            fetch('/scoring/attach-video', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({room_code: cfScoringRoomCode, video_id: videoId})
+            });
+        }
+
+        function initCfScoringSocket() {
+            if (cfScoringSocket) return;
+            cfScoringSocket = io(window.location.origin, {
+                transports: ['polling', 'websocket'],
+                reconnection: true,
+                reconnectionAttempts: 10,
+                reconnectionDelay: 1000
+            });
+            cfScoringSocket.on('connect', () => {
+                if (cfScoringRoomCode) {
+                    cfScoringSocket.emit('ws_scoring_event_judge_join', {
+                        room_code: cfScoringRoomCode
+                    });
+                }
+            });
+            cfScoringSocket.on('ws_scoring_room_update', (data) => {
+                updateCfJudgeIndicators(data.judges, data.completion);
+                if (data.scores) applyCfScores(data.scores);
+            });
+            cfScoringSocket.on('ws_scoring_score_update', (data) => {
+                updateCfScoreField(data.judge_num, data.field, data.value);
+                if (data.completion) updateCfCompletionIndicators(data.completion);
+            });
+            cfScoringSocket.on('ws_scoring_state_change', (data) => {
+                if (data.completion) updateCfCompletionIndicators(data.completion);
+            });
+            cfScoringSocket.on('ws_scoring_reset_all', () => {
+                for (let j = 1; j <= 5; j++) {
+                    const el = document.getElementById('cfJ' + j);
+                    if (el) el.value = '';
+                }
+                calculateCfAverage();
+            });
+            cfScoringSocket.on('ws_scoring_error', (data) => {
+                console.error('CF Scoring error:', data.message);
+                alert('Scoring error: ' + data.message);
+            });
+        }
+
+        function updateCfScoreField(judgeNum, field, value) {
+            if (field !== 'points') return;
+            const input = document.getElementById('cfJ' + judgeNum);
+            if (input) {
+                input.value = (value !== null && value !== undefined) ? Math.round(value) : '';
+                calculateCfAverage();
+            }
+        }
+
+        function applyCfScores(scores) {
+            for (const [judgeNum, judgeScores] of Object.entries(scores)) {
+                for (const [field, value] of Object.entries(judgeScores)) {
+                    updateCfScoreField(parseInt(judgeNum), field, value);
+                }
+            }
+        }
+
+        function updateCfJudgeIndicators(judges, completion) {
+            for (let j = 1; j <= 5; j++) {
+                const dot = document.getElementById('cfRtJ' + j + 'Dot');
+                const nameEl = document.getElementById('cfRtJ' + j + 'Name');
+                if (!dot || !nameEl) continue;
+                const jStr = String(j);
+                if (judges[jStr] && judges[jStr].connected) {
+                    dot.classList.remove('bg-gray-500');
+                    dot.classList.add('bg-green-500');
+                    nameEl.classList.remove('text-gray-500');
+                    nameEl.classList.add('text-green-400');
+                    nameEl.textContent = judges[jStr].name || ('J' + j);
+                } else {
+                    dot.classList.remove('bg-green-500');
+                    dot.classList.add('bg-gray-500');
+                    nameEl.classList.remove('text-green-400');
+                    nameEl.classList.add('text-gray-500');
+                    nameEl.textContent = judges[jStr] ? judges[jStr].name : ('J' + j);
+                }
+            }
+            if (completion) updateCfCompletionIndicators(completion);
+        }
+
+        function updateCfCompletionIndicators(completion) {
+            for (let j = 1; j <= 5; j++) {
+                const checkEl = document.getElementById('cfRtJ' + j + 'Check');
+                if (!checkEl) continue;
+                const jData = completion[j] || completion[String(j)];
+                if (jData && jData.complete) {
+                    checkEl.classList.remove('hidden');
+                } else {
+                    checkEl.classList.add('hidden');
+                }
+            }
+        }
+
+        function copyCfRoomLink(btn) {
+            const code = document.getElementById('cfRoomCode').textContent;
+            const link = window.location.origin + '/scoring/join/' + code;
+            navigator.clipboard.writeText(link).then(() => {
+                const orig = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = orig, 2000);
+            });
+        }
+
+        function lockCfScoring() {
+            if (cfScoringSocket && cfScoringRoomCode) {
+                cfScoringSocket.emit('ws_scoring_lock', { room_code: cfScoringRoomCode });
+            }
+        }
+
+        function resetCfScoring() {
+            if (cfScoringSocket && cfScoringRoomCode) {
+                cfScoringSocket.emit('ws_scoring_reset', { room_code: cfScoringRoomCode });
+                for (let j = 1; j <= 5; j++) {
+                    const el = document.getElementById('cfJ' + j);
+                    if (el) el.value = '';
+                }
+                calculateCfAverage();
+            }
+        }
+
+        // ============================================
+        // AE REAL-TIME SCORING ROOM FUNCTIONS
+        // ============================================
+        // aeScoringSocket and aeScoringRoomCode declared at top for video sync
+
+        function connectAeScoringRoom() {
+            aeScoringRoomCode = 'AE1';
+            document.getElementById('aeScoringNotStarted').classList.add('hidden');
+            document.getElementById('aeScoringStarted').classList.remove('hidden');
+            document.getElementById('aeRoomCode').textContent = aeScoringRoomCode;
+            initAeScoringSocket();
+            fetch('/scoring/attach-video', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({room_code: aeScoringRoomCode, video_id: videoId})
+            });
+        }
+
+        function initAeScoringSocket() {
+            if (aeScoringSocket) return;
+            aeScoringSocket = io(window.location.origin, {
+                transports: ['polling', 'websocket'],
+                reconnection: true,
+                reconnectionAttempts: 10,
+                reconnectionDelay: 1000
+            });
+            aeScoringSocket.on('connect', () => {
+                if (aeScoringRoomCode) {
+                    aeScoringSocket.emit('ws_scoring_event_judge_join', {
+                        room_code: aeScoringRoomCode
+                    });
+                }
+            });
+            aeScoringSocket.on('ws_scoring_room_update', (data) => {
+                updateAeJudgeIndicators(data.judges, data.completion);
+            });
+            aeScoringSocket.on('ws_scoring_score_update', (data) => {
+                if (data.completion) updateAeCompletionIndicators(data.completion);
+            });
+            aeScoringSocket.on('ws_scoring_state_change', (data) => {
+                if (data.completion) updateAeCompletionIndicators(data.completion);
+            });
+            aeScoringSocket.on('ws_scoring_reset_all', () => {
+                // AE scores are on judge devices, just update indicators
+                updateAeCompletionIndicators({});
+            });
+            aeScoringSocket.on('ws_scoring_error', (data) => {
+                console.error('AE Scoring error:', data.message);
+                alert('Scoring error: ' + data.message);
+            });
+        }
+
+        function updateAeJudgeIndicators(judges, completion) {
+            for (let j = 1; j <= 5; j++) {
+                const dot = document.getElementById('aeRtJ' + j + 'Dot');
+                const nameEl = document.getElementById('aeRtJ' + j + 'Name');
+                if (!dot || !nameEl) continue;
+                const jStr = String(j);
+                if (judges[jStr] && judges[jStr].connected) {
+                    dot.classList.remove('bg-gray-500');
+                    dot.classList.add('bg-green-500');
+                    nameEl.classList.remove('text-gray-500');
+                    nameEl.classList.add('text-green-400');
+                    nameEl.textContent = judges[jStr].name || ('J' + j);
+                } else {
+                    dot.classList.remove('bg-green-500');
+                    dot.classList.add('bg-gray-500');
+                    nameEl.classList.remove('text-green-400');
+                    nameEl.classList.add('text-gray-500');
+                    nameEl.textContent = judges[jStr] ? judges[jStr].name : ('J' + j);
+                }
+            }
+            if (completion) updateAeCompletionIndicators(completion);
+        }
+
+        function updateAeCompletionIndicators(completion) {
+            for (let j = 1; j <= 5; j++) {
+                const checkEl = document.getElementById('aeRtJ' + j + 'Check');
+                if (!checkEl) continue;
+                const jData = completion[j] || completion[String(j)];
+                if (jData && jData.complete) {
+                    checkEl.classList.remove('hidden');
+                } else {
+                    checkEl.classList.add('hidden');
+                }
+            }
+        }
+
+        function copyAeRoomLink(btn) {
+            const code = document.getElementById('aeRoomCode').textContent;
+            const link = window.location.origin + '/scoring/join/' + code;
+            navigator.clipboard.writeText(link).then(() => {
+                const orig = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = orig, 2000);
+            });
+        }
+
+        function lockAeScoring() {
+            if (aeScoringSocket && aeScoringRoomCode) {
+                aeScoringSocket.emit('ws_scoring_lock', { room_code: aeScoringRoomCode });
+            }
+        }
+
+        function resetAeScoring() {
+            if (aeScoringSocket && aeScoringRoomCode) {
+                aeScoringSocket.emit('ws_scoring_reset', { room_code: aeScoringRoomCode });
             }
         }
 
@@ -6116,6 +6599,9 @@
             document.getElementById('judgeModeTopRow').classList.add('hidden');
             document.getElementById('cpFreestyleSection').classList.add('hidden');
             document.getElementById('cpJudgeModeRow').classList.add('hidden');
+            document.getElementById('fsScoringRealtime').classList.add('hidden');
+            document.getElementById('cfScoringRealtime').classList.add('hidden');
+            document.getElementById('aeScoringRealtime').classList.add('hidden');
 
             // Restore FS scoring controls by default
             document.getElementById('fsScoringControls').classList.remove('hidden');
@@ -6153,6 +6639,7 @@
             if (isArtisticCategory || isArtisticEvent) {
                 document.getElementById('artisticMultiJudgePanel').classList.remove('hidden');
                 document.getElementById('judgeModeTopRow').classList.remove('hidden');
+                document.getElementById('aeScoringRealtime').classList.remove('hidden');
                 // Auto-select discipline based on subcategory or event type
                 const subcategory = '{{ video.subcategory|default("", true) }}'.toLowerCase();
                 if (subcategory.includes('freefly') || subcategory.includes('ff') || eventType === 'freefly') {
@@ -6169,9 +6656,11 @@
             // Show appropriate panel for other categories
             if (cfCategories.includes(category.toLowerCase()) || cfEvents.includes(eventType)) {
                 document.getElementById('cfMultiJudgePanel').classList.remove('hidden');
+                document.getElementById('cfScoringRealtime').classList.remove('hidden');
             } else {
                 // Default to FS panel
                 document.getElementById('fsMultiJudgePanel').classList.remove('hidden');
+                document.getElementById('fsScoringRealtime').classList.remove('hidden');
             }
         }
 

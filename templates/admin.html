@@ -259,7 +259,7 @@
                             {% endfor %}
                         </datalist>
                         <button onclick="createNewEvent()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm">+ New</button>
-                        <button onclick="bulkAssignEvent()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm">Assign to Visible</button>
+                        <button onclick="bulkAssignEvent()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm">Assign to Selected</button>
                         <button id="bulkSaveBtn" onclick="bulkSaveAllChanges()" class="hidden bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                             <span id="bulkSaveLabel">Save Changes</span>
@@ -295,6 +295,13 @@
                             {% endfor %}
                         </select>
                         <button onclick="bulkAssignDiscipline()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm">Assign to Selected</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1">Apply Round to Selected</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="bulkRoundInput" placeholder="Round # (e.g. 1, 2...)" class="px-3 py-2 rounded bg-gray-700 text-white w-48">
+                        <button onclick="bulkAssignRound()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm">Apply to Selected</button>
                     </div>
                 </div>
                 <div>
@@ -2679,21 +2686,21 @@
                 return;
             }
 
-            const visibleVideos = document.querySelectorAll('.video-list-item:not([style*="display: none"])');
-            if (visibleVideos.length === 0) {
-                alert('No visible videos to assign');
+            const selectedIds = Array.from(document.querySelectorAll('.video-checkbox:checked')).map(cb => cb.dataset.videoId);
+            if (selectedIds.length === 0) {
+                alert('Select videos first');
                 return;
             }
 
-            if (!confirm(`Assign "${newEvent}" to ${visibleVideos.length} video(s)?`)) {
+            if (!confirm(`Assign "${newEvent}" to ${selectedIds.length} video(s)?`)) {
                 return;
             }
 
             let success = 0;
             let failed = 0;
 
-            for (const video of visibleVideos) {
-                const videoId = video.dataset.videoId;
+            for (const videoId of selectedIds) {
+                const video = document.querySelector(`.video-list-item[data-video-id="${videoId}"]`);
                 try {
                     const response = await fetch(`/admin/edit-video/${videoId}`, {
                         method: 'POST',
@@ -2703,9 +2710,11 @@
                     const result = await response.json();
                     if (result.success) {
                         success++;
-                        video.dataset.event = newEvent;
-                        const eventInput = video.querySelector('.event-input');
-                        if (eventInput) eventInput.value = newEvent;
+                        if (video) {
+                            video.dataset.event = newEvent;
+                            const eventInput = video.querySelector('.event-input');
+                            if (eventInput) eventInput.value = newEvent;
+                        }
                     } else {
                         failed++;
                     }
@@ -2715,7 +2724,6 @@
             }
 
             alert(`Done! ${success} updated, ${failed} failed.`);
-            // Re-apply filter to hide moved videos
             filterVideosByEvent();
         }
 
@@ -2841,6 +2849,51 @@
                             sel.dataset.original = '';
                             sel.dataset.current = '';
                         });
+                    } else {
+                        failed++;
+                    }
+                } catch (e) {
+                    failed++;
+                }
+            }
+
+            alert(`Done! ${success} updated, ${failed} failed.`);
+        }
+
+        async function bulkAssignRound() {
+            const roundNum = document.getElementById('bulkRoundInput').value.trim();
+            if (!roundNum) {
+                alert('Please enter a round number');
+                return;
+            }
+
+            const selectedIds = Array.from(document.querySelectorAll('.video-checkbox:checked')).map(cb => cb.dataset.videoId);
+            if (selectedIds.length === 0) {
+                alert('Select videos first');
+                return;
+            }
+
+            if (!confirm(`Apply round "${roundNum}" to ${selectedIds.length} video(s)?`)) return;
+
+            let success = 0;
+            let failed = 0;
+
+            for (const videoId of selectedIds) {
+                try {
+                    const response = await fetch(`/admin/edit-video/${videoId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ round_num: roundNum })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        success++;
+                        const video = document.querySelector(`.video-list-item[data-video-id="${videoId}"]`);
+                        if (video) {
+                            video.dataset.roundNum = roundNum;
+                            const roundInput = video.querySelector('.round-input');
+                            if (roundInput) roundInput.value = roundNum;
+                        }
                     } else {
                         failed++;
                     }

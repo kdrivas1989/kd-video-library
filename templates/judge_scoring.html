@@ -15,7 +15,12 @@
 <body class="bg-gray-900 text-white min-h-screen">
     <nav class="bg-gray-800 p-4">
         <div class="container mx-auto flex justify-between items-center">
-            <span class="text-xl font-bold text-purple-400">Judge Scoring</span>
+            <div>
+                <span class="text-xl font-bold text-purple-400">Judge Scoring</span>
+                {% if is_permanent and room_name %}
+                <span class="text-gray-400 text-sm ml-2">{{ room_name }}</span>
+                {% endif %}
+            </div>
             <div class="flex items-center gap-3">
                 <span id="connectionDot" class="w-3 h-3 rounded-full bg-gray-500 inline-block"></span>
                 <span class="text-gray-400 text-sm">Room: <span class="text-white font-mono">{{ room_code }}</span></span>
@@ -147,6 +152,39 @@
                 </div>
             </div>
 
+            <!-- FS Points Score Fields -->
+            <div id="fsPointsFields" class="hidden">
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <label class="block text-gray-400 text-sm mb-2">Point Count <span class="text-gray-600">(0-99)</span></label>
+                    <input type="number" id="score_fs_points" min="0" max="99" step="1"
+                        inputmode="numeric" placeholder="0" data-field="points" data-min="0" data-max="99"
+                        class="w-full px-4 py-4 rounded-lg bg-gray-700 text-white text-2xl text-center font-bold border-2 field-empty"
+                        onchange="submitScore('points', this.value)" oninput="onFieldInput(this)">
+                </div>
+            </div>
+
+            <!-- CF Points Score Fields -->
+            <div id="cfPointsFields" class="hidden">
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <label class="block text-gray-400 text-sm mb-2">Formation Count <span class="text-gray-600">(0-99)</span></label>
+                    <input type="number" id="score_cf_points" min="0" max="99" step="1"
+                        inputmode="numeric" placeholder="0" data-field="points" data-min="0" data-max="99"
+                        class="w-full px-4 py-4 rounded-lg bg-gray-700 text-white text-2xl text-center font-bold border-2 field-empty"
+                        onchange="submitScore('points', this.value)" oninput="onFieldInput(this)">
+                </div>
+            </div>
+
+            <!-- AE Score Fields -->
+            <div id="aeScoreFields" class="hidden">
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <label class="block text-gray-400 text-sm mb-2">Score <span class="text-gray-600">(0.0 - 10.0)</span></label>
+                    <input type="number" id="score_ae_score" min="0" max="10" step="0.1"
+                        inputmode="decimal" placeholder="0.0" data-field="score" data-min="0" data-max="10"
+                        class="w-full px-4 py-4 rounded-lg bg-gray-700 text-white text-2xl text-center font-bold border-2 field-empty"
+                        onchange="submitScore('score', this.value)" oninput="onFieldInput(this)">
+                </div>
+            </div>
+
             <!-- Completion Summary -->
             <div id="completionSummary" class="mt-4 bg-gray-800 rounded-lg p-3 text-center">
                 <span id="completionText" class="text-gray-400 text-sm">0/0 fields submitted</span>
@@ -187,12 +225,24 @@
             },
             'cp-freestyle': {
                 'score': {min: 0, max: 10}
+            },
+            'fs-points': {
+                'points': {min: 0, max: 99}
+            },
+            'cf-points': {
+                'points': {min: 0, max: 99}
+            },
+            'ae-score': {
+                'score': {min: 0, max: 10}
             }
         };
 
         function setScoringType(type) {
             currentScoringType = type;
-            const labels = {'ws-free': 'WS Free', 'ws-compulsory': 'WS Compulsory', 'cp-freestyle': 'CP Freestyle'};
+            const labels = {
+                'ws-free': 'WS Free', 'ws-compulsory': 'WS Compulsory', 'cp-freestyle': 'CP Freestyle',
+                'fs-points': 'FS Points', 'cf-points': 'CF Points', 'ae-score': 'Artistic Events'
+            };
             const label = labels[type] || type;
             const joinLabel = document.getElementById('joinScoringTypeLabel');
             if (joinLabel) joinLabel.textContent = label;
@@ -200,15 +250,26 @@
             if (scoreLabel) scoreLabel.textContent = label;
 
             // Show/hide field sets
-            document.getElementById('wsFreeFields').classList.toggle('hidden', type !== 'ws-free');
-            document.getElementById('wsCompFields').classList.toggle('hidden', type !== 'ws-compulsory');
-            document.getElementById('cpFreeFields').classList.toggle('hidden', type !== 'cp-freestyle');
+            const allFieldSets = ['wsFreeFields', 'wsCompFields', 'cpFreeFields',
+                                  'fsPointsFields', 'cfPointsFields', 'aeScoreFields'];
+            const typeToFieldSet = {
+                'ws-free': 'wsFreeFields', 'ws-compulsory': 'wsCompFields', 'cp-freestyle': 'cpFreeFields',
+                'fs-points': 'fsPointsFields', 'cf-points': 'cfPointsFields', 'ae-score': 'aeScoreFields'
+            };
+            allFieldSets.forEach(id => {
+                document.getElementById(id).classList.toggle('hidden', id !== typeToFieldSet[type]);
+            });
 
-            // Show/hide J4 and J5 options based on panel size
-            const j4Opt = document.querySelector('#judgePosition option[value="4"]');
-            const j5Opt = document.querySelector('#judgePosition option[value="5"]');
-            if (j4Opt) j4Opt.style.display = type === 'cp-freestyle' ? '' : 'none';
-            if (j5Opt) j5Opt.style.display = type === 'cp-freestyle' ? '' : 'none';
+            // Show/hide judge position options based on panel size
+            const panelSizes = {
+                'ws-free': 3, 'ws-compulsory': 3,
+                'cp-freestyle': 5, 'fs-points': 5, 'cf-points': 5, 'ae-score': 5
+            };
+            const size = panelSizes[type] || 5;
+            for (let j = 1; j <= 5; j++) {
+                const opt = document.querySelector('#judgePosition option[value="' + j + '"]');
+                if (opt) opt.style.display = j <= size ? '' : 'none';
+            }
         }
 
         function clearAllInputs() {
@@ -360,7 +421,7 @@
                 setScoringType(data.scoring_type);
                 clearAllInputs();
                 updateState(data.state);
-                const typeLabels = {'ws-free': 'WS Free', 'ws-compulsory': 'WS Compulsory', 'cp-freestyle': 'CP Freestyle'};
+                const typeLabels = {'ws-free': 'WS Free', 'ws-compulsory': 'WS Compulsory', 'cp-freestyle': 'CP Freestyle', 'fs-points': 'FS Points', 'cf-points': 'CF Points', 'ae-score': 'Artistic Events'};
                 addStatus('Switched to ' + (typeLabels[data.scoring_type] || data.scoring_type), 'warning');
             });
 
@@ -400,6 +461,15 @@
             }
             if (currentScoringType === 'cp-freestyle' && field === 'score') {
                 return document.getElementById('score_cp_score');
+            }
+            if (currentScoringType === 'fs-points' && field === 'points') {
+                return document.getElementById('score_fs_points');
+            }
+            if (currentScoringType === 'cf-points' && field === 'points') {
+                return document.getElementById('score_cf_points');
+            }
+            if (currentScoringType === 'ae-score' && field === 'score') {
+                return document.getElementById('score_ae_score');
             }
             return document.getElementById('score_' + field);
         }
@@ -485,7 +555,7 @@
         }
 
         // Fetch room status on load to show correct scoring type and judge options
-        fetch('/ws-scoring/' + roomCode + '/status')
+        fetch('/scoring/' + roomCode + '/status')
             .then(r => r.json())
             .then(data => {
                 if (data.scoring_type) {

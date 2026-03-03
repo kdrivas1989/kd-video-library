@@ -13146,6 +13146,45 @@ def sync_room_status(room_id):
 import random
 import string
 
+WS_SCORE_FIELDS = {
+    'ws-free': {
+        'style': (0, 10),
+        'dive_plan': (0, 10),
+        'cam_quality': (0, 7),
+        'cam_progressive': (0, 3)
+    },
+    'ws-compulsory': {
+        'style': (0, 10)
+    },
+    'cp-freestyle': {
+        'score': (0, 10)
+    },
+    'fs-points': {
+        'points': (0, 99)
+    },
+    'cf-points': {
+        'points': (0, 99)
+    },
+    'ae-score': {
+        'score': (0, 10)
+    }
+}
+
+PANEL_SIZES = {
+    'ws-free': 3, 'ws-compulsory': 3,
+    'cp-freestyle': 5, 'fs-points': 5, 'cf-points': 5, 'ae-score': 5
+}
+
+PERMANENT_ROOMS = {
+    'FS1': {'name': 'Formation Skydiving Panel 1', 'scoring_type': 'fs-points', 'panel_size': 5},
+    'FS2': {'name': 'Formation Skydiving Panel 2', 'scoring_type': 'fs-points', 'panel_size': 5},
+    'CP1': {'name': 'Canopy Piloting', 'scoring_type': 'cp-freestyle', 'panel_size': 5},
+    'WS1': {'name': 'Wingsuit', 'scoring_type': 'ws-free', 'panel_size': 3, 'allowed_types': ['ws-free', 'ws-compulsory']},
+    'CF1': {'name': 'Canopy Formation Panel 1', 'scoring_type': 'cf-points', 'panel_size': 5},
+    'CF2': {'name': 'Canopy Formation Panel 2', 'scoring_type': 'cf-points', 'panel_size': 5},
+    'AE1': {'name': 'Artistic Events', 'scoring_type': 'ae-score', 'panel_size': 5},
+}
+
 def generate_room_code():
     """Generate a 6-character alphanumeric room code."""
     chars = string.ascii_uppercase + string.digits
@@ -13154,17 +13193,17 @@ def generate_room_code():
         if code not in ws_scoring_rooms:
             return code
 
-@app.route('/ws-scoring/create', methods=['POST'])
+@app.route('/scoring/create', methods=['POST'])
 @login_required
 def create_ws_scoring_room():
     """Create a WS scoring room (requires login)."""
     data = request.json
     scoring_type = data.get('scoring_type', 'ws-free')
 
-    if scoring_type not in ('ws-free', 'ws-compulsory', 'cp-freestyle'):
+    if scoring_type not in WS_SCORE_FIELDS:
         return jsonify({'error': 'Invalid scoring type'}), 400
 
-    panel_size = 5 if scoring_type == 'cp-freestyle' else 3
+    panel_size = PANEL_SIZES.get(scoring_type, 5)
     room_code = generate_room_code()
     ws_scoring_rooms[room_code] = {
         'event_judge_name': session.get('username'),
@@ -13200,7 +13239,7 @@ def create_ws_scoring_room():
     return jsonify({'success': True, 'room_code': room_code})
 
 
-@app.route('/ws-scoring/join/<room_code>')
+@app.route('/scoring/join/<room_code>')
 def ws_scoring_join_page(room_code):
     """Serve judge scoring page (no login required)."""
     if room_code not in ws_scoring_rooms:
@@ -13229,10 +13268,12 @@ def ws_scoring_join_page(room_code):
     return render_template('judge_scoring.html',
                          room_code=room_code,
                          event_judge_name=room['event_judge_name'],
-                         video=video)
+                         video=video,
+                         is_permanent=room.get('permanent', False),
+                         room_name=PERMANENT_ROOMS.get(room_code, {}).get('name', ''))
 
 
-@app.route('/ws-scoring/<room_code>/status')
+@app.route('/scoring/<room_code>/status')
 def ws_scoring_room_status(room_code):
     """Get WS scoring room status."""
     if room_code not in ws_scoring_rooms:
@@ -13245,6 +13286,56 @@ def ws_scoring_room_status(room_code):
         'scores': room['scores'],
         'scoring_type': room['scoring_type']
     })
+
+
+@app.route('/scoring/attach-video', methods=['POST'])
+@login_required
+def ws_scoring_attach_video():
+    """Attach a video to an existing scoring room."""
+    data = request.json
+    room_code = data.get('room_code')
+    video_id = data.get('video_id')
+    if room_code not in ws_scoring_rooms:
+        return jsonify({'error': 'Room not found'}), 404
+    room = ws_scoring_rooms[room_code]
+    if video_id:
+        video = get_video(video_id)
+        if video:
+            if video.get('video_type') == 'pcloud' and video.get('local_file'):
+                video['video_src'] = f'/pcloud/stream/{video["local_file"]}'
+                video['is_direct_url'] = True
+            elif video.get('url') and is_direct_video_url(video.get('url', '')):
+                video['video_src'] = video['url']
+                video['is_direct_url'] = True
+            elif video.get('video_type') == 'local' and video.get('local_file'):
+                video['video_src'] = f'/static/videos/{video["local_file"]}'
+                video['is_direct_url'] = True
+            elif video.get('url'):
+                video['embed_url'] = get_video_embed_url(video.get('url', ''))
+                video['is_direct_url'] = False
+            room['video_id'] = video_id
+            room['video'] = video
+            _save_ws_rooms()
+    return jsonify({'success': True})
+
+
+@app.route('/scoring/permanent-rooms')
+@login_required
+def list_permanent_rooms():
+    """List all permanent scoring rooms and their current state."""
+    result = {}
+    for code, definition in PERMANENT_ROOMS.items():
+        room = ws_scoring_rooms.get(code, {})
+        result[code] = {
+            'name': definition['name'],
+            'scoring_type': room.get('scoring_type', definition['scoring_type']),
+            'panel_size': room.get('panel_size', definition['panel_size']),
+            'state': room.get('state', 'scoring'),
+            'judges': {k: {'name': v.get('name', ''), 'connected': v.get('connected', False)}
+                       for k, v in room.get('judges', {}).items()},
+            'allowed_types': definition.get('allowed_types'),
+        }
+    return jsonify(result)
 
 
 # SocketIO events for sync viewing
@@ -13420,6 +13511,31 @@ if SOCKETIO_ENABLED:
         return {}
 
     ws_scoring_rooms = _load_ws_rooms()
+
+    # PERMANENT_ROOMS defined at module level above
+
+    def _ensure_permanent_rooms():
+        """Ensure all permanent rooms exist. Create missing ones, don't overwrite existing."""
+        for code, definition in PERMANENT_ROOMS.items():
+            if code not in ws_scoring_rooms:
+                ws_scoring_rooms[code] = {
+                    'event_judge_name': definition['name'],
+                    'scoring_type': definition['scoring_type'],
+                    'panel_size': definition['panel_size'],
+                    'judges': {},
+                    'scores': {j: {} for j in range(1, definition['panel_size'] + 1)},
+                    'state': 'scoring',
+                    'permanent': True,
+                    'allowed_types': definition.get('allowed_types'),
+                    'created_at': datetime.now().isoformat()
+                }
+            else:
+                ws_scoring_rooms[code]['permanent'] = True
+                if 'allowed_types' not in ws_scoring_rooms[code]:
+                    ws_scoring_rooms[code]['allowed_types'] = definition.get('allowed_types')
+        _save_ws_rooms()
+
+    _ensure_permanent_rooms()
 
     # Panel judging sessions for synchronized multi-judge scoring
     panel_sessions = {}
@@ -13712,21 +13828,7 @@ if SOCKETIO_ENABLED:
             if all(not j['connected'] for j in session['judges'].values()):
                 del panel_sessions[session_id]
 
-    # WS real-time scoring SocketIO events
-    WS_SCORE_FIELDS = {
-        'ws-free': {
-            'style': (0, 10),
-            'dive_plan': (0, 10),
-            'cam_quality': (0, 7),
-            'cam_progressive': (0, 3)
-        },
-        'ws-compulsory': {
-            'style': (0, 10)
-        },
-        'cp-freestyle': {
-            'score': (0, 10)
-        }
-    }
+    # WS real-time scoring SocketIO events (WS_SCORE_FIELDS, PANEL_SIZES defined at module level)
 
     @socketio.on('ws_scoring_join')
     def on_ws_scoring_join(data):
@@ -13829,12 +13931,18 @@ if SOCKETIO_ENABLED:
             emit('ws_scoring_error', {'message': 'Room not found'})
             return
 
-        if new_type not in ('ws-free', 'ws-compulsory', 'cp-freestyle'):
-            emit('ws_scoring_error', {'message': 'Invalid scoring type'})
-            return
-
         room = ws_scoring_rooms[room_code]
-        panel_size = 5 if new_type == 'cp-freestyle' else 3
+        allowed = room.get('allowed_types')
+        if allowed:
+            if new_type not in allowed:
+                emit('ws_scoring_error', {'message': f'This room only supports: {", ".join(allowed)}'})
+                return
+        else:
+            if new_type not in WS_SCORE_FIELDS:
+                emit('ws_scoring_error', {'message': 'Invalid scoring type'})
+                return
+
+        panel_size = PANEL_SIZES.get(new_type, 5)
         room['scoring_type'] = new_type
         room['panel_size'] = panel_size
         room['scores'] = {j: {} for j in range(1, panel_size + 1)}
