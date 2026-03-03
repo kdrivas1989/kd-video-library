@@ -3695,11 +3695,20 @@
             resetTimer();
         }
 
-        // FlySight variables (must be declared before init calls updateWsMode)
-        let flysightDataRaw = null; // Raw MSL data
-        let flysightData = null;    // Adjusted for ground elevation (AGL)
+        // State variables (must be declared before init since updateEventType references them)
+        let flysightDataRaw = null;
+        let flysightData = null;
         let wsWorkingTime = 0;
-        let wsCompetitionMode = false; // false = library/practice, true = competition
+        let wsCompetitionMode = false;
+        let multiJudgeModeEnabled = false;
+        let currentJudgeCount = 5;
+        let artisticRoutineType = 'free';
+        let artisticDiscipline = 'freestyle';
+        let artisticDifficultyPreset = null;
+        let artisticJudgeMode = 'solo';
+        let wsCompulsoryNV = false;
+        let wsCompSingleJudge = true;
+        let wsFreeSingleJudge = true;
 
         // Initialize event type on page load (after all functions and constants are declared)
         try {
@@ -4848,9 +4857,6 @@
         }
 
         // Wingsuit Compulsory Scoring
-        let wsCompulsoryNV = false;
-        let wsCompSingleJudge = true;  // Default to single judge for practice
-        let wsFreeSingleJudge = true;  // Default to single judge for practice
 
         function toggleWsCompJudgeMode() {
             const count = document.getElementById('wsCompJudgeCount').value;
@@ -5041,9 +5047,6 @@
         // ============================================
         // MULTI-JUDGE SCORING FUNCTIONS
         // ============================================
-
-        let multiJudgeModeEnabled = false;
-        let currentJudgeCount = 5;
 
         function toggleMultiJudgeMode() {
             multiJudgeModeEnabled = document.getElementById('multiJudgeMode').checked;
@@ -5237,10 +5240,6 @@
         }
 
         // USPA Artistic Events State
-        let artisticRoutineType = 'free'; // 'free' or 'compulsory'
-        let artisticDiscipline = 'freestyle'; // 'freestyle' or 'freefly'
-        let artisticDifficultyPreset = null; // Preset difficulty from chief judge
-        let artisticJudgeMode = 'solo'; // 'solo' or 'panel'
 
         function setArtisticJudgeMode(mode) {
             artisticJudgeMode = mode;
