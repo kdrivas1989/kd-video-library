@@ -420,27 +420,31 @@
                                     </summary>
                                     <div class="p-3 pt-0 border-t border-gray-700">
                                         <div class="grid grid-cols-2 gap-2 mb-2">
-                                            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
-                                                <input type="checkbox" id="camOutOfFrame" onchange="calculateUSPAArtisticScores()" class="rounded">
-                                                <span>Out of frame (-1.5)</span>
-                                            </label>
-                                            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
-                                                <input type="checkbox" id="camOffCenter" onchange="calculateUSPAArtisticScores()" class="rounded">
-                                                <span>Off-center (-0.3)</span>
-                                            </label>
-                                            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
-                                                <input type="checkbox" id="camProximity" onchange="calculateUSPAArtisticScores()" class="rounded">
-                                                <span>Proximity issues (-2.0)</span>
-                                            </label>
-                                            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:bg-gray-700 p-1 rounded">
-                                                <input type="checkbox" id="camCropping" onchange="calculateUSPAArtisticScores()" class="rounded">
-                                                <span>Cropping (-0.3)</span>
-                                            </label>
+                                            <div class="flex items-center gap-2 text-sm text-gray-300 p-1 rounded">
+                                                <span class="flex-1">Out of frame</span>
+                                                <input type="number" id="camOutOfFrame" min="-10" max="0" step="0.1" value="0"
+                                                    class="w-20 px-2 py-1 rounded bg-gray-700 text-red-400 text-center font-mono text-sm" oninput="calculateUSPAArtisticScores()">
+                                            </div>
+                                            <div class="flex items-center gap-2 text-sm text-gray-300 p-1 rounded">
+                                                <span class="flex-1">Off-center</span>
+                                                <input type="number" id="camOffCenter" min="-10" max="0" step="0.1" value="0"
+                                                    class="w-20 px-2 py-1 rounded bg-gray-700 text-red-400 text-center font-mono text-sm" oninput="calculateUSPAArtisticScores()">
+                                            </div>
+                                            <div class="flex items-center gap-2 text-sm text-gray-300 p-1 rounded">
+                                                <span class="flex-1">Proximity issues</span>
+                                                <input type="number" id="camProximity" min="-10" max="0" step="0.1" value="0"
+                                                    class="w-20 px-2 py-1 rounded bg-gray-700 text-red-400 text-center font-mono text-sm" oninput="calculateUSPAArtisticScores()">
+                                            </div>
+                                            <div class="flex items-center gap-2 text-sm text-gray-300 p-1 rounded">
+                                                <span class="flex-1">Cropping</span>
+                                                <input type="number" id="camCropping" min="-10" max="0" step="0.1" value="0"
+                                                    class="w-20 px-2 py-1 rounded bg-gray-700 text-red-400 text-center font-mono text-sm" oninput="calculateUSPAArtisticScores()">
+                                            </div>
                                         </div>
                                         <div class="flex items-center gap-2">
-                                            <label class="text-xs text-gray-500">Custom:</label>
+                                            <label class="text-xs text-gray-500">Other:</label>
                                             <input type="number" id="camCustomDeduction" min="-10" max="0" step="0.1" value="0"
-                                                class="w-20 px-2 py-1 rounded bg-gray-700 text-white text-center font-mono text-sm" onchange="calculateUSPAArtisticScores()">
+                                                class="w-20 px-2 py-1 rounded bg-gray-700 text-red-400 text-center font-mono text-sm" oninput="calculateUSPAArtisticScores()">
                                         </div>
                                     </div>
                                 </details>
@@ -5340,10 +5344,10 @@
 
             // Calculate Camera deductions (shared between both modes)
             let cameraDeductions = 0;
-            if (document.getElementById('camOutOfFrame')?.checked) cameraDeductions -= 1.5;
-            if (document.getElementById('camOffCenter')?.checked) cameraDeductions -= 0.3;
-            if (document.getElementById('camProximity')?.checked) cameraDeductions -= 2.0;
-            if (document.getElementById('camCropping')?.checked) cameraDeductions -= 0.3;
+            cameraDeductions += parseFloat(document.getElementById('camOutOfFrame')?.value) || 0;
+            cameraDeductions += parseFloat(document.getElementById('camOffCenter')?.value) || 0;
+            cameraDeductions += parseFloat(document.getElementById('camProximity')?.value) || 0;
+            cameraDeductions += parseFloat(document.getElementById('camCropping')?.value) || 0;
             cameraDeductions += parseFloat(document.getElementById('camCustomDeduction')?.value) || 0;
 
             // Update camera total display
@@ -5525,10 +5529,10 @@
                 // Camera deductions (shared by both modes)
                 scorePayload.camera = {
                     deductions: {
-                        outOfFrame: document.getElementById('camOutOfFrame')?.checked || false,
-                        offCenter: document.getElementById('camOffCenter')?.checked || false,
-                        proximity: document.getElementById('camProximity')?.checked || false,
-                        cropping: document.getElementById('camCropping')?.checked || false,
+                        outOfFrame: parseFloat(document.getElementById('camOutOfFrame')?.value) || 0,
+                        offCenter: parseFloat(document.getElementById('camOffCenter')?.value) || 0,
+                        proximity: parseFloat(document.getElementById('camProximity')?.value) || 0,
+                        cropping: parseFloat(document.getElementById('camCropping')?.value) || 0,
                         custom: parseFloat(document.getElementById('camCustomDeduction')?.value) || 0
                     },
                     total: parseFloat(document.getElementById('artCamTotal')?.textContent) || 0
@@ -5723,11 +5727,10 @@
                 if (presInput) presInput.value = '';
             }
             // Camera deductions
-            document.getElementById('camOutOfFrame').checked = false;
-            document.getElementById('camOffCenter').checked = false;
-            document.getElementById('camProximity').checked = false;
-            document.getElementById('camCropping').checked = false;
-            document.getElementById('camEquipment').checked = false;
+            document.getElementById('camOutOfFrame').value = '0';
+            document.getElementById('camOffCenter').value = '0';
+            document.getElementById('camProximity').value = '0';
+            document.getElementById('camCropping').value = '0';
             document.getElementById('camCustomDeduction').value = '0';
 
             // Compulsory inputs
