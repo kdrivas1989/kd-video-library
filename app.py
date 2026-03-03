@@ -5625,6 +5625,7 @@ def upload_video():
     category = request.form.get('category', '') or 'uncategorized'
     subcategory = request.form.get('subcategory', '')
     event = request.form.get('event', '').strip()
+    round_num = request.form.get('round_num', '').strip()
     background = request.form.get('background', 'true').lower() == 'true'
 
     if category not in CATEGORIES:
@@ -5705,6 +5706,7 @@ def upload_video():
                 'video_type': 'local',
                 'local_file': output_filename,
                 'event': event,
+                'round_num': round_num,
                 'category_auto': category_auto
             }
 
@@ -5780,6 +5782,7 @@ def upload_video():
                 'video_type': 'local',
                 'local_file': output_filename,
                 'event': event,
+                'round_num': round_num,
                 'category_auto': category_auto
             }
 
