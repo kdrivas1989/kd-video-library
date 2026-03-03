@@ -5836,7 +5836,7 @@
             const isArtisticMode = artisticPanel && !artisticPanel.classList.contains('hidden');
 
             if (isArtisticMode) {
-                // Show artistic scoring summary
+                // Show artistic scoring summary with editable inputs
                 const totalScore = document.getElementById('artTotalScore')?.textContent || '0.00';
                 const difficulty = document.getElementById('artDifficulty')?.value || '0';
                 const execAvg = document.getElementById('artExecAvg')?.textContent || '0.00';
@@ -5847,25 +5847,33 @@
                 document.getElementById('confirmScoreValue').classList.remove('text-green-400');
                 document.getElementById('confirmScoreValue').classList.add('text-yellow-400');
 
-                // Update bust explanations section to show artistic breakdown
+                // Update bust explanations section to show editable artistic breakdown
                 const bustList = document.getElementById('bustExplanationsList');
                 bustList.innerHTML = `
                     <div class="grid grid-cols-2 gap-3 text-sm">
-                        <div class="bg-gray-700 rounded p-2 text-center">
-                            <div class="text-gray-400 text-xs">Difficulty</div>
-                            <div class="text-cyan-400 font-mono font-bold">${difficulty}</div>
+                        <div class="bg-gray-700 rounded p-3">
+                            <label class="text-gray-400 text-xs block mb-1">Difficulty</label>
+                            <input type="number" id="confirmArtDifficulty" value="${difficulty}" step="0.1" min="0" max="10"
+                                class="w-full px-2 py-1 rounded bg-gray-600 text-cyan-400 font-mono font-bold text-center text-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                oninput="recalcArtisticConfirmTotal()">
                         </div>
-                        <div class="bg-gray-700 rounded p-2 text-center">
-                            <div class="text-gray-400 text-xs">Execution</div>
-                            <div class="text-cyan-400 font-mono font-bold">${execAvg}</div>
+                        <div class="bg-gray-700 rounded p-3">
+                            <label class="text-gray-400 text-xs block mb-1">Execution</label>
+                            <input type="number" id="confirmArtExecution" value="${execAvg}" step="0.1" min="0" max="10"
+                                class="w-full px-2 py-1 rounded bg-gray-600 text-cyan-400 font-mono font-bold text-center text-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                oninput="recalcArtisticConfirmTotal()">
                         </div>
-                        <div class="bg-gray-700 rounded p-2 text-center">
-                            <div class="text-gray-400 text-xs">Presentation</div>
-                            <div class="text-cyan-400 font-mono font-bold">${presAvg}</div>
+                        <div class="bg-gray-700 rounded p-3">
+                            <label class="text-gray-400 text-xs block mb-1">Presentation</label>
+                            <input type="number" id="confirmArtPresentation" value="${presAvg}" step="0.1" min="0" max="10"
+                                class="w-full px-2 py-1 rounded bg-gray-600 text-cyan-400 font-mono font-bold text-center text-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                oninput="recalcArtisticConfirmTotal()">
                         </div>
-                        <div class="bg-gray-700 rounded p-2 text-center">
-                            <div class="text-gray-400 text-xs">Camera</div>
-                            <div class="text-red-400 font-mono font-bold">${camTotal}</div>
+                        <div class="bg-gray-700 rounded p-3">
+                            <label class="text-gray-400 text-xs block mb-1">Camera</label>
+                            <input type="number" id="confirmArtCamera" value="${camTotal}" step="0.1" min="0" max="10"
+                                class="w-full px-2 py-1 rounded bg-gray-600 text-red-400 font-mono font-bold text-center text-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                oninput="recalcArtisticConfirmTotal()">
                         </div>
                     </div>
                 `;
@@ -5923,11 +5931,48 @@
             bustList.innerHTML = html;
         }
 
+        function recalcArtisticConfirmTotal() {
+            const diff = parseFloat(document.getElementById('confirmArtDifficulty')?.value) || 0;
+            const exec = parseFloat(document.getElementById('confirmArtExecution')?.value) || 0;
+            const pres = parseFloat(document.getElementById('confirmArtPresentation')?.value) || 0;
+            const cam = parseFloat(document.getElementById('confirmArtCamera')?.value) || 0;
+            const total = (diff + exec + pres - cam).toFixed(2);
+            document.getElementById('confirmScoreValue').textContent = total;
+        }
+
         function hideConfirmScoreModal() {
             document.getElementById('confirmScoreModal').classList.add('hidden');
         }
 
         function confirmAndSubmitScore() {
+            // If artistic mode, push edited values back to the artistic panel
+            const confirmDiff = document.getElementById('confirmArtDifficulty');
+            if (confirmDiff) {
+                const diff = confirmDiff.value;
+                const exec = document.getElementById('confirmArtExecution').value;
+                const pres = document.getElementById('confirmArtPresentation').value;
+                const cam = document.getElementById('confirmArtCamera').value;
+
+                // Update the main artistic panel fields
+                const artDiff = document.getElementById('artDifficulty');
+                if (artDiff) artDiff.value = diff;
+                const artDiffPanel = document.getElementById('artDifficultyPanel');
+                if (artDiffPanel) artDiffPanel.value = diff;
+
+                // Update displayed averages
+                const artExecAvg = document.getElementById('artExecAvg');
+                if (artExecAvg) artExecAvg.textContent = parseFloat(exec).toFixed(2);
+                const artPresAvg = document.getElementById('artPresAvg');
+                if (artPresAvg) artPresAvg.textContent = parseFloat(pres).toFixed(2);
+                const artCamTotal = document.getElementById('artCamTotal');
+                if (artCamTotal) artCamTotal.textContent = parseFloat(cam).toFixed(2);
+
+                // Update total
+                const total = (parseFloat(diff) + parseFloat(exec) + parseFloat(pres) - parseFloat(cam)).toFixed(2);
+                const artTotal = document.getElementById('artTotalScore');
+                if (artTotal) artTotal.textContent = total;
+            }
+
             // Collect bust explanations
             const bustExplanations = [];
             document.querySelectorAll('.bust-explanation').forEach(input => {
