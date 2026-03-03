@@ -2611,7 +2611,6 @@
             // Connect to the same origin (works for both localhost and production)
             const socketUrl = window.location.origin;
             syncSocket = io(socketUrl, {
-                transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionAttempts: 5,
                 reconnectionDelay: 1000
@@ -5523,7 +5522,6 @@
             if (wsScoringSocket) return;
 
             wsScoringSocket = io(window.location.origin, {
-                transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionAttempts: 10,
                 reconnectionDelay: 1000
@@ -6047,7 +6045,6 @@
             if (cpScoringSocket) return;
 
             cpScoringSocket = io(window.location.origin, {
-                transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionAttempts: 10,
                 reconnectionDelay: 1000
@@ -6203,7 +6200,6 @@
         function initFsScoringSocket() {
             if (fsScoringSocket) return;
             fsScoringSocket = io(window.location.origin, {
-                transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionAttempts: 10,
                 reconnectionDelay: 1000
@@ -6340,7 +6336,6 @@
         function initCfScoringSocket() {
             if (cfScoringSocket) return;
             cfScoringSocket = io(window.location.origin, {
-                transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionAttempts: 10,
                 reconnectionDelay: 1000
@@ -6477,7 +6472,6 @@
         function initAeScoringSocket() {
             if (aeScoringSocket) return;
             aeScoringSocket = io(window.location.origin, {
-                transports: ['websocket', 'polling'],
                 reconnection: true,
                 reconnectionAttempts: 10,
                 reconnectionDelay: 1000
