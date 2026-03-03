@@ -13114,6 +13114,70 @@ def sync_room_status(room_id):
     })
 
 
+# ==================== WS REAL-TIME SCORING ====================
+
+import random
+import string
+
+def generate_room_code():
+    """Generate a 6-character alphanumeric room code."""
+    chars = string.ascii_uppercase + string.digits
+    while True:
+        code = ''.join(random.choices(chars, k=6))
+        if code not in ws_scoring_rooms:
+            return code
+
+@app.route('/ws-scoring/create', methods=['POST'])
+@login_required
+def create_ws_scoring_room():
+    """Create a WS scoring room (requires login). Room is persistent — no video_id coupling."""
+    data = request.json
+    scoring_type = data.get('scoring_type', 'ws-free')
+
+    if scoring_type not in ('ws-free', 'ws-compulsory'):
+        return jsonify({'error': 'Invalid scoring type'}), 400
+
+    room_code = generate_room_code()
+    ws_scoring_rooms[room_code] = {
+        'event_judge_name': session.get('username'),
+        'scoring_type': scoring_type,
+        'panel_size': 3,
+        'judges': {},
+        'scores': {1: {}, 2: {}, 3: {}},
+        'state': 'scoring',
+        'created_at': datetime.now().isoformat()
+    }
+
+    return jsonify({'success': True, 'room_code': room_code})
+
+
+@app.route('/ws-scoring/join/<room_code>')
+def ws_scoring_join_page(room_code):
+    """Serve judge scoring page (no login required)."""
+    if room_code not in ws_scoring_rooms:
+        return "Room not found", 404
+
+    room = ws_scoring_rooms[room_code]
+    return render_template('judge_scoring.html',
+                         room_code=room_code,
+                         event_judge_name=room['event_judge_name'])
+
+
+@app.route('/ws-scoring/<room_code>/status')
+def ws_scoring_room_status(room_code):
+    """Get WS scoring room status."""
+    if room_code not in ws_scoring_rooms:
+        return jsonify({'error': 'Room not found'}), 404
+
+    room = ws_scoring_rooms[room_code]
+    return jsonify({
+        'state': room['state'],
+        'judges': {k: {'name': v['name'], 'connected': v['connected']} for k, v in room['judges'].items()},
+        'scores': room['scores'],
+        'scoring_type': room['scoring_type']
+    })
+
+
 # SocketIO events for sync viewing
 if SOCKETIO_ENABLED:
     @socketio.on('join_sync_room')
@@ -13252,6 +13316,9 @@ if SOCKETIO_ENABLED:
                 'judges': room['judges'],
                 'state': room['state']
             }, room=room_id)
+
+    # WS real-time multi-judge scoring rooms
+    ws_scoring_rooms = {}
 
     # Panel judging sessions for synchronized multi-judge scoring
     panel_sessions = {}
@@ -13543,6 +13610,255 @@ if SOCKETIO_ENABLED:
             # Clean up empty sessions
             if all(not j['connected'] for j in session['judges'].values()):
                 del panel_sessions[session_id]
+
+    # WS real-time scoring SocketIO events
+    WS_SCORE_FIELDS = {
+        'ws-free': {
+            'style': (0, 10),
+            'dive_plan': (0, 10),
+            'cam_quality': (0, 7),
+            'cam_progressive': (0, 3)
+        },
+        'ws-compulsory': {
+            'style': (0, 10)
+        }
+    }
+
+    @socketio.on('ws_scoring_join')
+    def on_ws_scoring_join(data):
+        """Judge joins a WS scoring room."""
+        room_code = data.get('room_code')
+        judge_num = int(data.get('judge_num', 0))
+        judge_name = data.get('judge_name', 'Anonymous')
+
+        if room_code not in ws_scoring_rooms:
+            emit('ws_scoring_error', {'message': 'Room not found'})
+            return
+
+        room = ws_scoring_rooms[room_code]
+        if judge_num not in (1, 2, 3):
+            emit('ws_scoring_error', {'message': 'Invalid judge position'})
+            return
+
+        # Check if position is already taken by a different connected judge
+        if judge_num in room['judges'] and room['judges'][judge_num]['connected']:
+            existing_sid = room['judges'][judge_num].get('sid')
+            if existing_sid != request.sid:
+                emit('ws_scoring_error', {'message': f'J{judge_num} position already taken by {room["judges"][judge_num]["name"]}'})
+                return
+
+        room['judges'][judge_num] = {
+            'name': judge_name,
+            'connected': True,
+            'sid': request.sid
+        }
+        join_room(room_code)
+
+        # Send existing scores to the joining judge
+        emit('ws_scoring_joined', {
+            'judge_num': judge_num,
+            'scoring_type': room['scoring_type'],
+            'state': room['state'],
+            'scores': room['scores'].get(judge_num, {}),
+            'completion': _ws_scoring_completion(room)
+        })
+
+        # Notify all in room
+        emit('ws_scoring_room_update', {
+            'judges': {k: {'name': v['name'], 'connected': v['connected']} for k, v in room['judges'].items()},
+            'state': room['state'],
+            'scores': room['scores'],
+            'completion': _ws_scoring_completion(room)
+        }, room=room_code)
+
+    @socketio.on('ws_scoring_event_judge_join')
+    def on_ws_scoring_event_judge_join(data):
+        """Event judge connects to receive score updates."""
+        room_code = data.get('room_code')
+
+        if room_code not in ws_scoring_rooms:
+            emit('ws_scoring_error', {'message': 'Room not found'})
+            return
+
+        room = ws_scoring_rooms[room_code]
+        join_room(room_code)
+
+        # Send current state to event judge
+        emit('ws_scoring_room_update', {
+            'judges': {k: {'name': v['name'], 'connected': v['connected']} for k, v in room['judges'].items()},
+            'state': room['state'],
+            'scores': room['scores'],
+            'scoring_type': room['scoring_type'],
+            'completion': _ws_scoring_completion(room)
+        })
+
+    def _ws_scoring_completion(room):
+        """Compute per-judge completion status for a WS scoring room."""
+        required_fields = WS_SCORE_FIELDS.get(room['scoring_type'], {})
+        completion = {}
+        for j in (1, 2, 3):
+            judge_scores = room['scores'].get(j, {})
+            missing = []
+            for field, (min_val, max_val) in required_fields.items():
+                v = judge_scores.get(field)
+                if v is None:
+                    missing.append(field)
+                elif v < min_val or v > max_val:
+                    missing.append(field)
+            completion[j] = {
+                'complete': len(missing) == 0,
+                'missing': missing
+            }
+        return completion
+
+    @socketio.on('ws_scoring_set_type')
+    def on_ws_scoring_set_type(data):
+        """Event judge switches scoring_type between ws-free and ws-compulsory."""
+        room_code = data.get('room_code')
+        new_type = data.get('scoring_type')
+
+        if room_code not in ws_scoring_rooms:
+            emit('ws_scoring_error', {'message': 'Room not found'})
+            return
+
+        if new_type not in ('ws-free', 'ws-compulsory'):
+            emit('ws_scoring_error', {'message': 'Invalid scoring type'})
+            return
+
+        room = ws_scoring_rooms[room_code]
+        room['scoring_type'] = new_type
+        room['scores'] = {1: {}, 2: {}, 3: {}}
+        room['state'] = 'scoring'
+
+        emit('ws_scoring_type_changed', {
+            'scoring_type': new_type,
+            'state': 'scoring',
+            'scores': room['scores'],
+            'completion': _ws_scoring_completion(room)
+        }, room=room_code)
+
+    @socketio.on('ws_scoring_submit')
+    def on_ws_scoring_submit(data):
+        """Judge submits/updates a score field with completion tracking."""
+        room_code = data.get('room_code')
+        judge_num = int(data.get('judge_num', 0))
+        field = data.get('field')
+        value = data.get('value')
+
+        if room_code not in ws_scoring_rooms:
+            emit('ws_scoring_error', {'message': 'Room not found'})
+            return
+
+        room = ws_scoring_rooms[room_code]
+        if room['state'] == 'complete':
+            emit('ws_scoring_error', {'message': 'Scoring is locked'})
+            return
+
+        if judge_num not in (1, 2, 3):
+            emit('ws_scoring_error', {'message': 'Invalid judge position'})
+            return
+
+        valid_fields = WS_SCORE_FIELDS.get(room['scoring_type'], {})
+        if field not in valid_fields:
+            emit('ws_scoring_error', {'message': f'Invalid field: {field}'})
+            return
+
+        # Validate score range
+        min_val, max_val = valid_fields[field]
+        try:
+            value = float(value) if value not in (None, '') else None
+        except (ValueError, TypeError):
+            value = None
+
+        if value is not None and (value < min_val or value > max_val):
+            emit('ws_scoring_error', {'message': f'{field} must be between {min_val} and {max_val}'})
+            return
+
+        # Store the score
+        room['scores'][judge_num][field] = value
+
+        # Compute completion status for all judges
+        completion = _ws_scoring_completion(room)
+
+        # Broadcast to all in room
+        emit('ws_scoring_score_update', {
+            'judge_num': judge_num,
+            'field': field,
+            'value': value,
+            'all_scores': room['scores'],
+            'completion': completion
+        }, room=room_code)
+
+    @socketio.on('ws_scoring_lock')
+    def on_ws_scoring_lock(data):
+        """Event judge locks scores. Validates all judges have submitted all required fields."""
+        room_code = data.get('room_code')
+
+        if room_code not in ws_scoring_rooms:
+            emit('ws_scoring_error', {'message': 'Room not found'})
+            return
+
+        room = ws_scoring_rooms[room_code]
+        completion = _ws_scoring_completion(room)
+
+        # Check all 3 judges are complete
+        errors = []
+        for j in (1, 2, 3):
+            if not completion[j]['complete']:
+                missing_str = ', '.join(completion[j]['missing'])
+                errors.append(f'J{j} missing: {missing_str}')
+
+        if errors:
+            emit('ws_scoring_error', {'message': 'Cannot lock — ' + '; '.join(errors)})
+            return
+
+        room['state'] = 'complete'
+
+        emit('ws_scoring_state_change', {
+            'state': 'complete',
+            'completion': completion
+        }, room=room_code)
+
+    @socketio.on('ws_scoring_reset')
+    def on_ws_scoring_reset(data):
+        """Event judge resets all scores. Broadcasts current scoring_type so judges stay in sync."""
+        room_code = data.get('room_code')
+
+        if room_code not in ws_scoring_rooms:
+            emit('ws_scoring_error', {'message': 'Room not found'})
+            return
+
+        room = ws_scoring_rooms[room_code]
+        room['scores'] = {1: {}, 2: {}, 3: {}}
+        room['state'] = 'scoring'
+
+        emit('ws_scoring_reset_all', {
+            'state': 'scoring',
+            'scores': room['scores'],
+            'scoring_type': room['scoring_type'],
+            'completion': _ws_scoring_completion(room)
+        }, room=room_code)
+
+    @socketio.on('ws_scoring_leave')
+    def on_ws_scoring_leave(data):
+        """Judge disconnects from scoring room."""
+        room_code = data.get('room_code')
+        judge_num = int(data.get('judge_num', 0))
+
+        if room_code not in ws_scoring_rooms:
+            return
+
+        room = ws_scoring_rooms[room_code]
+        if judge_num in room['judges']:
+            room['judges'][judge_num]['connected'] = False
+
+        leave_room(room_code)
+
+        emit('ws_scoring_room_update', {
+            'judges': {k: {'name': v['name'], 'connected': v['connected']} for k, v in room['judges'].items()},
+            'state': room['state'],
+            'scores': room['scores']
+        }, room=room_code)
 
 
 # ==================== ARTISTIC EVENTS SCORING ====================

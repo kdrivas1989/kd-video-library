@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WS Judge Scoring</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        .field-empty { border-color: #4B5563; }
+        .field-valid { border-color: #22C55E; }
+        .field-invalid { border-color: #EF4444; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <nav class="bg-gray-800 p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <span class="text-xl font-bold text-purple-400">WS Judge Scoring</span>
+            <div class="flex items-center gap-3">
+                <span id="connectionDot" class="w-3 h-3 rounded-full bg-gray-500 inline-block"></span>
+                <span class="text-gray-400 text-sm">Room: <span class="text-white font-mono">{{ room_code }}</span></span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6 max-w-lg">
+
+        <!-- Join Form -->
+        <div id="joinForm" class="bg-gray-800 rounded-lg p-6">
+            <h2 class="text-lg font-bold mb-4">Join Scoring Session</h2>
+            <p class="text-gray-400 text-sm mb-4">Event Judge: <span class="text-white">{{ event_judge_name }}</span></p>
+            <p class="text-gray-400 text-sm mb-4">Type: <span id="joinScoringTypeLabel" class="text-purple-400 font-medium">Connecting...</span></p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1">Your Name</label>
+                    <input type="text" id="judgeName" placeholder="Enter your name"
+                        class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white text-lg" autocomplete="off">
+                </div>
+                <div>
+                    <label class="block text-gray-400 text-sm mb-1">Judge Position</label>
+                    <select id="judgePosition" class="w-full px-4 py-3 rounded-lg bg-gray-700 text-white text-lg">
+                        <option value="1">J1 - Judge 1</option>
+                        <option value="2">J2 - Judge 2</option>
+                        <option value="3">J3 - Judge 3</option>
+                    </select>
+                </div>
+                <button onclick="joinRoom()" class="w-full py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-lg font-bold">
+                    Join Session
+                </button>
+                <p id="joinError" class="text-red-400 text-sm hidden"></p>
+            </div>
+        </div>
+
+        <!-- Score Form (hidden until joined) -->
+        <div id="scoreForm" class="hidden">
+            <!-- Status Bar -->
+            <div class="bg-gray-800 rounded-lg p-4 mb-4 flex items-center justify-between">
+                <div>
+                    <span id="myJudgeLabel" class="text-purple-400 font-bold text-lg"></span>
+                    <span id="myJudgeName" class="text-gray-400 ml-2"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="scoringTypeLabel" class="text-xs text-purple-400 font-medium"></span>
+                    <div id="stateIndicator" class="px-3 py-1 rounded-full text-sm font-medium bg-yellow-600/30 text-yellow-300">
+                        Waiting
+                    </div>
+                </div>
+            </div>
+
+            <!-- WS Free Score Fields (both sets start hidden, JS shows the active one) -->
+            <div id="wsFreeFields" class="hidden">
+                <div class="space-y-4">
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <label class="block text-gray-400 text-sm mb-2">Style <span class="text-gray-600">(0-10)</span></label>
+                        <input type="number" id="score_style" min="0" max="10" step="0.1"
+                            inputmode="decimal" placeholder="0.0" data-field="style" data-min="0" data-max="10"
+                            class="w-full px-4 py-4 rounded-lg bg-gray-700 text-white text-2xl text-center font-bold border-2 field-empty"
+                            onchange="submitScore('style', this.value)" oninput="onFieldInput(this)">
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <label class="block text-gray-400 text-sm mb-2">Dive Plan <span class="text-gray-600">(0-10)</span></label>
+                        <input type="number" id="score_dive_plan" min="0" max="10" step="0.1"
+                            inputmode="decimal" placeholder="0.0" data-field="dive_plan" data-min="0" data-max="10"
+                            class="w-full px-4 py-4 rounded-lg bg-gray-700 text-white text-2xl text-center font-bold border-2 field-empty"
+                            onchange="submitScore('dive_plan', this.value)" oninput="onFieldInput(this)">
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <label class="block text-gray-400 text-sm mb-2">Camera Quality <span class="text-gray-600">(0-7)</span></label>
+                        <input type="number" id="score_cam_quality" min="0" max="7" step="0.1"
+                            inputmode="decimal" placeholder="0.0" data-field="cam_quality" data-min="0" data-max="7"
+                            class="w-full px-4 py-4 rounded-lg bg-gray-700 text-white text-2xl text-center font-bold border-2 field-empty"
+                            onchange="submitScore('cam_quality', this.value)" oninput="onFieldInput(this)">
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <label class="block text-gray-400 text-sm mb-2">Camera Progressive <span class="text-gray-600">(0-3)</span></label>
+                        <input type="number" id="score_cam_progressive" min="0" max="3" step="0.1"
+                            inputmode="decimal" placeholder="0.0" data-field="cam_progressive" data-min="0" data-max="3"
+                            class="w-full px-4 py-4 rounded-lg bg-gray-700 text-white text-2xl text-center font-bold border-2 field-empty"
+                            onchange="submitScore('cam_progressive', this.value)" oninput="onFieldInput(this)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- WS Compulsory Score Fields -->
+            <div id="wsCompFields" class="hidden">
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <label class="block text-gray-400 text-sm mb-2">Style <span class="text-gray-600">(0-10)</span></label>
+                    <input type="number" id="score_comp_style" min="0" max="10" step="0.1"
+                        inputmode="decimal" placeholder="0.0" data-field="style" data-min="0" data-max="10"
+                        class="w-full px-4 py-4 rounded-lg bg-gray-700 text-white text-2xl text-center font-bold border-2 field-empty"
+                        onchange="submitScore('style', this.value)" oninput="onFieldInput(this)">
+                </div>
+            </div>
+
+            <!-- Completion Summary -->
+            <div id="completionSummary" class="mt-4 bg-gray-800 rounded-lg p-3 text-center">
+                <span id="completionText" class="text-gray-400 text-sm">0/0 fields submitted</span>
+            </div>
+
+            <!-- Locked Overlay -->
+            <div id="lockedOverlay" class="hidden mt-4 bg-red-900/30 border border-red-700 rounded-lg p-6 text-center">
+                <p class="text-red-300 text-lg font-bold">Scores Locked</p>
+                <p class="text-gray-400 text-sm mt-1">The event judge has locked scoring.</p>
+            </div>
+
+            <!-- Status Messages -->
+            <div id="statusMessages" class="mt-4 space-y-2"></div>
+        </div>
+    </div>
+
+    <script>
+        const roomCode = '{{ room_code }}';
+        let currentScoringType = null;
+        let socket = null;
+        let myJudgeNum = 0;
+        let myName = '';
+        let isLocked = false;
+        let submitTimeout = null;
+
+        const FIELD_CONFIG = {
+            'ws-free': {
+                'style': {min: 0, max: 10},
+                'dive_plan': {min: 0, max: 10},
+                'cam_quality': {min: 0, max: 7},
+                'cam_progressive': {min: 0, max: 3}
+            },
+            'ws-compulsory': {
+                'style': {min: 0, max: 10}
+            }
+        };
+
+        function setScoringType(type) {
+            currentScoringType = type;
+            const label = type === 'ws-free' ? 'WS Free' : 'WS Compulsory';
+            const joinLabel = document.getElementById('joinScoringTypeLabel');
+            if (joinLabel) joinLabel.textContent = label;
+            const scoreLabel = document.getElementById('scoringTypeLabel');
+            if (scoreLabel) scoreLabel.textContent = label;
+
+            // Show/hide field sets
+            document.getElementById('wsFreeFields').classList.toggle('hidden', type !== 'ws-free');
+            document.getElementById('wsCompFields').classList.toggle('hidden', type !== 'ws-compulsory');
+        }
+
+        function clearAllInputs() {
+            document.querySelectorAll('#scoreForm input[type="number"]').forEach(input => {
+                input.value = '';
+                input.classList.remove('field-valid', 'field-invalid');
+                input.classList.add('field-empty');
+            });
+            updateCompletionSummary();
+        }
+
+        function onFieldInput(input) {
+            validateFieldBorder(input);
+            submitScore(input.dataset.field, input.value);
+        }
+
+        function validateFieldBorder(input) {
+            const val = input.value;
+            input.classList.remove('field-empty', 'field-valid', 'field-invalid');
+            if (val === '' || val === null) {
+                input.classList.add('field-empty');
+            } else {
+                const num = parseFloat(val);
+                const min = parseFloat(input.dataset.min);
+                const max = parseFloat(input.dataset.max);
+                if (!isNaN(num) && num >= min && num <= max) {
+                    input.classList.add('field-valid');
+                } else {
+                    input.classList.add('field-invalid');
+                }
+            }
+            updateCompletionSummary();
+        }
+
+        function updateCompletionSummary() {
+            if (!currentScoringType) return;
+            const fields = FIELD_CONFIG[currentScoringType];
+            if (!fields) return;
+
+            const totalFields = Object.keys(fields).length;
+            let filledCount = 0;
+
+            for (const [fieldName, range] of Object.entries(fields)) {
+                const input = getScoreInput(fieldName);
+                if (input && input.value !== '') {
+                    const num = parseFloat(input.value);
+                    if (!isNaN(num) && num >= range.min && num <= range.max) {
+                        filledCount++;
+                    }
+                }
+            }
+
+            const el = document.getElementById('completionText');
+            if (filledCount === totalFields) {
+                el.textContent = 'All fields submitted';
+                el.className = 'text-green-400 text-sm font-medium';
+            } else {
+                el.textContent = filledCount + '/' + totalFields + ' fields submitted';
+                el.className = 'text-gray-400 text-sm';
+            }
+        }
+
+        function joinRoom() {
+            myName = document.getElementById('judgeName').value.trim();
+            myJudgeNum = parseInt(document.getElementById('judgePosition').value);
+
+            if (!myName) {
+                showJoinError('Please enter your name');
+                return;
+            }
+
+            socket = io(window.location.origin, {
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionAttempts: 10,
+                reconnectionDelay: 1000
+            });
+
+            socket.on('connect', () => {
+                document.getElementById('connectionDot').classList.remove('bg-gray-500', 'bg-red-500');
+                document.getElementById('connectionDot').classList.add('bg-green-500');
+
+                socket.emit('ws_scoring_join', {
+                    room_code: roomCode,
+                    judge_num: myJudgeNum,
+                    judge_name: myName
+                });
+            });
+
+            socket.on('disconnect', () => {
+                document.getElementById('connectionDot').classList.remove('bg-green-500');
+                document.getElementById('connectionDot').classList.add('bg-red-500');
+                addStatus('Disconnected - reconnecting...', 'error');
+            });
+
+            socket.on('reconnect', () => {
+                socket.emit('ws_scoring_join', {
+                    room_code: roomCode,
+                    judge_num: myJudgeNum,
+                    judge_name: myName
+                });
+            });
+
+            socket.on('ws_scoring_joined', (data) => {
+                document.getElementById('joinForm').classList.add('hidden');
+                document.getElementById('scoreForm').classList.remove('hidden');
+                document.getElementById('myJudgeLabel').textContent = 'J' + myJudgeNum;
+                document.getElementById('myJudgeName').textContent = myName;
+
+                // Set scoring type from server (dynamic, not server-rendered)
+                setScoringType(data.scoring_type);
+                updateState(data.state);
+
+                // Repopulate existing scores
+                if (data.scores) {
+                    Object.entries(data.scores).forEach(([field, value]) => {
+                        if (value !== null && value !== undefined) {
+                            const input = getScoreInput(field);
+                            if (input) {
+                                input.value = value;
+                                validateFieldBorder(input);
+                            }
+                        }
+                    });
+                }
+
+                updateCompletionSummary();
+                addStatus('Joined as J' + myJudgeNum, 'success');
+            });
+
+            socket.on('ws_scoring_error', (data) => {
+                showJoinError(data.message);
+                addStatus(data.message, 'error');
+            });
+
+            socket.on('ws_scoring_state_change', (data) => {
+                updateState(data.state);
+            });
+
+            // Event judge switched scoring type
+            socket.on('ws_scoring_type_changed', (data) => {
+                setScoringType(data.scoring_type);
+                clearAllInputs();
+                updateState(data.state);
+                addStatus('Switched to ' + (data.scoring_type === 'ws-free' ? 'WS Free' : 'WS Compulsory'), 'warning');
+            });
+
+            socket.on('ws_scoring_reset_all', (data) => {
+                updateState(data.state);
+                // Sync scoring type in case it changed
+                if (data.scoring_type) {
+                    setScoringType(data.scoring_type);
+                }
+                clearAllInputs();
+                isLocked = false;
+                setInputsDisabled(false);
+                document.getElementById('lockedOverlay').classList.add('hidden');
+                addStatus('Scores reset by event judge', 'warning');
+            });
+        }
+
+        function getScoreInput(field) {
+            if (currentScoringType === 'ws-compulsory' && field === 'style') {
+                return document.getElementById('score_comp_style');
+            }
+            return document.getElementById('score_' + field);
+        }
+
+        function submitScore(field, value) {
+            if (!socket || isLocked) return;
+
+            clearTimeout(submitTimeout);
+            submitTimeout = setTimeout(() => {
+                socket.emit('ws_scoring_submit', {
+                    room_code: roomCode,
+                    judge_num: myJudgeNum,
+                    field: field,
+                    value: value
+                });
+            }, 150);
+        }
+
+        function updateState(state) {
+            const indicator = document.getElementById('stateIndicator');
+            indicator.className = 'px-3 py-1 rounded-full text-sm font-medium ';
+
+            switch(state) {
+                case 'waiting':
+                    indicator.className += 'bg-yellow-600/30 text-yellow-300';
+                    indicator.textContent = 'Waiting';
+                    setInputsDisabled(true);
+                    break;
+                case 'scoring':
+                    indicator.className += 'bg-green-600/30 text-green-300';
+                    indicator.textContent = 'Scoring';
+                    isLocked = false;
+                    setInputsDisabled(false);
+                    document.getElementById('lockedOverlay').classList.add('hidden');
+                    break;
+                case 'complete':
+                    indicator.className += 'bg-red-600/30 text-red-300';
+                    indicator.textContent = 'Locked';
+                    isLocked = true;
+                    setInputsDisabled(true);
+                    document.getElementById('lockedOverlay').classList.remove('hidden');
+                    break;
+            }
+        }
+
+        function setInputsDisabled(disabled) {
+            document.querySelectorAll('#scoreForm input[type="number"]').forEach(input => {
+                input.disabled = disabled;
+                if (disabled) {
+                    input.classList.add('opacity-50');
+                } else {
+                    input.classList.remove('opacity-50');
+                }
+            });
+        }
+
+        function showJoinError(msg) {
+            const el = document.getElementById('joinError');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 5000);
+        }
+
+        function addStatus(message, type) {
+            const container = document.getElementById('statusMessages');
+            const div = document.createElement('div');
+            div.className = 'p-3 rounded-lg text-sm ';
+            switch(type) {
+                case 'success': div.className += 'bg-green-600/30 text-green-300'; break;
+                case 'error': div.className += 'bg-red-600/30 text-red-300'; break;
+                case 'warning': div.className += 'bg-yellow-600/30 text-yellow-300'; break;
+                default: div.className += 'bg-blue-600/30 text-blue-300';
+            }
+            div.textContent = message;
+            container.insertBefore(div, container.firstChild);
+            while (container.children.length > 3) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if (socket) {
+                socket.emit('ws_scoring_leave', {
+                    room_code: roomCode,
+                    judge_num: myJudgeNum
+                });
+            }
+        });
+    </script>
+</body>
+</html>
