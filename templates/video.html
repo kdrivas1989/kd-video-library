@@ -848,17 +848,21 @@
                     </div>
                     </div><!-- End fsScoringControls -->
 
+                    <!-- CP Freestyle Judge Mode (hidden by default, shown between speed and scoring) -->
+                    <div id="cpJudgeModeRow" class="hidden mt-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-center gap-3">
+                            <span class="text-gray-400 text-sm">Judges:</span>
+                            <select id="cpFreeJudgeCount" onchange="toggleCpFreeJudgeMode()" class="px-2 py-1 rounded bg-gray-700 text-white text-sm">
+                                <option value="1" selected>Single</option>
+                                <option value="5">5 Panel</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <!-- CP Freestyle Scoring (hidden by default) -->
                     <div id="cpFreestyleSection" class="hidden mt-4 pt-4 border-t border-gray-700">
                         <div class="flex items-center justify-between mb-3">
                             <span class="text-gray-400 text-sm font-medium">CP Freestyle Scoring</span>
-                            <div class="flex items-center gap-2">
-                                <span class="text-gray-500 text-xs">Judges:</span>
-                                <select id="cpFreeJudgeCount" onchange="toggleCpFreeJudgeMode()" class="px-2 py-1 rounded bg-gray-700 text-white text-xs">
-                                    <option value="1" selected>Single</option>
-                                    <option value="5">5 Panel</option>
-                                </select>
-                            </div>
                         </div>
 
                         <!-- CP Freestyle Real-Time Scoring Panel -->
@@ -4063,10 +4067,12 @@
             document.getElementById('wsRoutineToggle').classList.add('hidden');
             document.getElementById('wsFreeSectionTop').classList.add('hidden');
             document.getElementById('cpFreestyleSection').classList.add('hidden');
+            document.getElementById('cpJudgeModeRow').classList.add('hidden');
 
             if (isCpFreestyle) {
                 document.getElementById('durationLabel').textContent = 'CP Freestyle';
                 document.getElementById('cpFreestyleSection').classList.remove('hidden');
+                document.getElementById('cpJudgeModeRow').classList.remove('hidden');
             } else if (isSpeedEvent) {
                 document.getElementById('durationLabel').textContent = 'Speed competition';
                 document.getElementById('speedInfo').textContent = '10-Way Speed: X to start, X again to stop. Max score: 35.00s. Freeze 6s after completion.';
@@ -6088,6 +6094,7 @@
             document.getElementById('artisticMultiJudgePanel').classList.add('hidden');
             document.getElementById('judgeModeTopRow').classList.add('hidden');
             document.getElementById('cpFreestyleSection').classList.add('hidden');
+            document.getElementById('cpJudgeModeRow').classList.add('hidden');
 
             // Restore FS scoring controls by default
             document.getElementById('fsScoringControls').classList.remove('hidden');
@@ -6106,6 +6113,7 @@
             const isCpFreestyle = eventType === 'cp-freestyle' || (category === 'cp' && '{{ video.subcategory|default("", true) }}'.toLowerCase().includes('freestyle'));
             if (isCpFreestyle) {
                 document.getElementById('cpFreestyleSection').classList.remove('hidden');
+                document.getElementById('cpJudgeModeRow').classList.remove('hidden');
                 document.getElementById('fsScoringControls').classList.add('hidden');
                 document.getElementById('formationsSection').classList.add('hidden');
                 document.getElementById('multiJudgePanel').classList.add('hidden');
