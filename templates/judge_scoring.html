@@ -262,7 +262,7 @@
             addStatus('Connecting to server...', 'info');
 
             socket = io(window.location.origin, {
-                transports: ['websocket', 'polling'],
+                transports: ['polling', 'websocket'],
                 reconnection: true,
                 reconnectionAttempts: 10,
                 reconnectionDelay: 1000

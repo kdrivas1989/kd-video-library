@@ -138,7 +138,7 @@
         // Connect to the same origin (works for both localhost and production)
         const socketUrl = window.location.origin;
         const socket = io(socketUrl, {
-            transports: ['websocket', 'polling'],
+            transports: ['polling', 'websocket'],
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 1000
