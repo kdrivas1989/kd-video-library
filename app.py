@@ -13706,8 +13706,10 @@ if SOCKETIO_ENABLED:
         # Check if position is already taken by a different connected judge
         if judge_num in room['judges'] and room['judges'][judge_num]['connected']:
             existing_sid = room['judges'][judge_num].get('sid')
-            if existing_sid != request.sid:
-                emit('ws_scoring_error', {'message': f'J{judge_num} position already taken by {room["judges"][judge_num]["name"]}'})
+            existing_name = room['judges'][judge_num].get('name', '')
+            # Allow same judge to reclaim their position (reconnect)
+            if existing_sid != request.sid and existing_name != judge_name:
+                emit('ws_scoring_error', {'message': f'J{judge_num} position already taken by {existing_name}'})
                 return
 
         room['judges'][judge_num] = {
