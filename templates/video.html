@@ -5764,11 +5764,6 @@
 
         // Submit assignment score function
         function submitAssignmentScore() {
-            if (!currentAssignmentId) {
-                alert('No assignment found for this video. Please contact the Chief Judge.');
-                return;
-            }
-
             // Calculate score based on event type
             let score = 0;
             let scoreData = {};
@@ -5800,6 +5795,16 @@
             // Update UI displays
             document.getElementById('currentScore').textContent = score;
             document.getElementById('workingTimeDisplay').textContent = workingTime;
+
+            if (!currentAssignmentId) {
+                // No assignment - just show success locally
+                const notification = document.createElement('div');
+                notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                notification.textContent = 'Score recorded: ' + score + ' points (' + workingTime + ')';
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 3000);
+                return;
+            }
 
             // Submit to server
             fetch('/assignment/' + currentAssignmentId + '/score', {
