@@ -270,6 +270,16 @@
                     {% if video.category != 'uncategorized' %}
                     <!-- Scoring Timeline (hidden for uncategorized videos) -->
                     <div class="mt-4 pt-4 border-t border-gray-700">
+                        <!-- Judge Mode (shown for artistic events, placed above scoring) -->
+                        <div id="judgeModeTopRow" class="hidden mb-4 flex items-center gap-4">
+                            <span class="text-gray-400 text-sm">Judge Mode:</span>
+                            <div class="flex rounded overflow-hidden">
+                                <button type="button" id="btnArtSoloJudgeTop" onclick="setArtisticJudgeMode('solo')"
+                                    class="px-3 py-1 text-sm bg-blue-600 text-white">Single Judge</button>
+                                <button type="button" id="btnArtPanelJudgeTop" onclick="setArtisticJudgeMode('panel')"
+                                    class="px-3 py-1 text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">3-Judge Panel</button>
+                            </div>
+                        </div>
                         <div class="flex items-center justify-between mb-3">
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-400 text-sm">Scoring:</span>
@@ -623,8 +633,8 @@
 
                             <!-- FREE ROUTINE PANEL -->
                             <div id="artFreeRoutinePanel">
-                                <!-- Judge Mode Toggle -->
-                                <div class="mb-4 flex items-center gap-4">
+                                <!-- Judge Mode Toggle (moved to top of scoring section) -->
+                                <div class="hidden mb-4 flex items-center gap-4">
                                     <span class="text-gray-400 text-sm">Judge Mode:</span>
                                     <div class="flex rounded overflow-hidden">
                                         <button type="button" id="btnArtSoloJudge" onclick="setArtisticJudgeMode('solo')"
@@ -5029,6 +5039,7 @@
             document.getElementById('fsMultiJudgePanel').classList.add('hidden');
             document.getElementById('cfMultiJudgePanel').classList.add('hidden');
             document.getElementById('artisticMultiJudgePanel').classList.add('hidden');
+            document.getElementById('judgeModeTopRow').classList.add('hidden');
 
             // Category and event type lists
             const artisticCategories = ['ae', 'artistic', 'artistic_events'];
@@ -5044,6 +5055,7 @@
 
             if (isArtisticCategory || isArtisticEvent) {
                 document.getElementById('artisticMultiJudgePanel').classList.remove('hidden');
+                document.getElementById('judgeModeTopRow').classList.remove('hidden');
                 // Auto-select discipline based on subcategory or event type
                 const subcategory = '{{ video.subcategory|default("", true) }}'.toLowerCase();
                 if (subcategory.includes('freefly') || subcategory.includes('ff') || eventType === 'freefly') {
@@ -5202,21 +5214,22 @@
             artisticJudgeMode = mode;
             const btnSolo = document.getElementById('btnArtSoloJudge');
             const btnPanel = document.getElementById('btnArtPanelJudge');
+            const btnSoloTop = document.getElementById('btnArtSoloJudgeTop');
+            const btnPanelTop = document.getElementById('btnArtPanelJudgeTop');
             const soloPanel = document.getElementById('artSoloJudgePanel');
             const panelPanel = document.getElementById('artPanelJudgePanel');
 
+            const soloButtons = [btnSolo, btnSoloTop].filter(Boolean);
+            const panelButtons = [btnPanel, btnPanelTop].filter(Boolean);
+
             if (mode === 'solo') {
-                btnSolo.classList.remove('bg-gray-700', 'text-gray-300');
-                btnSolo.classList.add('bg-blue-600', 'text-white');
-                btnPanel.classList.remove('bg-blue-600', 'text-white');
-                btnPanel.classList.add('bg-gray-700', 'text-gray-300');
+                soloButtons.forEach(b => { b.classList.remove('bg-gray-700', 'text-gray-300'); b.classList.add('bg-blue-600', 'text-white'); });
+                panelButtons.forEach(b => { b.classList.remove('bg-blue-600', 'text-white'); b.classList.add('bg-gray-700', 'text-gray-300'); });
                 soloPanel.classList.remove('hidden');
                 panelPanel.classList.add('hidden');
             } else {
-                btnPanel.classList.remove('bg-gray-700', 'text-gray-300');
-                btnPanel.classList.add('bg-blue-600', 'text-white');
-                btnSolo.classList.remove('bg-blue-600', 'text-white');
-                btnSolo.classList.add('bg-gray-700', 'text-gray-300');
+                panelButtons.forEach(b => { b.classList.remove('bg-gray-700', 'text-gray-300'); b.classList.add('bg-blue-600', 'text-white'); });
+                soloButtons.forEach(b => { b.classList.remove('bg-blue-600', 'text-white'); b.classList.add('bg-gray-700', 'text-gray-300'); });
                 panelPanel.classList.remove('hidden');
                 soloPanel.classList.add('hidden');
             }
