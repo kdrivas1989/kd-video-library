@@ -30,9 +30,9 @@
 
     <div class="container mx-auto px-4 py-6 max-w-lg">
 
-        {% if video %}
-        <!-- Video Player (synced by event judge) -->
-        <div class="mb-4">
+        <!-- Video Player (synced by event judge, dynamically updated) -->
+        <div id="videoContainer" class="mb-4">
+            {% if video %}
             {% if video.is_direct_url %}
             <video id="judgeScoringVideo" class="w-full rounded-lg" preload="metadata"
                 controlsList="noplaybackrate nodownload">
@@ -48,8 +48,8 @@
             <iframe id="judgeScoringEmbed" src="{{ video.embed_url }}"
                 class="w-full aspect-video rounded-lg" frameborder="0" allowfullscreen></iframe>
             {% endif %}
+            {% endif %}
         </div>
-        {% endif %}
 
         <!-- Join Form -->
         <div id="joinForm" class="bg-gray-800 rounded-lg p-6">
@@ -438,21 +438,31 @@
                 addStatus('Scores reset by event judge', 'warning');
             });
 
-            // Video sync events from event judge
-            const syncVideo = document.getElementById('judgeScoringVideo');
-            if (syncVideo) {
-                socket.on('ws_scoring_video_play', (data) => {
-                    syncVideo.currentTime = data.time;
-                    syncVideo.play().catch(() => {});
-                });
-                socket.on('ws_scoring_video_pause', (data) => {
-                    syncVideo.pause();
-                    syncVideo.currentTime = data.time;
-                });
-                socket.on('ws_scoring_video_seek', (data) => {
-                    syncVideo.currentTime = data.time;
-                });
-            }
+            // Video sync events from event judge (use dynamic lookup so it works even if video loaded after join)
+            socket.on('ws_scoring_video_play', (data) => {
+                const v = document.getElementById('judgeScoringVideo');
+                if (v) { v.currentTime = data.time; v.play().catch(() => {}); }
+            });
+            socket.on('ws_scoring_video_pause', (data) => {
+                const v = document.getElementById('judgeScoringVideo');
+                if (v) { v.pause(); v.currentTime = data.time; }
+            });
+            socket.on('ws_scoring_video_seek', (data) => {
+                const v = document.getElementById('judgeScoringVideo');
+                if (v) { v.currentTime = data.time; }
+            });
+
+            // Event judge attached a new video — dynamically create the player
+            socket.on('ws_scoring_video_attached', (data) => {
+                const container = document.getElementById('videoContainer');
+                if (!container) return;
+                if (data.is_direct_url && data.video_src) {
+                    container.innerHTML = '<video id="judgeScoringVideo" class="w-full rounded-lg" preload="metadata" controlsList="noplaybackrate nodownload"><source src="' + data.video_src + '" type="video/mp4"></video>';
+                } else if (data.embed_url) {
+                    container.innerHTML = '<iframe id="judgeScoringEmbed" src="' + data.embed_url + '" class="w-full aspect-video rounded-lg" frameborder="0" allowfullscreen></iframe>';
+                }
+                addStatus('Video loaded by event judge', 'info');
+            });
         }
 
         function getScoreInput(field) {

@@ -13319,6 +13319,14 @@ def ws_scoring_attach_video():
             room['video_id'] = video_id
             room['video'] = video
             _save_ws_rooms()
+            # Notify connected judges about the new video
+            if SOCKETIO_ENABLED and socketio:
+                video_info = {}
+                if video.get('is_direct_url') and video.get('video_src'):
+                    video_info = {'video_src': video['video_src'], 'is_direct_url': True}
+                elif video.get('embed_url'):
+                    video_info = {'embed_url': video['embed_url'], 'is_direct_url': False}
+                socketio.emit('ws_scoring_video_attached', video_info, room=room_code)
     return jsonify({'success': True})
 
 
