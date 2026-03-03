@@ -4059,10 +4059,13 @@ def video(video_id):
 
     # Judges can only access videos assigned to them
     if is_judge_only():
-        assigned = get_assignments_for_user(session.get('username'))
+        username = session.get('username')
+        assigned = get_assignments_for_user(username)
         assigned_ids = {a['video_id'] for a in assigned}
         if video_id not in assigned_ids:
-            return "You don't have access to this video.", 403
+            # If judge has no assignments at all, don't restrict (new/unassigned judge)
+            if assigned_ids:
+                return "You don't have access to this video.", 403
 
     # Determine video source
     # Check pCloud first
