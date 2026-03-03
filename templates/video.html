@@ -1216,73 +1216,69 @@
                             </div>
                         </div>
 
+                        <div class="grid grid-cols-3 gap-3 mb-3">
                         <!-- Style Score -->
-                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
-                            <div class="flex items-center justify-between mb-2">
+                        <div class="bg-gray-900 rounded-lg p-3">
+                            <div class="mb-2">
                                 <span class="text-gray-400 text-sm">Style</span>
                             </div>
-                            <div id="wsFreeStyleSingle" class="flex items-center gap-2">
+                            <div id="wsFreeStyleSingle" class="flex flex-col gap-1">
                                 <input type="number" id="wsFreeStyleSingleInput" min="0" max="10" step="0.1" placeholder="Score"
-                                    class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
-                                <span class="text-gray-400">=</span>
-                                <span id="wsFreeStyleAvgSingle" class="text-yellow-400 font-bold">0.0</span>
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <span class="text-yellow-400 font-bold text-center" id="wsFreeStyleAvgSingle">0.0</span>
                             </div>
-                            <div id="wsFreeStylePanel" class="hidden flex items-center gap-2 flex-wrap">
+                            <div id="wsFreeStylePanel" class="hidden flex flex-col gap-1">
                                 <input type="number" id="wsFreeStyleJ1" min="0" max="10" step="0.1" placeholder="J1"
-                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
                                 <input type="number" id="wsFreeStyleJ2" min="0" max="10" step="0.1" placeholder="J2"
-                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
                                 <input type="number" id="wsFreeStyleJ3" min="0" max="10" step="0.1" placeholder="J3"
-                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
-                                <span class="text-gray-400">=</span>
-                                <span id="wsFreeStyleAvg" class="text-yellow-400 font-bold">0.0</span>
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <span class="text-yellow-400 font-bold text-center" id="wsFreeStyleAvg">0.0</span>
                             </div>
                         </div>
 
                         <!-- Dive Plan Score -->
-                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
-                            <div class="flex items-center justify-between mb-2">
+                        <div class="bg-gray-900 rounded-lg p-3">
+                            <div class="mb-2">
                                 <span class="text-gray-400 text-sm">Dive Plan</span>
                             </div>
-                            <div id="wsFreeDiveSingle" class="flex items-center gap-2">
+                            <div id="wsFreeDiveSingle" class="flex flex-col gap-1">
                                 <input type="number" id="wsFreeDiveSingleInput" min="0" max="10" step="0.1" placeholder="Score"
-                                    class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
-                                <span class="text-gray-400">=</span>
-                                <span id="wsFreeDiveAvgSingle" class="text-yellow-400 font-bold">0.0</span>
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <span class="text-yellow-400 font-bold text-center" id="wsFreeDiveAvgSingle">0.0</span>
                             </div>
-                            <div id="wsFreeDivePanel" class="hidden flex items-center gap-2 flex-wrap">
+                            <div id="wsFreeDivePanel" class="hidden flex flex-col gap-1">
                                 <input type="number" id="wsFreeDiveJ1" min="0" max="10" step="0.1" placeholder="J1"
-                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
                                 <input type="number" id="wsFreeDiveJ2" min="0" max="10" step="0.1" placeholder="J2"
-                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
                                 <input type="number" id="wsFreeDiveJ3" min="0" max="10" step="0.1" placeholder="J3"
-                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
-                                <span class="text-gray-400">=</span>
-                                <span id="wsFreeDiveAvg" class="text-yellow-400 font-bold">0.0</span>
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <span class="text-yellow-400 font-bold text-center" id="wsFreeDiveAvg">0.0</span>
                             </div>
                         </div>
 
                         <!-- Camerawork Score -->
-                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-gray-400 text-sm">Camerawork</span>
+                        <div class="bg-gray-900 rounded-lg p-3">
+                            <div class="mb-2">
+                                <span class="text-gray-400 text-sm">Camera</span>
                             </div>
-                            <div id="wsFreeCamSingle" class="flex items-center gap-2">
+                            <div id="wsFreeCamSingle" class="flex flex-col gap-1">
                                 <input type="number" id="wsFreeCamSingleInput" min="0" max="10" step="0.1" placeholder="Score"
-                                    class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
-                                <span class="text-gray-400">=</span>
-                                <span id="wsFreeCamAvgSingle" class="text-yellow-400 font-bold">0.0</span>
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <span class="text-yellow-400 font-bold text-center" id="wsFreeCamAvgSingle">0.0</span>
                             </div>
-                            <div id="wsFreeCamPanel" class="hidden flex items-center gap-2 flex-wrap">
+                            <div id="wsFreeCamPanel" class="hidden flex flex-col gap-1">
                                 <input type="number" id="wsFreeCamJ1" min="0" max="10" step="0.1" placeholder="J1"
-                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
                                 <input type="number" id="wsFreeCamJ2" min="0" max="10" step="0.1" placeholder="J2"
-                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
                                 <input type="number" id="wsFreeCamJ3" min="0" max="10" step="0.1" placeholder="J3"
-                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
-                                <span class="text-gray-400">=</span>
-                                <span id="wsFreeCamAvg" class="text-yellow-400 font-bold">0.0</span>
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <span class="text-yellow-400 font-bold text-center" id="wsFreeCamAvg">0.0</span>
                             </div>
+                        </div>
                         </div>
 
                         <!-- NV Toggle and Totals -->
