@@ -13160,16 +13160,17 @@ def create_ws_scoring_room():
     data = request.json
     scoring_type = data.get('scoring_type', 'ws-free')
 
-    if scoring_type not in ('ws-free', 'ws-compulsory'):
+    if scoring_type not in ('ws-free', 'ws-compulsory', 'cp-freestyle'):
         return jsonify({'error': 'Invalid scoring type'}), 400
 
+    panel_size = 5 if scoring_type == 'cp-freestyle' else 3
     room_code = generate_room_code()
     ws_scoring_rooms[room_code] = {
         'event_judge_name': session.get('username'),
         'scoring_type': scoring_type,
-        'panel_size': 3,
+        'panel_size': panel_size,
         'judges': {},
-        'scores': {1: {}, 2: {}, 3: {}},
+        'scores': {j: {} for j in range(1, panel_size + 1)},
         'state': 'scoring',
         'created_at': datetime.now().isoformat()
     }
@@ -13647,6 +13648,9 @@ if SOCKETIO_ENABLED:
         },
         'ws-compulsory': {
             'style': (0, 10)
+        },
+        'cp-freestyle': {
+            'score': (0, 10)
         }
     }
 
@@ -13662,7 +13666,8 @@ if SOCKETIO_ENABLED:
             return
 
         room = ws_scoring_rooms[room_code]
-        if judge_num not in (1, 2, 3):
+        panel_size = room.get('panel_size', 3)
+        if judge_num < 1 or judge_num > panel_size:
             emit('ws_scoring_error', {'message': 'Invalid judge position'})
             return
 
@@ -13719,10 +13724,11 @@ if SOCKETIO_ENABLED:
         })
 
     def _ws_scoring_completion(room):
-        """Compute per-judge completion status for a WS scoring room."""
+        """Compute per-judge completion status for a scoring room."""
         required_fields = WS_SCORE_FIELDS.get(room['scoring_type'], {})
+        panel_size = room.get('panel_size', 3)
         completion = {}
-        for j in (1, 2, 3):
+        for j in range(1, panel_size + 1):
             judge_scores = room['scores'].get(j, {})
             missing = []
             for field, (min_val, max_val) in required_fields.items():
@@ -13747,13 +13753,15 @@ if SOCKETIO_ENABLED:
             emit('ws_scoring_error', {'message': 'Room not found'})
             return
 
-        if new_type not in ('ws-free', 'ws-compulsory'):
+        if new_type not in ('ws-free', 'ws-compulsory', 'cp-freestyle'):
             emit('ws_scoring_error', {'message': 'Invalid scoring type'})
             return
 
         room = ws_scoring_rooms[room_code]
+        panel_size = 5 if new_type == 'cp-freestyle' else 3
         room['scoring_type'] = new_type
-        room['scores'] = {1: {}, 2: {}, 3: {}}
+        room['panel_size'] = panel_size
+        room['scores'] = {j: {} for j in range(1, panel_size + 1)}
         room['state'] = 'scoring'
 
         emit('ws_scoring_type_changed', {
@@ -13780,7 +13788,8 @@ if SOCKETIO_ENABLED:
             emit('ws_scoring_error', {'message': 'Scoring is locked'})
             return
 
-        if judge_num not in (1, 2, 3):
+        panel_size = room.get('panel_size', 3)
+        if judge_num < 1 or judge_num > panel_size:
             emit('ws_scoring_error', {'message': 'Invalid judge position'})
             return
 
@@ -13801,6 +13810,8 @@ if SOCKETIO_ENABLED:
             return
 
         # Store the score
+        if judge_num not in room['scores']:
+            room['scores'][judge_num] = {}
         room['scores'][judge_num][field] = value
 
         # Compute completion status for all judges
@@ -13827,9 +13838,10 @@ if SOCKETIO_ENABLED:
         room = ws_scoring_rooms[room_code]
         completion = _ws_scoring_completion(room)
 
-        # Check all 3 judges are complete
+        # Check all judges are complete
+        panel_size = room.get('panel_size', 3)
         errors = []
-        for j in (1, 2, 3):
+        for j in range(1, panel_size + 1):
             if not completion[j]['complete']:
                 missing_str = ', '.join(completion[j]['missing'])
                 errors.append(f'J{j} missing: {missing_str}')
@@ -13855,7 +13867,8 @@ if SOCKETIO_ENABLED:
             return
 
         room = ws_scoring_rooms[room_code]
-        room['scores'] = {1: {}, 2: {}, 3: {}}
+        panel_size = room.get('panel_size', 3)
+        room['scores'] = {j: {} for j in range(1, panel_size + 1)}
         room['state'] = 'scoring'
 
         emit('ws_scoring_reset_all', {

@@ -696,6 +696,7 @@
                         <div id="wsFreeSectionTop" class="hidden mb-4 pb-4 border-b border-gray-700">
                         </div>
 
+                        <div id="fsScoringControls">
                         <div class="flex items-center justify-between mb-3">
                             <div class="flex items-center gap-3">
                                 <span class="text-gray-400 text-sm">Scoring:</span>
@@ -845,6 +846,7 @@
                             </div>
                         </div>
                     </div>
+                    </div><!-- End fsScoringControls -->
 
                     <!-- Saved Scores Display -->
                     <div class="mt-4 pt-4 border-t border-gray-700">
@@ -885,6 +887,9 @@
                                 <optgroup label="Wingsuit Acrobatic">
                                     <option value="ws-compulsory" data-duration="0">WS Compulsory Round</option>
                                     <option value="ws-free" data-duration="0">WS Free Round</option>
+                                </optgroup>
+                                <optgroup label="Canopy Piloting">
+                                    <option value="cp-freestyle" data-duration="0">CP Freestyle</option>
                                 </optgroup>
                             </select>
                             <select id="eventClass" onchange="updateFormations()"
@@ -1161,7 +1166,7 @@
                         <!-- Style Score -->
                         <div class="bg-gray-900 rounded-lg p-3 mb-3">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-gray-400 text-sm">Style Score</span>
+                                <span class="text-gray-400 text-sm">Style Score <span class="text-gray-600">(0-10)</span></span>
                             </div>
                             <div id="wsStyleSingleJudge" class="flex items-center gap-2">
                                 <input type="number" id="wsStyleSingle" min="0" max="10" step="0.1" placeholder="Score"
@@ -1256,7 +1261,7 @@
                         <!-- Style Score -->
                         <div class="bg-gray-900 rounded-lg p-3">
                             <div class="mb-2">
-                                <span class="text-gray-400 text-sm">Style</span>
+                                <span class="text-gray-400 text-sm">Style <span class="text-gray-600">(0-10)</span></span>
                             </div>
                             <div id="wsFreeStyleSingle" class="flex flex-col gap-1">
                                 <input type="number" id="wsFreeStyleSingleInput" min="0" max="10" step="0.1" placeholder="Score"
@@ -1277,7 +1282,7 @@
                         <!-- Dive Plan Score -->
                         <div class="bg-gray-900 rounded-lg p-3">
                             <div class="mb-2">
-                                <span class="text-gray-400 text-sm">Dive Plan</span>
+                                <span class="text-gray-400 text-sm">Dive Plan <span class="text-gray-600">(0-10)</span></span>
                             </div>
                             <div id="wsFreeDiveSingle" class="flex flex-col gap-1">
                                 <input type="number" id="wsFreeDiveSingleInput" min="0" max="10" step="0.1" placeholder="Score"
@@ -1365,6 +1370,153 @@
                             </button>
                         </div>
                     </div>
+
+                    <!-- CP Freestyle Scoring (hidden by default) -->
+                    <div id="cpFreestyleSection" class="hidden mt-4 pt-4 border-t border-gray-700">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-gray-400 text-sm font-medium">CP Freestyle Scoring</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500 text-xs">Judges:</span>
+                                <select id="cpFreeJudgeCount" onchange="toggleCpFreeJudgeMode()" class="px-2 py-1 rounded bg-gray-700 text-white text-xs">
+                                    <option value="1" selected>Single</option>
+                                    <option value="5">5 Panel</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- CP Freestyle Real-Time Scoring Panel -->
+                        <div id="cpScoringPanel" class="hidden mb-3 bg-gray-900 border border-purple-600 rounded-lg p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-purple-400 text-sm font-medium">Real-Time Scoring</span>
+                                <span class="text-xs text-purple-300 font-medium">CP Freestyle</span>
+                            </div>
+                            <div id="cpScoringNotStarted">
+                                <button onclick="createCpScoringRoom()" class="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
+                                    Start Judge Session
+                                </button>
+                            </div>
+                            <div id="cpScoringStarted" class="hidden">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-gray-400 text-xs">Code:</span>
+                                    <span id="cpRoomCode" class="text-white font-mono text-sm font-bold"></span>
+                                    <button onclick="copyCpRoomLink()" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs">Copy Link</button>
+                                </div>
+                                <div class="flex items-center gap-3 mb-2" id="cpJudgeIndicators">
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ1Dot"></span><span class="text-gray-500 text-xs" id="cpJ1Name">J1</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ1Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ2Dot"></span><span class="text-gray-500 text-xs" id="cpJ2Name">J2</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ2Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ3Dot"></span><span class="text-gray-500 text-xs" id="cpJ3Name">J3</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ3Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ4Dot"></span><span class="text-gray-500 text-xs" id="cpJ4Name">J4</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ4Check">&#10003;</span></span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ5Dot"></span><span class="text-gray-500 text-xs" id="cpJ5Name">J5</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ5Check">&#10003;</span></span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="lockCpScoring()" class="flex-1 py-1 rounded bg-red-600 hover:bg-red-700 text-xs font-medium">Lock Scores</button>
+                                    <button onclick="resetCpScoring()" class="flex-1 py-1 rounded bg-gray-600 hover:bg-gray-700 text-xs font-medium">Reset</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Judge Scores (0-10) -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="mb-2">
+                                <span class="text-gray-400 text-sm">Judge Scores <span class="text-gray-600">(0.0 - 10.0)</span></span>
+                            </div>
+                            <!-- Single judge mode -->
+                            <div id="cpFreeSingleJudge" class="flex items-center gap-2">
+                                <input type="number" id="cpFreeScoreSingle" min="0" max="10" step="0.1" placeholder="Score"
+                                    class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                <span class="text-gray-400">=</span>
+                                <span id="cpFreeAvgSingle" class="text-yellow-400 font-bold">0.0</span>
+                            </div>
+                            <!-- 5-judge panel mode -->
+                            <div id="cpFreePanelJudge" class="hidden">
+                                <div class="grid grid-cols-5 gap-2">
+                                    <div class="text-center">
+                                        <label class="text-gray-500 text-xs block mb-1">J1</label>
+                                        <input type="number" id="cpFreeJ1" min="0" max="10" step="0.1" placeholder="0.0"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-gray-500 text-xs block mb-1">J2</label>
+                                        <input type="number" id="cpFreeJ2" min="0" max="10" step="0.1" placeholder="0.0"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-gray-500 text-xs block mb-1">J3</label>
+                                        <input type="number" id="cpFreeJ3" min="0" max="10" step="0.1" placeholder="0.0"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-gray-500 text-xs block mb-1">J4</label>
+                                        <input type="number" id="cpFreeJ4" min="0" max="10" step="0.1" placeholder="0.0"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                    </div>
+                                    <div class="text-center">
+                                        <label class="text-gray-500 text-xs block mb-1">J5</label>
+                                        <input type="number" id="cpFreeJ5" min="0" max="10" step="0.1" placeholder="0.0"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                    </div>
+                                </div>
+                                <div class="text-right mt-2 text-sm">
+                                    Avg: <span id="cpFreeAvgPanel" class="text-yellow-400 font-bold font-mono">0.000</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DOD (Degree of Difficulty) -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="flex items-center gap-3">
+                                <span class="text-gray-400 text-sm">Degree of Difficulty (DOD)</span>
+                                <input type="number" id="cpFreeDOD" min="1.0" max="5.0" step="0.1" placeholder="1.0" value=""
+                                    class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                            </div>
+                        </div>
+
+                        <!-- Penalties (each judge can indicate) -->
+                        <div class="bg-gray-900 rounded-lg p-3 mb-3">
+                            <div class="mb-2">
+                                <span class="text-gray-400 text-sm">Penalties <span class="text-gray-600">(applied when 3+ judges indicate)</span></span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="cpPenaltyME" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
+                                    <span class="text-sm text-gray-300">ME <span class="text-gray-500 text-xs">(Missed Entry - no water contact)</span></span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="cpPenaltyMF" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
+                                    <span class="text-sm text-gray-300">MF <span class="text-gray-500 text-xs">(Move Failure)</span></span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="cpPenaltyWL" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
+                                    <span class="text-sm text-gray-300">WL <span class="text-gray-500 text-xs">(Water Landing)</span></span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="cpPenaltyMV" onchange="calculateCpFreestyle()" class="rounded bg-gray-700 border-gray-600 text-red-500 focus:ring-red-500">
+                                    <span class="text-sm text-gray-300">MV <span class="text-gray-500 text-xs">(Move Variation - repeated)</span></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Result Summary -->
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="flex items-center gap-3">
+                                <span id="cpResultBadge" class="hidden px-2 py-1 rounded text-xs font-bold"></span>
+                            </div>
+                            <div class="text-sm">
+                                <span class="text-gray-400">Score: </span>
+                                <span id="cpFreeScoreFinal" class="text-green-400 font-bold font-mono">0.000</span>
+                            </div>
+                        </div>
+
+                        <!-- Save CP Freestyle Score -->
+                        <div class="mt-3 pt-3 border-t border-gray-700 flex items-center justify-between">
+                            <input type="text" id="cpFreeRoundLabel" placeholder="Round #"
+                                class="w-24 px-3 py-1 rounded bg-gray-700 text-white text-sm">
+                            <button onclick="saveCpFreestyleScore()" class="px-4 py-1 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
+                                Save Score
+                            </button>
+                        </div>
+                    </div>
+
                 {% endif %}
                 </div>
                 </div><!-- End flex-1 video container -->
@@ -3327,6 +3479,27 @@
                             <button onclick="deleteSavedScore(${score.id})" class="text-red-400 hover:text-red-300 text-xs">×</button>
                         </div>
                     `;
+                } else if (score.type === 'cp-freestyle') {
+                    // CP Freestyle
+                    const penaltyHtml = score.penalties && score.penalties.length > 0
+                        ? `<span class="text-red-500 ml-2">${score.penalties.join(', ')}</span>` : '';
+                    return `
+                        <div class="bg-gray-800 rounded p-3 flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3">
+                                    <span class="font-medium text-white">${score.round}</span>
+                                    <span class="text-xs text-gray-500">CP Freestyle</span>
+                                </div>
+                                <div class="text-xs text-gray-400 mt-1">
+                                    Score: <span class="${score.score === 'MR' ? 'text-red-400' : (score.score === 'DR' ? 'text-orange-400' : 'text-yellow-400')} font-bold">${score.score}</span>
+                                    <span class="text-gray-500 mx-1">|</span>
+                                    DOD: <span class="text-yellow-400">${score.dod}</span>
+                                    ${penaltyHtml}
+                                </div>
+                            </div>
+                            <button onclick="deleteSavedScore(${score.id})" class="text-red-400 hover:text-red-300 text-xs">×</button>
+                        </div>
+                    `;
                 } else {
                     // Formation Skydiving (X/C/Q scoring)
                     const bustReasonsHtml = score.bustReasons && score.bustReasons.length > 0
@@ -3529,6 +3702,11 @@
                     '2way_vfs': '4way-vfs',
                     '8way': '8way',
                     '_default': '4way-fs'
+                },
+                // CP Freestyle
+                'cp': {
+                    'freestyle': 'cp-freestyle',
+                    '_default': 'cp-freestyle'
                 }
             };
 
@@ -3752,6 +3930,8 @@
             const isWingsuit = (eventType === 'ws-compulsory' || eventType === 'ws-free');
             isCountUpEvent = isWingsuit; // Wingsuit uses count-up timer like speed events
 
+            const isCpFreestyle = (eventType === 'cp-freestyle');
+
             // Hide all special sections first
             document.getElementById('speedInfo').classList.add('hidden');
             document.getElementById('wingsuitSection').classList.add('hidden');
@@ -3759,8 +3939,12 @@
             document.getElementById('wsFreeSection').classList.add('hidden');
             document.getElementById('wsRoutineToggle').classList.add('hidden');
             document.getElementById('wsFreeSectionTop').classList.add('hidden');
+            document.getElementById('cpFreestyleSection').classList.add('hidden');
 
-            if (isSpeedEvent) {
+            if (isCpFreestyle) {
+                document.getElementById('durationLabel').textContent = 'CP Freestyle';
+                document.getElementById('cpFreestyleSection').classList.remove('hidden');
+            } else if (isSpeedEvent) {
                 document.getElementById('durationLabel').textContent = 'Speed competition';
                 document.getElementById('speedInfo').textContent = '10-Way Speed: X to start, X again to stop. Max score: 35.00s. Freeze 6s after completion.';
                 document.getElementById('speedInfo').classList.remove('hidden');
@@ -5444,6 +5628,296 @@
         }
 
         // ============================================
+        // CP FREESTYLE SCORING FUNCTIONS
+        // ============================================
+        let cpFreeSingleJudge = true;
+        let cpScoringSocket = null;
+        let cpScoringRoomCode = null;
+
+        function truncTo3(val) {
+            // Truncate to 3 decimal places (no rounding)
+            return Math.floor(val * 1000) / 1000;
+        }
+
+        function toggleCpFreeJudgeMode() {
+            const count = document.getElementById('cpFreeJudgeCount').value;
+            cpFreeSingleJudge = (count === '1');
+
+            if (cpFreeSingleJudge) {
+                document.getElementById('cpFreeSingleJudge').classList.remove('hidden');
+                document.getElementById('cpFreePanelJudge').classList.add('hidden');
+                document.getElementById('cpScoringPanel').classList.add('hidden');
+            } else {
+                document.getElementById('cpFreeSingleJudge').classList.add('hidden');
+                document.getElementById('cpFreePanelJudge').classList.remove('hidden');
+                document.getElementById('cpScoringPanel').classList.remove('hidden');
+            }
+            calculateCpFreestyle();
+        }
+
+        function calculateCpFreestyle() {
+            let avg;
+            const penalties = {
+                ME: document.getElementById('cpPenaltyME').checked,
+                MF: document.getElementById('cpPenaltyMF').checked,
+                WL: document.getElementById('cpPenaltyWL').checked,
+                MV: document.getElementById('cpPenaltyMV').checked
+            };
+            const dod = parseFloat(document.getElementById('cpFreeDOD').value) || 1.0;
+            const badge = document.getElementById('cpResultBadge');
+            const finalEl = document.getElementById('cpFreeScoreFinal');
+
+            if (cpFreeSingleJudge) {
+                avg = parseFloat(document.getElementById('cpFreeScoreSingle').value) || 0;
+                document.getElementById('cpFreeAvgSingle').textContent = avg.toFixed(1);
+            } else {
+                const scores = [];
+                for (let j = 1; j <= 5; j++) {
+                    scores.push(parseFloat(document.getElementById('cpFreeJ' + j).value));
+                }
+                const valid = scores.filter(s => !isNaN(s) && s !== null);
+                if (valid.length === 5) {
+                    // Average of 5 judges (no drop)
+                    avg = truncTo3(valid.reduce((a, b) => a + b, 0) / 5);
+                } else if (valid.length > 0) {
+                    avg = truncTo3(valid.reduce((a, b) => a + b, 0) / valid.length);
+                } else {
+                    avg = 0;
+                }
+                document.getElementById('cpFreeAvgPanel').textContent = avg.toFixed(3);
+            }
+
+            // Check for MR (Minimum Result): ME penalty
+            if (penalties.ME) {
+                badge.textContent = 'MR';
+                badge.className = 'px-2 py-1 rounded text-xs font-bold bg-red-600 text-white';
+                badge.classList.remove('hidden');
+                finalEl.textContent = 'MR';
+                finalEl.classList.remove('text-green-400');
+                finalEl.classList.add('text-red-400');
+                return;
+            }
+
+            // Check for DR (Default Result): MF, WL, or MV penalty after entry gate
+            if (penalties.MF || penalties.WL || penalties.MV) {
+                badge.textContent = 'DR';
+                badge.className = 'px-2 py-1 rounded text-xs font-bold bg-orange-600 text-white';
+                badge.classList.remove('hidden');
+                finalEl.textContent = 'DR';
+                finalEl.classList.remove('text-green-400');
+                finalEl.classList.add('text-orange-400');
+                return;
+            }
+
+            // Normal score: avg × DOD, truncated to 3 decimals
+            badge.classList.add('hidden');
+            const score = truncTo3(avg * dod);
+            finalEl.textContent = score.toFixed(3);
+            finalEl.classList.remove('text-red-400', 'text-orange-400');
+            finalEl.classList.add('text-green-400');
+        }
+
+        function saveCpFreestyleScore() {
+            const roundLabel = document.getElementById('cpFreeRoundLabel').value || 'Round ' + (savedScores.length + 1);
+            const finalScore = document.getElementById('cpFreeScoreFinal').textContent;
+            const dod = parseFloat(document.getElementById('cpFreeDOD').value) || 1.0;
+
+            // Collect judge scores
+            let judgeScores = {};
+            if (cpFreeSingleJudge) {
+                judgeScores.single = parseFloat(document.getElementById('cpFreeScoreSingle').value) || 0;
+            } else {
+                for (let j = 1; j <= 5; j++) {
+                    judgeScores['J' + j] = parseFloat(document.getElementById('cpFreeJ' + j).value) || 0;
+                }
+            }
+
+            const penalties = [];
+            if (document.getElementById('cpPenaltyME').checked) penalties.push('ME');
+            if (document.getElementById('cpPenaltyMF').checked) penalties.push('MF');
+            if (document.getElementById('cpPenaltyWL').checked) penalties.push('WL');
+            if (document.getElementById('cpPenaltyMV').checked) penalties.push('MV');
+
+            const scoreData = {
+                id: Date.now(),
+                round: roundLabel,
+                event: 'cp-freestyle',
+                type: 'cp-freestyle',
+                score: finalScore,
+                dod: dod,
+                judgeScores: judgeScores,
+                penalties: penalties,
+                timestamp: new Date().toLocaleString()
+            };
+
+            savedScores.push(scoreData);
+            localStorage.setItem('practiceScores_' + videoId, JSON.stringify(savedScores));
+            document.getElementById('cpFreeRoundLabel').value = '';
+            displaySavedScores();
+
+            navigateToNextVideo('saveScoreStatus');
+        }
+
+        // CP Freestyle real-time scoring room functions
+        function createCpScoringRoom() {
+            fetch('/ws-scoring/create', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({scoring_type: 'cp-freestyle'})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    cpScoringRoomCode = data.room_code;
+                    document.getElementById('cpScoringNotStarted').classList.add('hidden');
+                    document.getElementById('cpScoringStarted').classList.remove('hidden');
+                    document.getElementById('cpRoomCode').textContent = data.room_code;
+                    initCpScoringSocket();
+                }
+            });
+        }
+
+        function initCpScoringSocket() {
+            if (cpScoringSocket) return;
+
+            cpScoringSocket = io(window.location.origin, {
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionAttempts: 10,
+                reconnectionDelay: 1000
+            });
+
+            cpScoringSocket.on('connect', () => {
+                if (cpScoringRoomCode) {
+                    cpScoringSocket.emit('ws_scoring_event_judge_join', {
+                        room_code: cpScoringRoomCode
+                    });
+                }
+            });
+
+            cpScoringSocket.on('ws_scoring_room_update', (data) => {
+                updateCpJudgeIndicators(data.judges, data.completion);
+                if (data.scores) {
+                    applyCpScores(data.scores);
+                }
+            });
+
+            cpScoringSocket.on('ws_scoring_score_update', (data) => {
+                updateCpScoreField(data.judge_num, data.field, data.value);
+                if (data.completion) {
+                    updateCpCompletionIndicators(data.completion);
+                }
+            });
+
+            cpScoringSocket.on('ws_scoring_state_change', (data) => {
+                if (data.completion) {
+                    updateCpCompletionIndicators(data.completion);
+                }
+            });
+
+            cpScoringSocket.on('ws_scoring_reset_all', () => {
+                for (let j = 1; j <= 5; j++) {
+                    const el = document.getElementById('cpFreeJ' + j);
+                    if (el) el.value = '';
+                }
+                calculateCpFreestyle();
+            });
+
+            cpScoringSocket.on('ws_scoring_error', (data) => {
+                console.error('CP Scoring error:', data.message);
+                alert('Scoring error: ' + data.message);
+            });
+        }
+
+        function updateCpScoreField(judgeNum, field, value) {
+            if (field !== 'score') return;
+            const input = document.getElementById('cpFreeJ' + judgeNum);
+            if (input) {
+                input.value = (value !== null && value !== undefined) ? value : '';
+                calculateCpFreestyle();
+            }
+        }
+
+        function applyCpScores(scores) {
+            for (const [judgeNum, judgeScores] of Object.entries(scores)) {
+                for (const [field, value] of Object.entries(judgeScores)) {
+                    updateCpScoreField(parseInt(judgeNum), field, value);
+                }
+            }
+        }
+
+        function updateCpJudgeIndicators(judges, completion) {
+            for (let j = 1; j <= 5; j++) {
+                const dot = document.getElementById('cpJ' + j + 'Dot');
+                const nameEl = document.getElementById('cpJ' + j + 'Name');
+                if (!dot || !nameEl) continue;
+
+                const jStr = String(j);
+                if (judges[jStr] && judges[jStr].connected) {
+                    dot.classList.remove('bg-gray-500');
+                    dot.classList.add('bg-green-500');
+                    nameEl.classList.remove('text-gray-500');
+                    nameEl.classList.add('text-green-400');
+                    nameEl.textContent = judges[jStr].name || ('J' + j);
+                } else {
+                    dot.classList.remove('bg-green-500');
+                    dot.classList.add('bg-gray-500');
+                    nameEl.classList.remove('text-green-400');
+                    nameEl.classList.add('text-gray-500');
+                    nameEl.textContent = judges[jStr] ? judges[jStr].name : ('J' + j);
+                }
+            }
+            if (completion) {
+                updateCpCompletionIndicators(completion);
+            }
+        }
+
+        function updateCpCompletionIndicators(completion) {
+            for (let j = 1; j <= 5; j++) {
+                const checkEl = document.getElementById('cpJ' + j + 'Check');
+                if (!checkEl) continue;
+                const jData = completion[j] || completion[String(j)];
+                if (jData && jData.complete) {
+                    checkEl.classList.remove('hidden');
+                } else {
+                    checkEl.classList.add('hidden');
+                }
+            }
+        }
+
+        function copyCpRoomLink() {
+            const code = document.getElementById('cpRoomCode').textContent;
+            const link = window.location.origin + '/ws-scoring/join/' + code;
+            navigator.clipboard.writeText(link).then(() => {
+                const btn = event.target;
+                const orig = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = orig, 2000);
+            });
+        }
+
+        function lockCpScoring() {
+            if (cpScoringSocket && cpScoringRoomCode) {
+                cpScoringSocket.emit('ws_scoring_lock', {
+                    room_code: cpScoringRoomCode
+                });
+            }
+        }
+
+        function resetCpScoring() {
+            if (cpScoringSocket && cpScoringRoomCode) {
+                cpScoringSocket.emit('ws_scoring_reset', {
+                    room_code: cpScoringRoomCode
+                });
+                for (let j = 1; j <= 5; j++) {
+                    const el = document.getElementById('cpFreeJ' + j);
+                    if (el) el.value = '';
+                }
+                calculateCpFreestyle();
+            }
+        }
+
+        // ============================================
         // MULTI-JUDGE SCORING FUNCTIONS
         // ============================================
 
@@ -5474,6 +5948,12 @@
             document.getElementById('cfMultiJudgePanel').classList.add('hidden');
             document.getElementById('artisticMultiJudgePanel').classList.add('hidden');
             document.getElementById('judgeModeTopRow').classList.add('hidden');
+            document.getElementById('cpFreestyleSection').classList.add('hidden');
+
+            // Restore FS scoring controls by default
+            document.getElementById('fsScoringControls').classList.remove('hidden');
+            document.getElementById('formationsSection').classList.remove('hidden');
+            document.getElementById('multiJudgePanel').classList.remove('hidden');
 
             // Category and event type lists
             const artisticCategories = ['ae', 'artistic', 'artistic_events'];
@@ -5482,6 +5962,21 @@
                                     'fs-artistic', 'artistic', 'freefly-ae', 'freestyle-ae'];
             const fsEvents = ['4way', '8way', '4way-vfs', 'vfs', '4way-inter', '8way-inter', '10way', '4way-fs', '2way-mfs', '16way'];
             const cfEvents = ['2way-cf', '4way-cf', '4way-cf-rotation', '8way-cf', 'cf-2way', 'cf-4way', 'cf-8way', '4way-cf-seq', '4way-cf-rot', '2way-cf-seq'];
+
+            // CP Freestyle: always show when event type is cp-freestyle or category is cp with freestyle subcategory
+            const isCpFreestyle = eventType === 'cp-freestyle' || (category === 'cp' && '{{ video.subcategory|default("", true) }}'.toLowerCase().includes('freestyle'));
+            if (isCpFreestyle) {
+                document.getElementById('cpFreestyleSection').classList.remove('hidden');
+                document.getElementById('fsScoringControls').classList.add('hidden');
+                document.getElementById('formationsSection').classList.add('hidden');
+                document.getElementById('multiJudgePanel').classList.add('hidden');
+                // Auto-select cp-freestyle in dropdown if not already
+                const select = document.getElementById('eventType');
+                if (select.value !== 'cp-freestyle') {
+                    select.value = 'cp-freestyle';
+                }
+                return;
+            }
 
             // ALWAYS show artistic panel for artistic events (regardless of multi-judge mode)
             const isArtisticCategory = artisticCategories.includes(category.toLowerCase());
