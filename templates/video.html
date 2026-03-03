@@ -1144,7 +1144,7 @@
                                 <div class="flex items-center gap-2 mb-2">
                                     <span class="text-gray-400 text-xs">Code:</span>
                                     <span id="wsRoomCode" class="text-white font-mono text-sm font-bold"></span>
-                                    <button onclick="copyWsRoomLink()" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs">Copy Link</button>
+                                    <button onclick="copyWsRoomLink(this)" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs">Copy Link</button>
                                 </div>
                                 <div class="flex items-center gap-3 mb-2" id="wsJudgeIndicators">
                                     <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="wsJ1Dot"></span><span class="text-gray-500 text-xs" id="wsJ1Name">J1</span><span class="hidden text-green-400 text-xs ml-0.5" id="wsJ1Check">&#10003;</span></span>
@@ -1399,7 +1399,7 @@
                                 <div class="flex items-center gap-2 mb-2">
                                     <span class="text-gray-400 text-xs">Code:</span>
                                     <span id="cpRoomCode" class="text-white font-mono text-sm font-bold"></span>
-                                    <button onclick="copyCpRoomLink()" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs">Copy Link</button>
+                                    <button onclick="copyCpRoomLink(this)" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs">Copy Link</button>
                                 </div>
                                 <div class="flex items-center gap-3 mb-2" id="cpJudgeIndicators">
                                     <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-500" id="cpJ1Dot"></span><span class="text-gray-500 text-xs" id="cpJ1Name">J1</span><span class="hidden text-green-400 text-xs ml-0.5" id="cpJ1Check">&#10003;</span></span>
@@ -1468,6 +1468,9 @@
                                 <span class="text-gray-400 text-sm">Degree of Difficulty (DOD)</span>
                                 <input type="number" id="cpFreeDOD" min="1.0" max="5.0" step="0.1" placeholder="1.0" value=""
                                     class="w-24 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateCpFreestyle()">
+                                <span class="text-gray-400 text-sm ml-2">Move</span>
+                                <input type="text" id="cpFreeMoveName" placeholder="e.g. Horseshoe"
+                                    class="flex-1 px-2 py-1 rounded bg-gray-700 text-white text-sm">
                             </div>
                         </div>
 
@@ -2633,7 +2636,7 @@
                         </div>
                     </div>
                     <div class="flex gap-3 justify-center">
-                        <button onclick="copySessionIdFromModal('${sessionId}')" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium">
+                        <button onclick="copySessionIdFromModal('${sessionId}', this)" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium">
                             Copy ID
                         </button>
                         <button onclick="document.getElementById('sessionIdModal').remove()" class="px-6 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg font-medium">
@@ -2646,9 +2649,8 @@
             document.body.appendChild(modal);
         }
 
-        function copySessionIdFromModal(sessionId) {
+        function copySessionIdFromModal(sessionId, btn) {
             navigator.clipboard.writeText(sessionId).then(() => {
-                const btn = event.target;
                 btn.textContent = 'Copied!';
                 btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
                 btn.classList.add('bg-green-600');
@@ -3494,6 +3496,7 @@
                                     Score: <span class="${score.score === 'MR' ? 'text-red-400' : (score.score === 'DR' ? 'text-orange-400' : 'text-yellow-400')} font-bold">${score.score}</span>
                                     <span class="text-gray-500 mx-1">|</span>
                                     DOD: <span class="text-yellow-400">${score.dod}</span>
+                                    ${score.moveName ? `<span class="text-gray-500 mx-1">|</span> Move: <span class="text-blue-400">${score.moveName}</span>` : ''}
                                     ${penaltyHtml}
                                 </div>
                             </div>
@@ -5430,11 +5433,10 @@
             }
         }
 
-        function copyWsRoomLink() {
+        function copyWsRoomLink(btn) {
             const code = document.getElementById('wsRoomCode').textContent;
             const link = window.location.origin + '/ws-scoring/join/' + code;
             navigator.clipboard.writeText(link).then(() => {
-                const btn = event.target;
                 const orig = btn.textContent;
                 btn.textContent = 'Copied!';
                 setTimeout(() => btn.textContent = orig, 2000);
@@ -5721,6 +5723,7 @@
             const roundLabel = document.getElementById('cpFreeRoundLabel').value || 'Round ' + (savedScores.length + 1);
             const finalScore = document.getElementById('cpFreeScoreFinal').textContent;
             const dod = parseFloat(document.getElementById('cpFreeDOD').value) || 1.0;
+            const moveName = document.getElementById('cpFreeMoveName').value.trim();
 
             // Collect judge scores
             let judgeScores = {};
@@ -5745,6 +5748,7 @@
                 type: 'cp-freestyle',
                 score: finalScore,
                 dod: dod,
+                moveName: moveName,
                 judgeScores: judgeScores,
                 penalties: penalties,
                 timestamp: new Date().toLocaleString()
@@ -5885,11 +5889,10 @@
             }
         }
 
-        function copyCpRoomLink() {
+        function copyCpRoomLink(btn) {
             const code = document.getElementById('cpRoomCode').textContent;
             const link = window.location.origin + '/ws-scoring/join/' + code;
             navigator.clipboard.writeText(link).then(() => {
-                const btn = event.target;
                 const orig = btn.textContent;
                 btn.textContent = 'Copied!';
                 setTimeout(() => btn.textContent = orig, 2000);
