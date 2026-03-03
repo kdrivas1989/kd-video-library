@@ -1402,6 +1402,16 @@
     <script src="https://player.vimeo.com/api/player.js"></script>
 
     <script>
+        // Global error handler to show JS errors visually
+        window.onerror = function(msg, url, line, col, error) {
+            console.error('JS Error:', msg, 'at line', line);
+            const errDiv = document.createElement('div');
+            errDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:red;color:white;padding:8px;z-index:99999;font-size:12px;';
+            errDiv.textContent = 'JS Error: ' + msg + ' (line ' + line + ')';
+            document.body.appendChild(errDiv);
+            setTimeout(() => errDiv.remove(), 10000);
+        };
+
         const video = document.getElementById('videoPlayer');
         const isEmbeddedVideo = !video;
         const frameTime = 1/30; // ~0.033s for 30fps video (frame-by-frame)
@@ -5240,11 +5250,13 @@
         }
 
         function setArtisticRoutineType(type) {
+            console.log('[VideoLib] setArtisticRoutineType:', type);
             artisticRoutineType = type;
             const btnFree = document.getElementById('btnFreeRoutine');
             const btnComp = document.getElementById('btnCompulsoryRoutine');
             const freePanel = document.getElementById('artFreeRoutinePanel');
             const compPanel = document.getElementById('artCompulsoryPanel');
+            console.log('[VideoLib] panels found:', !!freePanel, !!compPanel);
 
             if (type === 'free') {
                 btnFree.classList.remove('bg-gray-700', 'text-gray-300');
@@ -6031,6 +6043,9 @@
             const row = document.getElementById('confirmScoreRow');
             if (row) row.classList.add('hidden');
         }
+
+        // Diagnostic: verify key functions loaded
+        console.log('[VideoLib] Script loaded OK. startTimer=' + typeof startTimer + ', setCurrentAsStart=' + typeof setCurrentAsStart + ', handleKeyboardShortcut=' + typeof handleKeyboardShortcut);
     </script>
 
     <!-- Confirm Score Modal -->
