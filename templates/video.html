@@ -328,7 +328,7 @@
                                 <span class="text-purple-400 text-sm font-medium">Real-Time Scoring</span>
                                 <span class="text-xs text-purple-300 font-medium">Artistic Events</span>
                             </div>
-                            <div id="aeScoringNotStarted">
+                            <div id="aeScoringNotStarted" class="hidden">
                                 <button onclick="connectAeScoringRoom()" class="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
                                     Connect to AE1
                                 </button>
@@ -817,7 +817,7 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <!-- Sync Panel Session (panel mode only) -->
+                        <!-- Sync Panel Session (hidden - not functional yet) -->
                         <div id="syncPanelRow" class="hidden mb-3 p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
                             <div class="flex items-center justify-between flex-wrap gap-2">
                                 <div class="flex items-center gap-2">
@@ -923,7 +923,7 @@
                                 <span class="text-purple-400 text-sm font-medium">Real-Time Scoring</span>
                                 <span class="text-xs text-purple-300 font-medium">CP Freestyle</span>
                             </div>
-                            <div id="cpScoringNotStarted">
+                            <div id="cpScoringNotStarted" class="hidden">
                                 <button onclick="connectCpScoringRoom()" class="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
                                     Connect to CP1
                                 </button>
@@ -1280,7 +1280,7 @@
                                 <span class="text-purple-400 text-sm font-medium">Real-Time Scoring</span>
                                 <span class="text-xs text-purple-300 font-medium">FS Points</span>
                             </div>
-                            <div id="fsScoringNotStarted">
+                            <div id="fsScoringNotStarted" class="hidden">
                                 <div class="flex gap-2">
                                     <button onclick="connectFsScoringRoom('FS1')" class="flex-1 py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
                                         Connect Panel 1 (FS1)
@@ -1357,7 +1357,7 @@
                                 <span class="text-purple-400 text-sm font-medium">Real-Time Scoring</span>
                                 <span class="text-xs text-purple-300 font-medium">CF Points</span>
                             </div>
-                            <div id="cfScoringNotStarted">
+                            <div id="cfScoringNotStarted" class="hidden">
                                 <div class="flex gap-2">
                                     <button onclick="connectCfScoringRoom('CF1')" class="flex-1 py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
                                         Connect Panel 1 (CF1)
@@ -1536,7 +1536,7 @@
                                 <span class="text-purple-400 text-sm font-medium">Real-Time Scoring</span>
                                 <span id="wsScoringTypeIndicator" class="text-xs text-purple-300 font-medium"></span>
                             </div>
-                            <div id="wsScoringNotStarted">
+                            <div id="wsScoringNotStarted" class="hidden">
                                 <button onclick="connectWsScoringRoom()" class="w-full py-2 rounded bg-purple-600 hover:bg-purple-700 text-sm font-medium">
                                     Connect to WS1
                                 </button>
@@ -2536,6 +2536,12 @@
                         return true;
                     }
 
+                    // Multi-judge room mode: consensus start via server
+                    if (panelSize > 1 && getActiveRoomCode() && !timerRunning) {
+                        markWorkingTimeStart();
+                        return true;
+                    }
+
                     if (isCountUpEvent) {
                         // Wingsuit: First X starts timer, subsequent X adds points
                         if (!timerRunning) {
@@ -2617,7 +2623,7 @@
                 judgeLabel.textContent = getJudgeName(0);
                 judgeLabel.classList.remove('hidden');
                 judgeNamesRow.classList.remove('hidden');
-                syncPanelRow.classList.remove('hidden');
+                // syncPanelRow hidden - sync sessions not functional yet
 
                 // Update "I am Judge X" options based on panel size
                 myJudgeNumSelect.innerHTML = '';
@@ -4458,6 +4464,17 @@
         }
 
         function startTimer() {
+            // Auto-connect to scoring room on timer start if in multi-judge mode
+            if (panelSize > 1 && !getActiveRoomCode()) {
+                const roomCode = getAutoRoomCode();
+                const judgeAssignments = {};
+                for (let i = 1; i <= panelSize; i++) {
+                    const sel = document.getElementById('judgeName' + i);
+                    if (sel && sel.value) judgeAssignments[i] = sel.value;
+                }
+                autoConnectToRoom(roomCode, judgeAssignments);
+            }
+
             if (isSpeedEvent) {
                 startSpeedTimer();
             } else if (isCountUpEvent) {
@@ -5773,6 +5790,7 @@
                 console.error('WS Scoring error:', data.message);
                 alert('Scoring error: ' + data.message);
             });
+            setupConsensusListeners(wsScoringSocket);
         }
 
         function clearAllWsScoringInputs() {
@@ -6268,6 +6286,7 @@
                 console.error('CP Scoring error:', data.message);
                 alert('Scoring error: ' + data.message);
             });
+            setupConsensusListeners(cpScoringSocket);
         }
 
         function updateCpScoreField(judgeNum, field, value) {
@@ -6358,6 +6377,197 @@
         }
 
         // ============================================
+        // AUTO-CONNECT JUDGES TO SCORING ROOMS
+        // ============================================
+        const loggedInUsername = '{{ logged_in_username|default("", true) }}';
+        const loggedInName = '{{ logged_in_name|default("", true) }}';
+        var myJudgeNum = 0;  // Which judge position I am (set on auto-join)
+        var isAutoConnectedJudge = false;  // True if I was auto-connected (not event judge)
+
+        function getAutoRoomCode() {
+            const category = '{{ video.category|default("", true) }}'.toLowerCase();
+            const eventType = document.getElementById('eventType').value;
+            if (['cf','canopy_formation','canopy'].includes(category) || eventType.includes('cf')) return 'CF1';
+            if (['ae','artistic','artistic_events'].includes(category) ||
+                ['freefly','freestyle'].some(t => eventType.includes(t))) return 'AE1';
+            if (category === 'cp' || eventType.includes('cp-freestyle')) return 'CP1';
+            if (category === 'ws' || eventType.includes('ws-')) return 'WS1';
+            return 'FS1';
+        }
+
+        function getActiveRoomSocket() {
+            if (fsScoringRoomCode && fsScoringSocket) return fsScoringSocket;
+            if (cfScoringRoomCode && cfScoringSocket) return cfScoringSocket;
+            if (aeScoringRoomCode && aeScoringSocket) return aeScoringSocket;
+            if (wsScoringRoomCode && wsScoringSocket) return wsScoringSocket;
+            if (cpScoringRoomCode && cpScoringSocket) return cpScoringSocket;
+            return null;
+        }
+
+        function getActiveRoomCode() {
+            return fsScoringRoomCode || cfScoringRoomCode || aeScoringRoomCode || wsScoringRoomCode || cpScoringRoomCode || null;
+        }
+
+        function autoConnectToRoom(roomCode, judgeAssignments) {
+            const prefix = roomCode.replace(/[0-9]/g, '').toLowerCase();
+            // Call the appropriate connect function
+            switch (prefix) {
+                case 'fs': connectFsScoringRoom(roomCode); break;
+                case 'cf': connectCfScoringRoom(roomCode); break;
+                case 'ae': connectAeScoringRoom(); break;
+                case 'ws': connectWsScoringRoom(); break;
+                case 'cp': connectCpScoringRoom(); break;
+            }
+            // After connect, assign judges via socket
+            setTimeout(() => {
+                const activeSocket = getActiveRoomSocket();
+                if (activeSocket) {
+                    activeSocket.emit('ws_scoring_assign_judges', {
+                        room_code: roomCode,
+                        judges: judgeAssignments,
+                        video_id: videoId,
+                        panel_size: panelSize
+                    });
+                }
+                // Show connected status
+                document.getElementById('timerStatus').textContent = 'Connected to ' + roomCode;
+                document.getElementById('timerStatus').style.color = '#a78bfa';
+            }, 500);
+        }
+
+        function autoJoinAsJudge(roomCode, judgeNum, scoringType) {
+            myJudgeNum = judgeNum;
+            isAutoConnectedJudge = true;
+
+            // Show notification
+            document.getElementById('timerStatus').textContent = 'Connected as Judge ' + judgeNum + ' in ' + roomCode;
+            document.getElementById('timerStatus').style.color = '#34d399';
+
+            // Enable multi-judge mode if not already
+            const multiJudgeCheckbox = document.getElementById('multiJudgeMode');
+            if (multiJudgeCheckbox && !multiJudgeCheckbox.checked) {
+                multiJudgeCheckbox.checked = true;
+                multiJudgeCheckbox.dispatchEvent(new Event('change'));
+            }
+
+            // Connect to the room
+            const prefix = roomCode.replace(/[0-9]/g, '').toLowerCase();
+            switch (prefix) {
+                case 'fs': connectFsScoringRoom(roomCode); break;
+                case 'cf': connectCfScoringRoom(roomCode); break;
+                case 'ae': connectAeScoringRoom(); break;
+                case 'ws': connectWsScoringRoom(); break;
+                case 'cp': connectCpScoringRoom(); break;
+            }
+
+            // After socket connects, join as judge and set up video sync
+            setTimeout(() => {
+                const activeSocket = getActiveRoomSocket();
+                if (activeSocket) {
+                    activeSocket.emit('ws_scoring_join', {
+                        room_code: roomCode,
+                        judge_num: judgeNum,
+                        judge_name: loggedInName || loggedInUsername
+                    });
+                    setupVideoSyncListeners(activeSocket);
+                    setupConsensusListeners(activeSocket);
+                }
+                // Disable video controls for judges (event judge controls playback)
+                disableVideoControlsForJudge();
+            }, 500);
+        }
+
+        function setupVideoSyncListeners(socket) {
+            socket.on('ws_scoring_video_play', (data) => {
+                if (video) { video.currentTime = data.time; video.play(); }
+                if (vimeoPlayer) { vimeoPlayer.setCurrentTime(data.time).then(() => vimeoPlayer.play()); }
+            });
+            socket.on('ws_scoring_video_pause', (data) => {
+                if (video) { video.pause(); video.currentTime = data.time; }
+                if (vimeoPlayer) { vimeoPlayer.pause().then(() => vimeoPlayer.setCurrentTime(data.time)); }
+            });
+            socket.on('ws_scoring_video_seek', (data) => {
+                if (video) video.currentTime = data.time;
+                if (vimeoPlayer) vimeoPlayer.setCurrentTime(data.time);
+            });
+        }
+
+        function setupConsensusListeners(socket) {
+            socket.on('ws_scoring_timer_start', (data) => {
+                // Consensus reached! Seek to agreed time and start timer
+                const startTime = data.video_time;
+                if (video) video.currentTime = startTime;
+                if (vimeoPlayer) vimeoPlayer.setCurrentTime(startTime);
+                workingTimeVideoStart = startTime;
+                startTimer();
+                document.getElementById('timerStatus').textContent = 'Consensus! (spread: ' + data.spread + 's)';
+                document.getElementById('timerStatus').style.color = '#34d399';
+            });
+            socket.on('ws_scoring_start_status', (data) => {
+                document.getElementById('timerStatus').textContent = 'Marked: ' + data.marked.length + '/' + data.panel_size + ' judges';
+                document.getElementById('timerStatus').style.color = '#facc15';
+            });
+            socket.on('ws_scoring_start_rejected', (data) => {
+                document.getElementById('timerStatus').textContent = 'No consensus (' + data.spread + 's spread) — press X to retry';
+                document.getElementById('timerStatus').style.color = '#f87171';
+                // Reset video to start position
+                const startPos = videoStartTime || 0;
+                if (video) { video.pause(); video.currentTime = startPos; }
+                if (vimeoPlayer) { vimeoPlayer.pause().then(() => vimeoPlayer.setCurrentTime(startPos)); }
+            });
+        }
+
+        function markWorkingTimeStart() {
+            const videoTime = video ? video.currentTime : 0;
+            const activeSocket = getActiveRoomSocket();
+            const activeRoom = getActiveRoomCode();
+            if (activeSocket && activeRoom) {
+                activeSocket.emit('ws_scoring_mark_start', {
+                    room_code: activeRoom,
+                    judge_num: myJudgeNum,
+                    video_time: videoTime
+                });
+                document.getElementById('timerStatus').textContent = 'Marked start — waiting for others...';
+                document.getElementById('timerStatus').style.color = '#facc15';
+            }
+        }
+
+        function disableVideoControlsForJudge() {
+            if (video) {
+                video.removeAttribute('controls');
+                // Prevent judge from clicking to play/pause
+                video.style.pointerEvents = 'none';
+            }
+            // Show message
+            const container = document.getElementById('videoContainer');
+            if (container) {
+                const msg = document.createElement('div');
+                msg.id = 'judgeVideoControlMsg';
+                msg.className = 'absolute bottom-0 left-0 right-0 bg-purple-900/80 text-center text-xs text-purple-200 py-1';
+                msg.textContent = 'Event judge controls playback';
+                container.appendChild(msg);
+            }
+        }
+
+        // Judge presence socket — auto-connect when assigned to a room
+        if (loggedInUsername) {
+            const presenceSocket = io(window.location.origin);
+            presenceSocket.on('connect', () => {
+                presenceSocket.emit('ws_scoring_presence', { username: loggedInUsername });
+            });
+            presenceSocket.on('ws_scoring_auto_join', (data) => {
+                // If on wrong video, redirect
+                if (data.video_id && data.video_id !== videoId) {
+                    window.location.href = '/video/' + data.video_id;
+                    return;
+                }
+                // Already connected to a room? Skip
+                if (getActiveRoomCode()) return;
+                autoJoinAsJudge(data.room_code, data.judge_num, data.scoring_type);
+            });
+        }
+
+        // ============================================
         // FS REAL-TIME SCORING ROOM FUNCTIONS
         // ============================================
         // fsScoringSocket and fsScoringRoomCode declared at top for video sync
@@ -6411,6 +6621,7 @@
                 console.error('FS Scoring error:', data.message);
                 alert('Scoring error: ' + data.message);
             });
+            setupConsensusListeners(fsScoringSocket);
         }
 
         function updateFsScoreField(judgeNum, field, value) {
@@ -6547,6 +6758,7 @@
                 console.error('CF Scoring error:', data.message);
                 alert('Scoring error: ' + data.message);
             });
+            setupConsensusListeners(cfScoringSocket);
         }
 
         function updateCfScoreField(judgeNum, field, value) {
@@ -6678,6 +6890,7 @@
                 console.error('AE Scoring error:', data.message);
                 alert('Scoring error: ' + data.message);
             });
+            setupConsensusListeners(aeScoringSocket);
         }
 
         function updateAeJudgeIndicators(judges, completion) {

@@ -4419,7 +4419,9 @@ def video(video_id):
                          is_admin=session.get('role') == 'admin',
                          is_chief_judge=session.get('role') in ['admin', 'chief_judge'],
                          is_jwg=session.get('role') in ['admin', 'chief_judge', 'jwg'],
-                         users=all_users)
+                         users=all_users,
+                         logged_in_username=session.get('username', ''),
+                         logged_in_name=session.get('name', ''))
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -13985,6 +13987,9 @@ if SOCKETIO_ENABLED:
     # Track sid -> (room_code, judge_num) for disconnect handling
     _ws_sid_map = {}
 
+    # Track username -> socket_sid for judge presence/auto-connect
+    _ws_presence_map = {}
+
     # --- Initialize rooms ---
     _ws_rooms_memory = _load_ws_rooms()
 
@@ -14810,8 +14815,15 @@ if SOCKETIO_ENABLED:
 
     @socketio.on('disconnect')
     def on_ws_scoring_disconnect():
-        """Handle socket disconnect — mark judge as disconnected."""
+        """Handle socket disconnect — mark judge as disconnected and clean up presence."""
         sid = request.sid
+
+        # Clean up presence map
+        for uname, psid in list(_ws_presence_map.items()):
+            if psid == sid:
+                del _ws_presence_map[uname]
+                break
+
         mapping = _ws_sid_map.pop(sid, None)
         if not mapping:
             return
@@ -14855,6 +14867,106 @@ if SOCKETIO_ENABLED:
         room_code = data.get('room_code')
         if _ws_room_exists(room_code):
             emit('ws_scoring_video_seek', {'time': data.get('time', 0)}, room=room_code, include_self=False)
+
+    # --- Judge presence for auto-connect ---
+
+    @socketio.on('ws_scoring_presence')
+    def on_ws_scoring_presence(data):
+        """Judge announces presence — check if already assigned to a room."""
+        username = data.get('username')
+        if not username:
+            return
+        _ws_presence_map[username] = request.sid
+        # Check if already assigned to a room
+        for code in list(_get_all_ws_rooms().keys()):
+            room = _get_ws_room(code)
+            if not room:
+                continue
+            assigned = room.get('assigned_judges', {})
+            for judge_num_str, assigned_username in assigned.items():
+                if assigned_username == username:
+                    emit('ws_scoring_auto_join', {
+                        'room_code': code,
+                        'judge_num': int(judge_num_str),
+                        'scoring_type': room.get('scoring_type'),
+                        'video_id': room.get('video_id')
+                    })
+                    return
+
+    @socketio.on('ws_scoring_assign_judges')
+    def on_ws_scoring_assign_judges(data):
+        """Event judge assigns judges to a room — notify any online judges."""
+        room_code = data.get('room_code')
+        judges = data.get('judges', {})  # {judge_num: username}
+        video_id = data.get('video_id')
+        panel_size = data.get('panel_size', 5)
+        room = _get_ws_room(room_code)
+        if not room:
+            return
+        room['assigned_judges'] = judges
+        room['video_id'] = video_id
+        room['panel_size'] = panel_size
+        _set_ws_room(room_code, room)
+        # Notify any assigned judges who are already online
+        for judge_num_str, username in judges.items():
+            sid = _ws_presence_map.get(username)
+            if sid:
+                emit('ws_scoring_auto_join', {
+                    'room_code': room_code,
+                    'judge_num': int(judge_num_str),
+                    'scoring_type': room.get('scoring_type'),
+                    'video_id': video_id
+                }, to=sid)
+
+    @socketio.on('ws_scoring_mark_start')
+    def on_ws_scoring_mark_start(data):
+        """Judge marks working time start — check for consensus."""
+        room_code = data.get('room_code')
+        judge_num = data.get('judge_num')
+        video_time = data.get('video_time', 0)
+        room = _get_ws_room(room_code)
+        if not room:
+            return
+
+        # Store this judge's mark
+        if 'start_marks' not in room:
+            room['start_marks'] = {}
+        room['start_marks'][str(judge_num)] = video_time
+        _set_ws_room(room_code, room)
+
+        panel_size = room.get('panel_size', 5)
+        marks = room['start_marks']
+
+        # Broadcast status update — show who has marked
+        emit('ws_scoring_start_status', {
+            'marked': list(marks.keys()),
+            'panel_size': panel_size
+        }, room=room_code)
+
+        # Check if all judges have marked
+        if len(marks) >= panel_size:
+            times = list(marks.values())
+            spread = max(times) - min(times)
+            avg_time = sum(times) / len(times)
+
+            if spread <= 0.3:  # Within 0.3s tolerance
+                # Consensus reached — start timer for everyone
+                room['start_marks'] = {}
+                _set_ws_room(room_code, room)
+                emit('ws_scoring_timer_start', {
+                    'video_time': avg_time,
+                    'consensus': True,
+                    'spread': round(spread, 3)
+                }, room=room_code)
+            else:
+                # No consensus — reset marks
+                room['start_marks'] = {}
+                _set_ws_room(room_code, room)
+                emit('ws_scoring_start_rejected', {
+                    'spread': round(spread, 3),
+                    'marks': {str(k): round(v, 3) for k, v in marks.items()},
+                    'message': f'No consensus — spread was {spread:.3f}s (tolerance: 0.3s)'
+                }, room=room_code)
 
 
 # ==================== ARTISTIC EVENTS SCORING ====================
