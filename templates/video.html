@@ -114,8 +114,44 @@
 
                 <!-- Video Container -->
                 <div class="flex-1">
-                <!-- Video Player -->
-                <div class="aspect-video bg-black rounded-lg overflow-hidden mb-4 relative" id="videoContainer">
+                <!-- Video Player with Side Controls -->
+                <div class="relative mb-4">
+                <div class="aspect-video bg-black rounded-lg overflow-hidden relative" id="videoContainer">
+                    <!-- Left Controls: overlaid on left edge -->
+                    <div class="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1 p-1 bg-black/60 rounded-r-lg">
+                        <button onclick="startTimer()" id="timerBtn"
+                            class="px-2 py-1.5 rounded bg-green-600 hover:bg-green-700 text-xs font-medium whitespace-nowrap">
+                            Start (X)
+                        </button>
+                        <button onclick="endWorkingTimeEarly()" id="endTimeBtn"
+                            class="hidden px-2 py-1.5 rounded bg-yellow-600 hover:bg-yellow-700 text-xs font-medium whitespace-nowrap" title="End working time early (T)">
+                            End Time (T)
+                        </button>
+                        <button onclick="replayVideo()"
+                            class="px-2 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-xs whitespace-nowrap" title="Restart video without clearing scores">
+                            Replay
+                        </button>
+                        <button onclick="confirmReset()"
+                            class="px-2 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-xs whitespace-nowrap" title="Clear all scores and reset">
+                            Reset
+                        </button>
+                        <div class="border-t border-gray-500 my-0.5"></div>
+                        <button onclick="setCurrentAsStart()" class="px-2 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-xs whitespace-nowrap">
+                            Set Current
+                        </button>
+                    </div>
+                    <!-- Right Controls: overlaid on right edge -->
+                    <div class="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1 p-1 bg-black/60 rounded-l-lg">
+                        <button onclick="markAsTrimmed()" class="px-2 py-1.5 rounded bg-purple-600 hover:bg-purple-700 text-xs whitespace-nowrap" title="Mark as trimmed without trimming the file">
+                            Mark Trimmed
+                        </button>
+                        <div class="border-t border-gray-500 my-0.5"></div>
+                        <span class="text-gray-300 text-xs text-center">Speed</span>
+                        <button onclick="setSpeed(0.25)" class="speed-btn px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs text-center" data-speed="0.25">25%</button>
+                        <button onclick="setSpeed(0.5)" class="speed-btn px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs text-center" data-speed="0.5">50%</button>
+                        <button onclick="setSpeed(0.75)" class="speed-btn px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs text-center" data-speed="0.75">75%</button>
+                        <button onclick="setSpeed(1)" class="speed-btn px-2 py-1 rounded bg-blue-600 text-xs text-center" data-speed="1">100%</button>
+                    </div>
                     <!-- Freeze Frame Overlay (for all videos) -->
                     <div id="freezeOverlay" class="absolute inset-0 bg-black/80 flex items-center justify-center z-10 hidden">
                         <!-- Initial TIME display -->
@@ -171,6 +207,7 @@
                     </iframe>
                     {% endif %}
                 </div>
+                </div> <!-- end relative video wrapper -->
 
                 <!-- Scoring & Judging Panel -->
                 <div class="bg-gray-800 rounded-lg p-4 mb-6">
@@ -184,56 +221,20 @@
                                 class="px-3 py-1 text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">Free</button>
                         </div>
                     </div>
-                    <div class="flex items-center justify-between flex-wrap gap-4">
-                        <div class="flex items-center gap-2">
-                            <span class="text-gray-400 text-sm">Speed:</span>
-                            <button onclick="setSpeed(0.25)" class="speed-btn px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" data-speed="0.25">25%</button>
-                            <button onclick="setSpeed(0.5)" class="speed-btn px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" data-speed="0.5">50%</button>
-                            <button onclick="setSpeed(0.75)" class="speed-btn px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" data-speed="0.75">75%</button>
-                            <button onclick="setSpeed(1)" class="speed-btn px-3 py-1 rounded bg-blue-600 text-sm" data-speed="1">100%</button>
-                            <span class="text-gray-600 mx-2">|</span>
-                            <span class="text-gray-400 text-sm">Frame:</span>
-                            <button onclick="stepFrame(-1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Previous frame (,)">&lt;</button>
-                            <button onclick="stepFrame(1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Next frame (.)">></button>
-                            <span class="text-gray-600 mx-2">|</span>
-                            <button onclick="startTimer()" id="timerBtn"
-                                class="px-4 py-1 rounded bg-green-600 hover:bg-green-700 text-sm font-medium">
-                                Start (X)
-                            </button>
-                            <button onclick="endWorkingTimeEarly()" id="endTimeBtn"
-                                class="hidden px-3 py-1 rounded bg-yellow-600 hover:bg-yellow-700 text-sm font-medium" title="End working time early (T)">
-                                End Time (T)
-                            </button>
-                            <button onclick="replayVideo()"
-                                class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-sm" title="Restart video without clearing scores">
-                                Replay
-                            </button>
-                            <button onclick="confirmReset()"
-                                class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Clear all scores and reset">
-                                Reset
-                            </button>
-                            <span class="text-gray-600 mx-2">|</span>
-                            <span class="text-gray-400 text-sm">Video Start:</span>
-                            <span id="startTimeDisplay" class="font-mono text-cyan-400">{{ video.start_time|default(0, true) }}s</span>
-                            <button onclick="goToStartTime()" class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs">
-                                Go to Start
-                            </button>
-                            <button onclick="setCurrentAsStart()" class="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs">
-                                Set Current
-                            </button>
-                            <button onclick="clearStartTime()" class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs">
-                                Clear
-                            </button>
-                            <button onclick="markAsTrimmed()" class="px-2 py-1 rounded bg-purple-600 hover:bg-purple-700 text-xs" title="Mark as trimmed without trimming the file">
-                                Mark Trimmed
-                            </button>
-                            <span id="startTimeSaveStatus" class="text-xs text-gray-500"></span>
-                            <span id="timerDisplay" class="text-xl font-mono font-bold text-gray-400 ml-2">--:--</span>
-                            <span id="timerStatus" class="text-sm text-gray-500"></span>
-                            <span id="flysightTimeCompare" class="text-sm text-gray-500 hidden ml-2">
-                                / FlySight: <span id="flysightTimeDisplay" class="text-cyan-400 font-mono">--.-s</span>
-                            </span>
-                        </div>
+                    <div class="flex items-center flex-wrap gap-2">
+                        <span class="text-gray-400 text-sm">Frame:</span>
+                        <button onclick="stepFrame(-1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Previous frame (,)">&lt;</button>
+                        <button onclick="stepFrame(1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Next frame (.)">></button>
+                        <span class="text-gray-600 mx-2">|</span>
+                        <span class="text-gray-400 text-sm">Video Start:</span>
+                        <span id="startTimeDisplay" class="font-mono text-cyan-400">{{ video.start_time|default(0, true) }}s</span>
+                        <span id="startTimeSaveStatus" class="text-xs text-gray-500"></span>
+                        <span class="text-gray-600 mx-2">|</span>
+                        <span id="timerDisplay" class="text-xl font-mono font-bold text-gray-400">--:--</span>
+                        <span id="timerStatus" class="text-sm text-gray-500"></span>
+                        <span id="flysightTimeCompare" class="text-sm text-gray-500 hidden ml-2">
+                            / FlySight: <span id="flysightTimeDisplay" class="text-cyan-400 font-mono">--.-s</span>
+                        </span>
                     </div>
 
                     <!-- Confirm Score Button (appears after replay) -->
@@ -3634,6 +3635,29 @@
             document.getElementById('scoreSummaryTable').classList.add('hidden');
         }
 
+        // Cycle a score in the summary table: x→c, c→q, q→x
+        function cycleScoreInSummary(position, judgeIndex) {
+            const cycleMap = { x: 'c', c: 'q', q: 'x' };
+
+            if (panelSize > 1 && panelVotes.length > 0 && judgeIndex !== null) {
+                // Panel mode: cycle individual judge's vote
+                const current = panelVotes[position][judgeIndex];
+                if (!current) return;
+                panelVotes[position][judgeIndex] = cycleMap[current];
+                // Recalculate majority for this position
+                scoringTypes[position] = getMajorityVote(panelVotes[position]);
+                recalculatePanelCounts();
+            } else {
+                // Solo mode or majority row: cycle the final score
+                const current = scoringTypes[position];
+                if (!current) return;
+                const newType = cycleMap[current];
+                changeScoreType(position, newType);
+            }
+
+            generateScoreSummaryTable();
+        }
+
         function generateScoreSummaryTable() {
             const table = document.getElementById('scoreSummaryContent');
             const numPositions = scoringTypes.length;
@@ -3689,7 +3713,7 @@
                         } else {
                             display = '·';
                         }
-                        html += `<td class="py-2 px-1 text-center font-mono text-lg ${color}">${display}</td>`;
+                        html += `<td class="py-2 px-1 text-center font-mono text-lg ${color} cursor-pointer hover:ring-2 hover:ring-white/30 rounded transition-all" onclick="cycleScoreInSummary(${p}, ${j})">${display}</td>`;
                     }
                     const judgeTotal = judgeX - judgeQ;
                     html += `<td class="py-2 px-2 text-center font-bold sticky right-0 bg-gray-900 ${judgeTotal >= 0 ? 'text-green-400' : 'text-red-400'}">${judgeTotal}</td>`;
@@ -3719,7 +3743,7 @@
                     display = 'x';
                     color = 'text-orange-400';
                 }
-                html += `<td class="py-3 px-1 text-center font-mono text-xl font-bold ${color}">${display}</td>`;
+                html += `<td class="py-3 px-1 text-center font-mono text-xl font-bold ${color} cursor-pointer hover:ring-2 hover:ring-yellow-400/50 rounded transition-all" onclick="cycleScoreInSummary(${p}, null)">${display}</td>`;
             }
 
             const total = nvPenalty ? 0 : (xCount - qCount);
@@ -3732,6 +3756,9 @@
                 html += `<td colspan="${numPositions + 2}" class="py-2 px-2 text-center text-red-400 font-bold">⚠️ NV PENALTY - SCORE: 0</td>`;
                 html += '</tr>';
             }
+
+            // Hint row
+            html += '<tr><td colspan="100%" class="py-2 text-center text-gray-500 text-xs">Tap any score to change it</td></tr>';
 
             table.innerHTML = html;
             document.getElementById('summaryTotal').textContent = `Total: ${total}${nvPenalty ? ' (NV)' : ''}`;
