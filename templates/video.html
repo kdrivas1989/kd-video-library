@@ -737,7 +737,9 @@
                                 <!-- Panel Mode Toggle -->
                                 <select id="panelSize" onchange="updatePanelMode()" class="px-2 py-1 rounded bg-gray-700 text-white text-sm">
                                     <option value="1">Solo</option>
+                                    <option value="2">2 Panel</option>
                                     <option value="3">3 Panel</option>
+                                    <option value="4">4 Panel</option>
                                     <option value="5">5 Panel</option>
                                 </select>
                                 <span id="currentJudgeLabel" class="text-xs text-cyan-400 hidden">J1</span>
@@ -885,6 +887,9 @@
                             <span class="text-gray-400 text-sm">Judges:</span>
                             <select id="cpFreeJudgeCount" onchange="toggleCpFreeJudgeMode()" class="px-2 py-1 rounded bg-gray-700 text-white text-sm">
                                 <option value="1" selected>Single</option>
+                                <option value="2">2 Panel</option>
+                                <option value="3">3 Panel</option>
+                                <option value="4">4 Panel</option>
                                 <option value="5">5 Panel</option>
                             </select>
                         </div>
@@ -1245,7 +1250,9 @@
                                     <span class="text-gray-400 text-sm">Multi-Judge Mode</span>
                                 </label>
                                 <select id="judgeCount" onchange="updateJudgeCount()" class="px-2 py-1 rounded bg-gray-700 text-white text-sm hidden">
+                                    <option value="2">2 Judges</option>
                                     <option value="3">3 Judges</option>
+                                    <option value="4">4 Judges</option>
                                     <option value="5" selected>5 Judges</option>
                                 </select>
                             </div>
@@ -1499,7 +1506,10 @@
                                 <span class="text-gray-500 text-xs">Judges:</span>
                                 <select id="wsCompJudgeCount" onchange="toggleWsCompJudgeMode()" class="px-2 py-1 rounded bg-gray-700 text-white text-xs">
                                     <option value="1" selected>Single</option>
+                                    <option value="2">2 Panel</option>
                                     <option value="3">3 Panel</option>
+                                    <option value="4">4 Panel</option>
+                                    <option value="5">5 Panel</option>
                                 </select>
                             </div>
                         </div>
@@ -1556,6 +1566,10 @@
                                     class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsCompulsory()">
                                 <input type="number" id="wsStyleJ3" min="0" max="10" step="0.1" placeholder="J3"
                                     class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsCompulsory()">
+                                <input type="number" id="wsStyleJ4" min="0" max="10" step="0.1" placeholder="J4"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center hidden" onchange="calculateWsCompulsory()">
+                                <input type="number" id="wsStyleJ5" min="0" max="10" step="0.1" placeholder="J5"
+                                    class="w-16 px-2 py-1 rounded bg-gray-700 text-white text-sm text-center hidden" onchange="calculateWsCompulsory()">
                                 <span class="text-gray-400">=</span>
                                 <span id="wsStyleAvg" class="text-yellow-400 font-bold">0.0</span>
                             </div>
@@ -1625,7 +1639,10 @@
                                 <span class="text-gray-500 text-xs">Judges:</span>
                                 <select id="wsFreeJudgeCount" onchange="toggleWsFreeJudgeMode()" class="px-2 py-1 rounded bg-gray-700 text-white text-xs">
                                     <option value="1" selected>Single</option>
+                                    <option value="2">2 Panel</option>
                                     <option value="3">3 Panel</option>
+                                    <option value="4">4 Panel</option>
+                                    <option value="5">5 Panel</option>
                                 </select>
                             </div>
                         </div>
@@ -1650,6 +1667,10 @@
                                     class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
                                 <input type="number" id="wsFreeStyleJ3" min="0" max="10" step="0.1" placeholder="J3"
                                     class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <input type="number" id="wsFreeStyleJ4" min="0" max="10" step="0.1" placeholder="J4"
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center hidden" onchange="calculateWsFree()">
+                                <input type="number" id="wsFreeStyleJ5" min="0" max="10" step="0.1" placeholder="J5"
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center hidden" onchange="calculateWsFree()">
                                 <span class="text-yellow-400 font-bold text-center" id="wsFreeStyleAvg">0.0</span>
                             </div>
                         </div>
@@ -1671,6 +1692,10 @@
                                     class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
                                 <input type="number" id="wsFreeDiveJ3" min="0" max="10" step="0.1" placeholder="J3"
                                     class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                <input type="number" id="wsFreeDiveJ4" min="0" max="10" step="0.1" placeholder="J4"
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center hidden" onchange="calculateWsFree()">
+                                <input type="number" id="wsFreeDiveJ5" min="0" max="10" step="0.1" placeholder="J5"
+                                    class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center hidden" onchange="calculateWsFree()">
                                 <span class="text-yellow-400 font-bold text-center" id="wsFreeDiveAvg">0.0</span>
                             </div>
                         </div>
@@ -1705,6 +1730,10 @@
                                             class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
                                         <input type="number" id="wsFreeCamQualityJ3" min="0" max="7" step="0.1" placeholder="J3"
                                             class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                        <input type="number" id="wsFreeCamQualityJ4" min="0" max="7" step="0.1" placeholder="J4"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center hidden" onchange="calculateWsFree()">
+                                        <input type="number" id="wsFreeCamQualityJ5" min="0" max="7" step="0.1" placeholder="J5"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center hidden" onchange="calculateWsFree()">
                                     </div>
                                 </div>
                                 <div>
@@ -1716,6 +1745,10 @@
                                             class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
                                         <input type="number" id="wsFreeCamProgressiveJ3" min="0" max="3" step="0.1" placeholder="J3"
                                             class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center" onchange="calculateWsFree()">
+                                        <input type="number" id="wsFreeCamProgressiveJ4" min="0" max="3" step="0.1" placeholder="J4"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center hidden" onchange="calculateWsFree()">
+                                        <input type="number" id="wsFreeCamProgressiveJ5" min="0" max="3" step="0.1" placeholder="J5"
+                                            class="w-full px-2 py-1 rounded bg-gray-700 text-white text-sm text-center hidden" onchange="calculateWsFree()">
                                     </div>
                                 </div>
                                 <span class="text-yellow-400 font-bold text-center" id="wsFreeCamAvg">0.0</span>
@@ -2093,7 +2126,12 @@
             });
 
             // Sync video playback to all scoring room judges
-            function emitVideoSync(eventName) {
+            let lastSyncTime = 0;
+            function emitVideoSync(eventName, force) {
+                const now = Date.now();
+                // Throttle seek events to max once per 100ms
+                if (!force && eventName === 'ws_scoring_video_seek' && now - lastSyncTime < 100) return;
+                lastSyncTime = now;
                 const t = video.currentTime;
                 const rooms = [
                     {code: cpScoringRoomCode, socket: cpScoringSocket},
@@ -2108,8 +2146,8 @@
                     }
                 });
             }
-            video.addEventListener('play', () => emitVideoSync('ws_scoring_video_play'));
-            video.addEventListener('pause', () => emitVideoSync('ws_scoring_video_pause'));
+            video.addEventListener('play', () => emitVideoSync('ws_scoring_video_play', true));
+            video.addEventListener('pause', () => emitVideoSync('ws_scoring_video_pause', true));
             video.addEventListener('seeked', () => emitVideoSync('ws_scoring_video_seek'));
         }
 
@@ -5430,9 +5468,11 @@
 
         // Wingsuit Compulsory Scoring
 
+        let wsCompJudgeCountVal = 3;
         function toggleWsCompJudgeMode() {
-            const count = document.getElementById('wsCompJudgeCount').value;
-            wsCompSingleJudge = (count === '1');
+            const count = parseInt(document.getElementById('wsCompJudgeCount').value);
+            wsCompSingleJudge = (count === 1);
+            wsCompJudgeCountVal = count;
 
             if (wsCompSingleJudge) {
                 document.getElementById('wsStyleSingleJudge').classList.remove('hidden');
@@ -5442,13 +5482,19 @@
                 document.getElementById('wsStyleSingleJudge').classList.add('hidden');
                 document.getElementById('wsStylePanelJudge').classList.remove('hidden');
                 document.getElementById('wsScoringPanel').classList.remove('hidden');
+                for (let j = 1; j <= 5; j++) {
+                    const el = document.getElementById('wsStyleJ' + j);
+                    if (el) { el.style.display = j <= count ? '' : 'none'; el.classList.toggle('hidden', j > count); }
+                }
             }
             calculateWsCompulsory();
         }
 
+        let wsFreeJudgeCountVal = 3;
         function toggleWsFreeJudgeMode() {
-            const count = document.getElementById('wsFreeJudgeCount').value;
-            wsFreeSingleJudge = (count === '1');
+            const count = parseInt(document.getElementById('wsFreeJudgeCount').value);
+            wsFreeSingleJudge = (count === 1);
+            wsFreeJudgeCountVal = count;
 
             ['Style', 'Dive', 'Cam'].forEach(type => {
                 if (wsFreeSingleJudge) {
@@ -5463,6 +5509,13 @@
                 document.getElementById('wsScoringPanel').classList.add('hidden');
             } else {
                 document.getElementById('wsScoringPanel').classList.remove('hidden');
+                // Show/hide judge inputs based on count
+                for (let j = 1; j <= 5; j++) {
+                    ['wsFreeStyleJ', 'wsFreeDiveJ', 'wsFreeCamQualityJ', 'wsFreeCamProgressiveJ'].forEach(prefix => {
+                        const el = document.getElementById(prefix + j);
+                        if (el) { el.style.display = j <= count ? '' : 'none'; el.classList.toggle('hidden', j > count); }
+                    });
+                }
             }
             calculateWsFree();
         }
@@ -5730,11 +5783,10 @@
                 styleAvg = parseFloat(document.getElementById('wsStyleSingle').value) || 0;
                 document.getElementById('wsStyleAvgSingle').textContent = styleAvg.toFixed(1);
             } else {
-                const styleScores = [
-                    parseFloat(document.getElementById('wsStyleJ1').value),
-                    parseFloat(document.getElementById('wsStyleJ2').value),
-                    parseFloat(document.getElementById('wsStyleJ3').value)
-                ];
+                const styleScores = [];
+                for (let j = 1; j <= wsCompJudgeCountVal; j++) {
+                    styleScores.push(parseFloat(document.getElementById('wsStyleJ' + j).value));
+                }
                 styleAvg = calculateJudgeAverage(styleScores);
                 document.getElementById('wsStyleAvg').textContent = styleAvg;
             }
@@ -5804,35 +5856,23 @@
                 document.getElementById('wsFreeDiveAvgSingle').textContent = diveAvg.toFixed(1);
                 document.getElementById('wsFreeCamAvgSingle').textContent = camTotal.toFixed(1);
             } else {
-                // 3 judge panel mode
-                const styleScores = [
-                    parseFloat(document.getElementById('wsFreeStyleJ1').value),
-                    parseFloat(document.getElementById('wsFreeStyleJ2').value),
-                    parseFloat(document.getElementById('wsFreeStyleJ3').value)
-                ];
+                // Panel mode
+                const styleScores = [];
+                for (let j = 1; j <= wsFreeJudgeCountVal; j++) styleScores.push(parseFloat(document.getElementById('wsFreeStyleJ' + j).value));
                 styleAvg = calculateJudgeAverage(styleScores);
                 document.getElementById('wsFreeStyleAvg').textContent = styleAvg;
 
-                const diveScores = [
-                    parseFloat(document.getElementById('wsFreeDiveJ1').value),
-                    parseFloat(document.getElementById('wsFreeDiveJ2').value),
-                    parseFloat(document.getElementById('wsFreeDiveJ3').value)
-                ];
+                const diveScores = [];
+                for (let j = 1; j <= wsFreeJudgeCountVal; j++) diveScores.push(parseFloat(document.getElementById('wsFreeDiveJ' + j).value));
                 diveAvg = calculateJudgeAverage(diveScores);
                 document.getElementById('wsFreeDiveAvg').textContent = diveAvg;
 
-                const camQualityScores = [
-                    parseFloat(document.getElementById('wsFreeCamQualityJ1').value),
-                    parseFloat(document.getElementById('wsFreeCamQualityJ2').value),
-                    parseFloat(document.getElementById('wsFreeCamQualityJ3').value)
-                ];
+                const camQualityScores = [];
+                for (let j = 1; j <= wsFreeJudgeCountVal; j++) camQualityScores.push(parseFloat(document.getElementById('wsFreeCamQualityJ' + j).value));
                 camQualityAvg = parseFloat(calculateJudgeAverage(camQualityScores));
 
-                const camProgressiveScores = [
-                    parseFloat(document.getElementById('wsFreeCamProgressiveJ1').value),
-                    parseFloat(document.getElementById('wsFreeCamProgressiveJ2').value),
-                    parseFloat(document.getElementById('wsFreeCamProgressiveJ3').value)
-                ];
+                const camProgressiveScores = [];
+                for (let j = 1; j <= wsFreeJudgeCountVal; j++) camProgressiveScores.push(parseFloat(document.getElementById('wsFreeCamProgressiveJ' + j).value));
                 camProgressiveAvg = parseFloat(calculateJudgeAverage(camProgressiveScores));
 
                 camTotal = parseFloat((camQualityAvg + camProgressiveAvg).toFixed(1));
@@ -5885,9 +5925,11 @@
             return Math.floor(val * 1000) / 1000;
         }
 
+        let cpFreeJudgeCount = 5;
         function toggleCpFreeJudgeMode() {
-            const count = document.getElementById('cpFreeJudgeCount').value;
-            cpFreeSingleJudge = (count === '1');
+            const count = parseInt(document.getElementById('cpFreeJudgeCount').value);
+            cpFreeSingleJudge = (count === 1);
+            cpFreeJudgeCount = count;
 
             if (cpFreeSingleJudge) {
                 document.getElementById('cpFreeSingleJudge').classList.remove('hidden');
@@ -5897,6 +5939,14 @@
                 document.getElementById('cpFreeSingleJudge').classList.add('hidden');
                 document.getElementById('cpFreePanelJudge').classList.remove('hidden');
                 document.getElementById('cpScoringPanel').classList.remove('hidden');
+                // Show/hide judge inputs based on count
+                for (let j = 1; j <= 5; j++) {
+                    const el = document.getElementById('cpFreeJ' + j);
+                    if (el) el.closest('div.text-center').style.display = j <= count ? '' : 'none';
+                    // Also hide real-time scoring indicators
+                    const indicator = document.getElementById('cpJ' + j + 'Dot');
+                    if (indicator) indicator.closest('span.flex').style.display = j <= count ? '' : 'none';
+                }
                 // Auto-create room if not already started
                 if (!cpScoringRoomCode) {
                     connectCpScoringRoom();
@@ -5935,13 +5985,12 @@
                 document.getElementById('cpFreeAvgSingle').textContent = avg.toFixed(1);
             } else {
                 const scores = [];
-                for (let j = 1; j <= 5; j++) {
+                for (let j = 1; j <= cpFreeJudgeCount; j++) {
                     scores.push(parseFloat(document.getElementById('cpFreeJ' + j).value));
                 }
                 const valid = scores.filter(s => !isNaN(s) && s !== null);
-                if (valid.length === 5) {
-                    // Average of 5 judges (no drop)
-                    avg = truncTo3(valid.reduce((a, b) => a + b, 0) / 5);
+                if (valid.length === cpFreeJudgeCount) {
+                    avg = truncTo3(valid.reduce((a, b) => a + b, 0) / cpFreeJudgeCount);
                 } else if (valid.length > 0) {
                     avg = truncTo3(valid.reduce((a, b) => a + b, 0) / valid.length);
                 } else {

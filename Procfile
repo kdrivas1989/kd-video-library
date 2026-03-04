@@ -1,1 +1,1 @@
-web: gunicorn --worker-class gevent -w 1 --timeout 120 app:app
+web: gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 2 --timeout 120 app:app
