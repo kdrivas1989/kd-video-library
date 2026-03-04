@@ -116,42 +116,49 @@
                 <div class="flex-1">
                 <!-- Video Player with Side Controls -->
                 <div class="relative mb-4">
+                <!-- Left Controls: overlaid on left edge -->
+                <div style="position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:30;display:flex;flex-direction:column;gap:4px;padding:4px;background:rgba(0,0,0,0.7);border-radius:0 8px 8px 0;">
+                    <button onclick="startTimer()" id="timerBtn"
+                        class="px-2 py-1 rounded bg-green-600 hover:bg-green-700 text-xs font-medium whitespace-nowrap"
+                        style="color:white;border:none;cursor:pointer;">
+                        Start (X)
+                    </button>
+                    <button onclick="endWorkingTimeEarly()" id="endTimeBtn" class="hidden"
+                        style="padding:4px 8px;border-radius:4px;font-size:12px;font-weight:500;white-space:nowrap;background:#ca8a04;color:white;border:none;cursor:pointer;" title="End working time early (T)">
+                        End Time (T)
+                    </button>
+                    <button onclick="replayVideo()"
+                        style="padding:4px 8px;border-radius:4px;font-size:12px;white-space:nowrap;background:#2563eb;color:white;border:none;cursor:pointer;" title="Restart video without clearing scores">
+                        Replay
+                    </button>
+                    <button onclick="confirmReset()"
+                        style="padding:4px 8px;border-radius:4px;font-size:12px;white-space:nowrap;background:#374151;color:white;border:none;cursor:pointer;" title="Clear all scores and reset">
+                        Reset
+                    </button>
+                    <hr style="border-color:#6b7280;margin:2px 0;">
+                    <button onclick="setCurrentAsStart()"
+                        style="padding:4px 8px;border-radius:4px;font-size:12px;white-space:nowrap;background:#2563eb;color:white;border:none;cursor:pointer;">
+                        Set Current
+                    </button>
+                </div>
+                <!-- Right Controls: overlaid on right edge -->
+                <div style="position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:30;display:flex;flex-direction:column;gap:4px;padding:4px;background:rgba(0,0,0,0.7);border-radius:8px 0 0 8px;">
+                    <button onclick="markAsTrimmed()"
+                        style="padding:4px 8px;border-radius:4px;font-size:12px;white-space:nowrap;background:#9333ea;color:white;border:none;cursor:pointer;" title="Mark as trimmed without trimming the file">
+                        Mark Trimmed
+                    </button>
+                    <hr style="border-color:#6b7280;margin:2px 0;">
+                    <span style="font-size:11px;color:#d1d5db;text-align:center;">Speed</span>
+                    <button onclick="setSpeed(0.25)" class="speed-btn" data-speed="0.25"
+                        style="padding:3px 8px;border-radius:4px;font-size:12px;text-align:center;background:#374151;color:white;border:none;cursor:pointer;">25%</button>
+                    <button onclick="setSpeed(0.5)" class="speed-btn" data-speed="0.5"
+                        style="padding:3px 8px;border-radius:4px;font-size:12px;text-align:center;background:#374151;color:white;border:none;cursor:pointer;">50%</button>
+                    <button onclick="setSpeed(0.75)" class="speed-btn" data-speed="0.75"
+                        style="padding:3px 8px;border-radius:4px;font-size:12px;text-align:center;background:#374151;color:white;border:none;cursor:pointer;">75%</button>
+                    <button onclick="setSpeed(1)" class="speed-btn" data-speed="1"
+                        style="padding:3px 8px;border-radius:4px;font-size:12px;text-align:center;background:#2563eb;color:white;border:none;cursor:pointer;">100%</button>
+                </div>
                 <div class="aspect-video bg-black rounded-lg overflow-hidden relative" id="videoContainer">
-                    <!-- Left Controls: overlaid on left edge -->
-                    <div class="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1 p-1 bg-black/60 rounded-r-lg">
-                        <button onclick="startTimer()" id="timerBtn"
-                            class="px-2 py-1.5 rounded bg-green-600 hover:bg-green-700 text-xs font-medium whitespace-nowrap">
-                            Start (X)
-                        </button>
-                        <button onclick="endWorkingTimeEarly()" id="endTimeBtn"
-                            class="hidden px-2 py-1.5 rounded bg-yellow-600 hover:bg-yellow-700 text-xs font-medium whitespace-nowrap" title="End working time early (T)">
-                            End Time (T)
-                        </button>
-                        <button onclick="replayVideo()"
-                            class="px-2 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-xs whitespace-nowrap" title="Restart video without clearing scores">
-                            Replay
-                        </button>
-                        <button onclick="confirmReset()"
-                            class="px-2 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-xs whitespace-nowrap" title="Clear all scores and reset">
-                            Reset
-                        </button>
-                        <div class="border-t border-gray-500 my-0.5"></div>
-                        <button onclick="setCurrentAsStart()" class="px-2 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-xs whitespace-nowrap">
-                            Set Current
-                        </button>
-                    </div>
-                    <!-- Right Controls: overlaid on right edge -->
-                    <div class="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1 p-1 bg-black/60 rounded-l-lg">
-                        <button onclick="markAsTrimmed()" class="px-2 py-1.5 rounded bg-purple-600 hover:bg-purple-700 text-xs whitespace-nowrap" title="Mark as trimmed without trimming the file">
-                            Mark Trimmed
-                        </button>
-                        <div class="border-t border-gray-500 my-0.5"></div>
-                        <span class="text-gray-300 text-xs text-center">Speed</span>
-                        <button onclick="setSpeed(0.25)" class="speed-btn px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs text-center" data-speed="0.25">25%</button>
-                        <button onclick="setSpeed(0.5)" class="speed-btn px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs text-center" data-speed="0.5">50%</button>
-                        <button onclick="setSpeed(0.75)" class="speed-btn px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs text-center" data-speed="0.75">75%</button>
-                        <button onclick="setSpeed(1)" class="speed-btn px-2 py-1 rounded bg-blue-600 text-xs text-center" data-speed="1">100%</button>
-                    </div>
                     <!-- Freeze Frame Overlay (for all videos) -->
                     <div id="freezeOverlay" class="absolute inset-0 bg-black/80 flex items-center justify-center z-10 hidden">
                         <!-- Initial TIME display -->
