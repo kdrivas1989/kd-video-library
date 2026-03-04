@@ -246,15 +246,6 @@
                             <span id="flysightTimeCompare" class="text-sm text-gray-500 hidden ml-2">
                                 / FlySight: <span id="flysightTimeDisplay" class="text-cyan-400 font-mono">--.-s</span>
                             </span>
-                            <span class="text-gray-600 mx-2">|</span>
-                            <span class="text-gray-400 text-sm">Points (X): <span id="xCount2" class="text-green-400 font-bold">0</span></span>
-                            <span class="text-gray-400 text-sm">Busts (C): <span id="cCount2" class="text-red-400 font-bold">0</span></span>
-                            <span class="text-gray-400 text-sm">Omissions (Q): <span id="qCount2" class="text-orange-400 font-bold">0</span></span>
-                        </div>
-                        <div class="flex items-center gap-2 text-lg">
-                            <span id="nvIndicator2" class="text-red-500 font-bold hidden">NV</span>
-                            <span class="text-gray-400">Total:</span>
-                            <span id="totalScore2" class="text-yellow-400 font-bold">0</span>
                         </div>
                     </div>
 
@@ -872,14 +863,18 @@
                         <div class="bg-gray-900 rounded-lg p-3 mb-3 min-h-[40px] font-mono text-xl tracking-widest" id="scoringTimeline">
                             <span class="text-gray-500">Press X, C, or Q to score...</span>
                         </div>
-                        <!-- Hidden: score counts kept for JS references, displayed in top bar instead -->
-                        <div class="hidden">
-                            <span id="xCount">0</span>
-                            <span id="cCount">0</span>
-                            <span id="qCount">0</span>
-                            <span id="nvIndicator">0</span>
-                            <span id="totalScore">0</span>
-                            <span id="scoreComparison"></span>
+                        <div class="flex items-center justify-between text-sm">
+                            <div class="flex items-center gap-4">
+                                <span class="text-gray-400">Points (X): <span id="xCount" class="text-green-400 font-bold">0</span></span>
+                                <span class="text-gray-400">Busts (C): <span id="cCount" class="text-red-400 font-bold">0</span></span>
+                                <span class="text-gray-400">Omissions (Q): <span id="qCount" class="text-orange-400 font-bold">0</span></span>
+                            </div>
+                            <div class="text-lg flex items-center gap-3">
+                                <span id="nvIndicator" class="text-red-500 font-bold hidden">NV PENALTY</span>
+                                <span class="text-gray-400">Total:</span>
+                                <span id="totalScore" class="text-yellow-400 font-bold ml-2">0</span>
+                                <span id="scoreComparison" class="text-cyan-400 text-sm hidden"></span>
+                            </div>
                         </div>
                         <!-- Save Score Button -->
                         <div id="saveScoreSection" class="hidden mt-3 pt-3 border-t border-gray-700">
@@ -3470,18 +3465,6 @@
             const total = nvPenalty ? 0 : calculatedTotal;
             document.getElementById('totalScore').textContent = total;
 
-            // Mirror to top scoring bar
-            const xc2 = document.getElementById('xCount2');
-            if (xc2) xc2.textContent = xCount;
-            const cc2 = document.getElementById('cCount2');
-            if (cc2) cc2.textContent = cCount;
-            const qc2 = document.getElementById('qCount2');
-            if (qc2) qc2.textContent = qCount;
-            const ts2 = document.getElementById('totalScore2');
-            if (ts2) ts2.textContent = total;
-            const nv2 = document.getElementById('nvIndicator2');
-            if (nv2) { nvPenalty ? nv2.classList.remove('hidden') : nv2.classList.add('hidden'); }
-
             // Color the total based on value
             const totalEl = document.getElementById('totalScore');
             totalEl.classList.remove('text-yellow-400', 'text-green-400', 'text-red-400');
@@ -3493,11 +3476,6 @@
                 totalEl.classList.add('text-red-400');
             } else {
                 totalEl.classList.add('text-yellow-400');
-            }
-            // Mirror color to top bar total
-            if (ts2) {
-                ts2.classList.remove('text-yellow-400', 'text-green-400', 'text-red-400');
-                ts2.classList.add(totalEl.classList.contains('text-green-400') ? 'text-green-400' : totalEl.classList.contains('text-red-400') ? 'text-red-400' : 'text-yellow-400');
             }
 
             // Update score comparison with max points
