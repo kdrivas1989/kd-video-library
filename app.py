@@ -3948,7 +3948,9 @@ def background_convert_s3_video(job_id, video_id, s3_key, original_url, video_da
         temp_input = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
         temp_input.close()
 
-        urllib.request.urlretrieve(original_url, temp_input.name)
+        req = urllib.request.Request(original_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as resp, open(temp_input.name, 'wb') as f:
+            f.write(resp.read())
 
         with conversion_lock:
             conversion_jobs[job_id]['status'] = 'converting'
@@ -5371,7 +5373,9 @@ def download_and_convert_video(url, video_id):
         temp_input = os.path.join(temp_dir, f"{video_id}_input{ext}")
 
         print(f"Downloading {url}...")
-        urllib.request.urlretrieve(url, temp_input)
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as resp, open(temp_input, 'wb') as f:
+            f.write(resp.read())
 
         # Convert to MP4
         output_filename = f"{video_id}.mp4"
@@ -9007,7 +9011,9 @@ def set_video_start_time(video_id):
             tmp_input = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
             tmp_input.close()
             print(f"[TRIM] Downloading {video_url} for trim at {start_time}s...")
-            urllib.request.urlretrieve(video_url, tmp_input.name)
+            req = urllib.request.Request(video_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req) as resp, open(tmp_input.name, 'wb') as f:
+                f.write(resp.read())
             original_size = os.path.getsize(tmp_input.name)
 
             # FFmpeg trim (stream copy, no re-encode)
@@ -9199,7 +9205,9 @@ def trim_video(video_id):
             is_s3 = True
             import urllib.request
             temp_input = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
-            urllib.request.urlretrieve(video_src, temp_input.name)
+            req = urllib.request.Request(video_src, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req) as resp, open(temp_input.name, 'wb') as f:
+                f.write(resp.read())
             local_path = temp_input.name
         else:
             return jsonify({'error': 'Cannot trim this video type'}), 400
