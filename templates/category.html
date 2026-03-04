@@ -88,6 +88,25 @@
         </div>
         {% endif %}
 
+        <!-- Trim Status Filter -->
+        <div class="mb-6">
+            <div class="flex flex-wrap gap-2">
+                {% set base_url = '/category/' ~ cat_id %}
+                {% set params = [] %}
+                {% if current_sub %}{% set _ = params.append('sub=' ~ current_sub) %}{% endif %}
+                {% if current_event %}{% set _ = params.append('event=' ~ (current_event | urlencode)) %}{% endif %}
+                {% set base_qs = params | join('&') %}
+                <a href="{{ base_url }}{% if base_qs %}?{{ base_qs }}{% endif %}"
+                   class="px-3 py-1.5 rounded-lg text-sm transition {% if not filter_untrimmed %}bg-purple-600 text-white{% else %}bg-gray-700 text-gray-300 hover:bg-gray-600{% endif %}">
+                    All Videos
+                </a>
+                <a href="{{ base_url }}?{% if base_qs %}{{ base_qs }}&{% endif %}untrimmed=1"
+                   class="px-3 py-1.5 rounded-lg text-sm transition {% if filter_untrimmed %}bg-purple-600 text-white{% else %}bg-gray-700 text-gray-300 hover:bg-gray-600{% endif %}">
+                    Not Trimmed
+                </a>
+            </div>
+        </div>
+
         {% if is_admin and videos %}
         <!-- Bulk Actions Bar -->
         <div class="bg-gray-800 rounded-lg p-4 mb-6">

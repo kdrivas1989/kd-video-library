@@ -264,6 +264,76 @@ except ImportError:
     STORAGE_PROVIDER = None
     print(f"[STARTUP] boto3 not installed, S3 disabled")
 
+# Cloudflare CDN cache purge config
+CLOUDFLARE_ZONE_ID = os.environ.get('CLOUDFLARE_ZONE_ID')
+CLOUDFLARE_API_TOKEN = os.environ.get('CLOUDFLARE_API_TOKEN')
+
+
+def normalize_b2_url(url):
+    """Rewrite direct B2 URLs to CDN URLs."""
+    if not url or 'backblazeb2.com' not in url:
+        return url
+    bucket = AWS_S3_BUCKET or 'uspa-video-library'
+    marker = f'/file/{bucket}/'
+    idx = url.find(marker)
+    if idx >= 0:
+        return f"https://cdn.kd-evolution.com{url[idx:]}"
+    return url
+
+
+def normalize_video_urls(video):
+    """Normalize B2 URLs to CDN URLs on a video dict."""
+    if not video:
+        return video
+    for field in ('url', 'thumbnail'):
+        if video.get(field):
+            video[field] = normalize_b2_url(video[field])
+    return video
+
+
+def get_b2_key_from_url(url):
+    """Extract B2 object key from CDN or B2 URL."""
+    bucket = AWS_S3_BUCKET
+    marker = f'/file/{bucket}/'
+    idx = url.find(marker)
+    if idx >= 0:
+        return url[idx + len(marker):]
+    return None
+
+
+def upload_to_s3_key(file_path, s3_key, content_type='video/mp4'):
+    """Upload file to a specific S3/B2 key (overwrite)."""
+    s3_client.upload_file(file_path, AWS_S3_BUCKET, s3_key, ExtraArgs={'ContentType': content_type})
+    return f"https://cdn.kd-evolution.com/file/{AWS_S3_BUCKET}/{s3_key}"
+
+
+def purge_cloudflare_cache(urls):
+    """Purge specific URLs from Cloudflare CDN cache."""
+    if not CLOUDFLARE_ZONE_ID or not CLOUDFLARE_API_TOKEN:
+        print("[CLOUDFLARE] Cache purge skipped - not configured")
+        return False
+    try:
+        import requests
+        resp = requests.post(
+            f"https://api.cloudflare.com/client/v4/zones/{CLOUDFLARE_ZONE_ID}/purge_cache",
+            headers={
+                'Authorization': f'Bearer {CLOUDFLARE_API_TOKEN}',
+                'Content-Type': 'application/json'
+            },
+            json={'files': urls if isinstance(urls, list) else [urls]},
+            timeout=15
+        )
+        result = resp.json()
+        if result.get('success'):
+            print(f"[CLOUDFLARE] Cache purged for {len(urls) if isinstance(urls, list) else 1} URL(s)")
+            return True
+        else:
+            print(f"[CLOUDFLARE] Cache purge failed: {result.get('errors')}")
+            return False
+    except Exception as e:
+        print(f"[CLOUDFLARE] Cache purge error: {e}")
+        return False
+
 
 def upload_to_s3(file_data, filename, content_type='video/mp4', folder='videos'):
     """Upload a file to AWS S3 and return the public URL."""
@@ -287,7 +357,7 @@ def upload_to_s3(file_data, filename, content_type='video/mp4', folder='videos')
             url = f"https://{AWS_CLOUDFRONT_DOMAIN}/{s3_key}"
         elif STORAGE_PROVIDER == 'b2':
             # Backblaze B2 friendly URL format
-            url = f"https://f005.backblazeb2.com/file/{AWS_S3_BUCKET}/{s3_key}"
+            url = f"https://cdn.kd-evolution.com/file/{AWS_S3_BUCKET}/{s3_key}"
         else:
             url = f"https://{AWS_S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
 
@@ -1731,7 +1801,7 @@ def get_videos_by_category(category, subcategory=None):
                 for v in result.data:
                     vid_cat = v.get('category', '')
                     if vid_cat not in valid_categories or vid_cat == 'uncategorized':
-                        all_videos.append(v)
+                        all_videos.append(normalize_video_urls(v))
                 last_id = result.data[-1]['id']
                 if len(result.data) < batch_size:
                     break
@@ -1748,7 +1818,7 @@ def get_videos_by_category(category, subcategory=None):
             result = query.execute()
             if not result.data:
                 break
-            all_videos.extend(result.data)
+            all_videos.extend(normalize_video_urls(v) for v in result.data)
             last_id = result.data[-1]['id']
             if len(result.data) < batch_size:
                 break
@@ -1773,19 +1843,19 @@ def get_videos_by_category(category, subcategory=None):
                 'SELECT * FROM videos WHERE category = ? ORDER BY created_at DESC',
                 (category,)
             )
-        return [dict(row) for row in cursor.fetchall()]
+        return [normalize_video_urls(dict(row)) for row in cursor.fetchall()]
 
 
 def get_video(video_id):
     """Get a single video by ID."""
     if USE_SUPABASE:
         result = supabase.table('videos').select('*').eq('id', video_id).execute()
-        return result.data[0] if result.data else None
+        return normalize_video_urls(result.data[0]) if result.data else None
     else:
         db = get_sqlite_db()
         cursor = db.execute('SELECT * FROM videos WHERE id = ?', (video_id,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        return normalize_video_urls(dict(row)) if row else None
 
 
 def find_duplicate_video(title, duration, url=None):
@@ -3991,8 +4061,13 @@ def category(cat_id):
     cat = CATEGORIES[cat_id]
     subcategory = request.args.get('sub')
     current_event = request.args.get('event')
+    filter_untrimmed = request.args.get('untrimmed') == '1'
 
     videos = get_videos_by_category(cat_id, subcategory)
+
+    # Filter to only untrimmed videos if requested
+    if filter_untrimmed:
+        videos = [v for v in videos if not v.get('trimmed')]
 
     # Judges only see their assigned videos
     if is_judge_only() and username:
@@ -4062,7 +4137,8 @@ def category(cat_id):
                          all_categories=CATEGORIES,
                          events=events,
                          duplicate_events=duplicate_events,
-                         sub_id=subcategory)
+                         sub_id=subcategory,
+                         filter_untrimmed=filter_untrimmed)
 
 
 @app.route('/video/<video_id>')
@@ -6041,7 +6117,7 @@ def get_presigned_upload_url():
     if AWS_CLOUDFRONT_DOMAIN:
         final_url = f"https://{AWS_CLOUDFRONT_DOMAIN}/{s3_key}"
     elif STORAGE_PROVIDER == 'b2':
-        final_url = f"https://f005.backblazeb2.com/file/{AWS_S3_BUCKET}/{s3_key}"
+        final_url = f"https://cdn.kd-evolution.com/file/{AWS_S3_BUCKET}/{s3_key}"
     else:
         final_url = f"https://{AWS_S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
 
@@ -8723,7 +8799,8 @@ def pcloud_stream(pcloud_path):
 
 @app.route('/api/video/<video_id>/set-start-time', methods=['POST'])
 def set_video_start_time(video_id):
-    """Set the start time for a video (videographer/judge access)."""
+    """Set the start time for a video. When start_time > 0, trims the video file on B2."""
+    import tempfile
     data = request.json
 
     video = get_video(video_id)
@@ -8734,21 +8811,118 @@ def set_video_start_time(video_id):
     if start_time < 0:
         start_time = 0
 
-    # Update start_time directly in database
-    if USE_SUPABASE:
+    # If start_time > 0, trim the actual video file
+    if start_time > 0 and USE_S3 and s3_client:
+        video_url = video.get('url', '')
+        if not video_url:
+            return jsonify({'error': 'Video has no URL'}), 400
+
+        s3_key = get_b2_key_from_url(video_url)
+        if not s3_key:
+            return jsonify({'error': 'Could not extract B2 key from video URL'}), 400
+
+        tmp_input = None
+        tmp_output = None
         try:
-            supabase.table('videos').update({'start_time': start_time}).eq('id', video_id).execute()
+            # Download video to temp file
+            tmp_input = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+            tmp_input.close()
+            print(f"[TRIM] Downloading {video_url} for trim at {start_time}s...")
+            urllib.request.urlretrieve(video_url, tmp_input.name)
+            original_size = os.path.getsize(tmp_input.name)
+
+            # FFmpeg trim (stream copy, no re-encode)
+            tmp_output = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+            tmp_output.close()
+            ffmpeg = get_ffmpeg_path()
+            cmd = [
+                ffmpeg, '-y',
+                '-ss', str(start_time),
+                '-i', tmp_input.name,
+                '-c', 'copy',
+                '-movflags', '+faststart',
+                tmp_output.name
+            ]
+            result = subprocess.run(cmd, capture_output=True, timeout=120)
+            if result.returncode != 0:
+                stderr = result.stderr.decode()[-500:]
+                return jsonify({'error': f'FFmpeg trim failed: {stderr}'}), 500
+
+            trimmed_size = os.path.getsize(tmp_output.name)
+            if trimmed_size < 1000:
+                return jsonify({'error': 'Trimmed file too small, something went wrong'}), 500
+
+            # Re-upload to same B2 key
+            print(f"[TRIM] Uploading trimmed file ({trimmed_size} bytes) to {s3_key}...")
+            upload_to_s3_key(tmp_output.name, s3_key)
+
+            # Purge CDN cache
+            purge_cloudflare_cache(video_url)
+
+            # Update start_time to 0 and mark as trimmed
+            saved_bytes = original_size - trimmed_size
+            if USE_SUPABASE:
+                supabase.table('videos').update({'start_time': 0, 'trimmed': True}).eq('id', video_id).execute()
+            else:
+                db = get_sqlite_db()
+                db.execute('UPDATE videos SET start_time = ?, trimmed = 1 WHERE id = ?', (0, video_id))
+                db.commit()
+
+            print(f"[TRIM] Done! Saved {saved_bytes} bytes ({saved_bytes / 1024 / 1024:.1f} MB)")
+            return jsonify({
+                'success': True,
+                'trimmed': True,
+                'message': f'Video trimmed! Saved {saved_bytes / 1024 / 1024:.1f} MB',
+                'start_time': 0,
+                'original_size': original_size,
+                'trimmed_size': trimmed_size,
+                'saved_bytes': saved_bytes
+            })
+        except subprocess.TimeoutExpired:
+            return jsonify({'error': 'FFmpeg trim timed out'}), 500
         except Exception as e:
-            error_msg = str(e)
-            if 'start_time' in error_msg and 'column' in error_msg:
-                return jsonify({'error': 'Please add start_time column (type: float8) to your Supabase videos table'}), 400
-            raise
+            print(f"[TRIM] Error: {e}")
+            return jsonify({'error': f'Trim failed: {str(e)}'}), 500
+        finally:
+            for f in [tmp_input, tmp_output]:
+                if f:
+                    try:
+                        os.unlink(f.name)
+                    except:
+                        pass
+    else:
+        # start_time == 0: just save it (clear start time)
+        if USE_SUPABASE:
+            try:
+                supabase.table('videos').update({'start_time': start_time}).eq('id', video_id).execute()
+            except Exception as e:
+                error_msg = str(e)
+                if 'start_time' in error_msg and 'column' in error_msg:
+                    return jsonify({'error': 'Please add start_time column (type: float8) to your Supabase videos table'}), 400
+                raise
+        else:
+            db = get_sqlite_db()
+            db.execute('UPDATE videos SET start_time = ? WHERE id = ?', (start_time, video_id))
+            db.commit()
+
+        return jsonify({'success': True, 'message': 'Start time saved', 'start_time': start_time})
+
+
+@app.route('/api/video/<video_id>/mark-trimmed', methods=['POST'])
+def mark_video_trimmed(video_id):
+    """Mark a video as trimmed without actually trimming it."""
+    video = get_video(video_id)
+    if not video:
+        return jsonify({'error': 'Video not found'}), 404
+
+    if USE_SUPABASE:
+        supabase.table('videos').update({'trimmed': True}).eq('id', video_id).execute()
     else:
         db = get_sqlite_db()
-        db.execute('UPDATE videos SET start_time = ? WHERE id = ?', (start_time, video_id))
+        db.execute('UPDATE videos SET trimmed = 1 WHERE id = ?', (video_id,))
         db.commit()
 
-    return jsonify({'success': True, 'message': 'Start time saved', 'start_time': start_time})
+    return jsonify({'success': True, 'message': 'Marked as trimmed'})
 
 
 @app.route('/api/video/<video_id>/capture-frame')
@@ -13243,11 +13417,12 @@ def create_ws_scoring_room():
     if video_id:
         video = get_video(video_id)
         if video:
-            if video.get('video_type') == 'pcloud' and video.get('local_file'):
-                video['video_src'] = f'/pcloud/stream/{video["local_file"]}'
-                video['is_direct_url'] = True
-            elif video.get('url') and is_direct_video_url(video.get('url', '')):
+            # Prefer direct URL (B2/CDN) over server proxy for better performance
+            if video.get('url') and is_direct_video_url(video.get('url', '')):
                 video['video_src'] = video['url']
+                video['is_direct_url'] = True
+            elif video.get('video_type') == 'pcloud' and video.get('local_file'):
+                video['video_src'] = f'/pcloud/stream/{video["local_file"]}'
                 video['is_direct_url'] = True
             elif video.get('video_type') == 'local' and video.get('local_file'):
                 video['video_src'] = f'/static/videos/{video["local_file"]}'
@@ -13619,6 +13794,9 @@ if SOCKETIO_ENABLED:
             except Exception as e:
                 print(f"[REDIS] Error checking room {code}: {e}")
         return code in _ws_rooms_memory
+
+    # Track sid -> (room_code, judge_num) for disconnect handling
+    _ws_sid_map = {}
 
     # --- Initialize rooms ---
     _ws_rooms_memory = _load_ws_rooms()
@@ -14016,6 +14194,7 @@ if SOCKETIO_ENABLED:
             'confirmed': was_confirmed,
         }
         join_room(room_code)
+        _ws_sid_map[request.sid] = (room_code, judge_num)
         _set_ws_room(room_code, room)
 
         # Build video info for the joining judge
@@ -14055,6 +14234,7 @@ if SOCKETIO_ENABLED:
             'judges': {k: {'name': v['name'], 'connected': v.get('connected', False), 'confirmed': v.get('confirmed', False)} for k, v in room['judges'].items()},
             'state': room['state'],
             'scores': room['scores'],
+            'panel_size': room.get('panel_size', 5),
             'completion': _ws_scoring_completion(room)
         }, room=room_code)
 
@@ -14068,14 +14248,11 @@ if SOCKETIO_ENABLED:
             emit('ws_scoring_error', {'message': 'Room not found'})
             return
 
-        # Clear stale connection states (e.g. after server restart)
-        for j in room.get('judges', {}):
-            room['judges'][j]['connected'] = False
-            room['judges'][j]['confirmed'] = False
-        room['scores'] = {j: {} for j in range(1, room.get('panel_size', 5) + 1)}
-        _set_ws_room(room_code, room)
+        # Don't clear judge connections — trust current state from Redis.
+        # The disconnect handler marks judges offline when their socket actually drops.
 
         join_room(room_code)
+        _ws_sid_map[request.sid] = (room_code, 0)  # 0 = event judge
 
         emit('ws_scoring_room_update', {
             'judges': {k: {'name': v['name'], 'connected': v.get('connected', False), 'confirmed': v.get('confirmed', False)} for k, v in room.get('judges', {}).items()},
@@ -14085,6 +14262,9 @@ if SOCKETIO_ENABLED:
             'panel_size': room.get('panel_size', 5),
             'completion': _ws_scoring_completion(room)
         })
+
+        # Ask all judges in the room to re-announce themselves
+        emit('ws_scoring_roll_call', {'room_code': room_code}, room=room_code, include_self=False)
 
     def _ws_scoring_completion(room):
         """Compute per-judge completion status for a scoring room."""
@@ -14419,6 +14599,56 @@ if SOCKETIO_ENABLED:
             'state': room['state'],
             'scores': room['scores']
         }, room=room_code)
+
+    @socketio.on('ws_scoring_reconnect_judge')
+    def on_ws_scoring_reconnect_judge(data):
+        """Event judge forces a judge slot back to connected (clears stale disconnect)."""
+        room_code = data.get('room_code')
+        judge_num = int(data.get('judge_num', 0))
+
+        room = _get_ws_room(room_code)
+        if not room or judge_num not in room.get('judges', {}):
+            return
+
+        room['judges'][judge_num]['connected'] = True
+        _set_ws_room(room_code, room)
+
+        emit('ws_scoring_room_update', {
+            'judges': {k: {'name': v['name'], 'connected': v.get('connected', False), 'confirmed': v.get('confirmed', False)} for k, v in room.get('judges', {}).items()},
+            'state': room['state'],
+            'scores': room['scores'],
+            'panel_size': room.get('panel_size', 5),
+            'completion': _ws_scoring_completion(room)
+        }, room=room_code)
+
+    @socketio.on('disconnect')
+    def on_ws_scoring_disconnect():
+        """Handle socket disconnect — mark judge as disconnected."""
+        sid = request.sid
+        mapping = _ws_sid_map.pop(sid, None)
+        if not mapping:
+            return
+        room_code, judge_num = mapping
+        if judge_num == 0:
+            return  # Event judge disconnect, no judge status to update
+
+        room = _get_ws_room(room_code)
+        if not room:
+            return
+
+        if judge_num in room.get('judges', {}):
+            # Only mark disconnected if this sid is still the current one
+            if room['judges'][judge_num].get('sid') == sid:
+                room['judges'][judge_num]['connected'] = False
+                _set_ws_room(room_code, room)
+
+                emit('ws_scoring_room_update', {
+                    'judges': {k: {'name': v['name'], 'connected': v.get('connected', False), 'confirmed': v.get('confirmed', False)} for k, v in room.get('judges', {}).items()},
+                    'state': room['state'],
+                    'scores': room['scores'],
+                    'panel_size': room.get('panel_size', 5),
+                    'completion': _ws_scoring_completion(room)
+                }, room=room_code)
 
     # Video sync events — event judge broadcasts play/pause/seek to judges
     @socketio.on('ws_scoring_video_play')

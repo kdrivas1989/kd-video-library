@@ -224,6 +224,9 @@
                             <button onclick="clearStartTime()" class="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs">
                                 Clear
                             </button>
+                            <button onclick="markAsTrimmed()" class="px-2 py-1 rounded bg-purple-600 hover:bg-purple-700 text-xs" title="Mark as trimmed without trimming the file">
+                                Mark Trimmed
+                            </button>
                             <span id="startTimeSaveStatus" class="text-xs text-gray-500"></span>
                             <span id="timerDisplay" class="text-xl font-mono font-bold text-gray-400 ml-2">--:--</span>
                             <span id="timerStatus" class="text-sm text-gray-500"></span>
@@ -2190,24 +2193,80 @@
             saveStartTime(0);
         }
 
-        function saveStartTime(time) {
+        function markAsTrimmed() {
             const statusEl = document.getElementById('startTimeSaveStatus');
-            statusEl.textContent = 'Saving...';
+            statusEl.textContent = 'Marking...';
             statusEl.classList.remove('text-green-400', 'text-red-400');
             statusEl.classList.add('text-gray-500');
 
-            fetch(`/api/video/${videoId}/set-start-time`, {
+            fetch(`/api/video/${videoId}/mark-trimmed`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ start_time: time })
+                headers: { 'Content-Type': 'application/json' }
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    statusEl.textContent = 'Saved!';
+                    statusEl.textContent = 'Marked as trimmed!';
                     statusEl.classList.remove('text-gray-500');
                     statusEl.classList.add('text-green-400');
                     setTimeout(() => { statusEl.textContent = ''; }, 2000);
+                } else {
+                    statusEl.textContent = 'Error: ' + (data.error || 'Failed');
+                    statusEl.classList.remove('text-gray-500');
+                    statusEl.classList.add('text-red-400');
+                }
+            })
+            .catch(err => {
+                statusEl.textContent = 'Error';
+                statusEl.classList.remove('text-gray-500');
+                statusEl.classList.add('text-red-400');
+            });
+        }
+
+        function saveStartTime(time) {
+            const statusEl = document.getElementById('startTimeSaveStatus');
+            const isTrimming = time > 0;
+
+            if (isTrimming) {
+                statusEl.innerHTML = '<span class="animate-pulse">Trimming video...</span>';
+            } else {
+                statusEl.textContent = 'Saving...';
+            }
+            statusEl.classList.remove('text-green-400', 'text-red-400');
+            statusEl.classList.add('text-gray-500');
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+            fetch(`/api/video/${videoId}/set-start-time`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start_time: time }),
+                signal: controller.signal
+            })
+            .then(response => response.json())
+            .then(data => {
+                clearTimeout(timeoutId);
+                if (data.success) {
+                    if (data.trimmed) {
+                        statusEl.textContent = data.message || 'Trimmed!';
+                        videoStartTime = 0;
+                        document.getElementById('startTimeDisplay').textContent = '0s';
+                        // Reload video with cache-busted URL
+                        if (video) {
+                            const src = video.querySelector('source') || video;
+                            const currentSrc = src.src || video.src;
+                            const bustUrl = currentSrc.split('?')[0] + '?t=' + Date.now();
+                            if (src.src) src.src = bustUrl;
+                            else video.src = bustUrl;
+                            video.load();
+                        }
+                    } else {
+                        statusEl.textContent = 'Saved!';
+                    }
+                    statusEl.classList.remove('text-gray-500');
+                    statusEl.classList.add('text-green-400');
+                    setTimeout(() => { statusEl.textContent = ''; }, 3000);
                 } else {
                     statusEl.textContent = 'Error: ' + (data.error || 'Failed to save');
                     statusEl.classList.remove('text-gray-500');
@@ -2215,7 +2274,12 @@
                 }
             })
             .catch(err => {
-                statusEl.textContent = 'Error saving';
+                clearTimeout(timeoutId);
+                if (err.name === 'AbortError') {
+                    statusEl.textContent = 'Trim timed out - try again';
+                } else {
+                    statusEl.textContent = 'Error saving';
+                }
                 statusEl.classList.remove('text-gray-500');
                 statusEl.classList.add('text-red-400');
             });
@@ -2910,7 +2974,8 @@
         }
 
         function showSessionIdDialog(sessionId) {
-            // Create modal dialog to show session ID prominently
+            // Create modal dialog with shareable join link
+            const joinUrl = `${window.location.origin}/scoring/join/${sessionId}`;
             const modal = document.createElement('div');
             modal.id = 'sessionIdModal';
             modal.className = 'fixed inset-0 bg-black/80 flex items-center justify-center z-50';
@@ -2920,33 +2985,33 @@
                         <span class="text-4xl">🔗</span>
                     </div>
                     <h3 class="text-xl font-bold text-white text-center mb-2">Session Created!</h3>
-                    <p class="text-gray-300 text-center mb-4">Share this Session ID with your panel judges:</p>
+                    <p class="text-gray-300 text-center mb-4">Share this link with your panel judges:</p>
                     <div class="bg-gray-900 rounded-lg p-4 mb-4">
                         <div class="text-center">
-                            <span id="modalSessionId" class="text-2xl font-mono text-yellow-400 select-all">${sessionId}</span>
+                            <a href="${joinUrl}" target="_blank" class="text-lg font-mono text-yellow-400 hover:text-yellow-300 underline break-all">${joinUrl}</a>
                         </div>
                     </div>
                     <div class="flex gap-3 justify-center">
-                        <button onclick="copySessionIdFromModal('${sessionId}', this)" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium">
-                            Copy ID
+                        <button onclick="copySessionLink('${joinUrl}', this)" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium">
+                            Copy Link
                         </button>
                         <button onclick="document.getElementById('sessionIdModal').remove()" class="px-6 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg font-medium">
                             Close
                         </button>
                     </div>
-                    <p class="text-gray-500 text-xs text-center mt-4">Panel judges enter this ID to join the scoring session</p>
+                    <p class="text-gray-500 text-xs text-center mt-4">Judges can click this link to join the scoring session</p>
                 </div>
             `;
             document.body.appendChild(modal);
         }
 
-        function copySessionIdFromModal(sessionId, btn) {
-            navigator.clipboard.writeText(sessionId).then(() => {
+        function copySessionLink(url, btn) {
+            navigator.clipboard.writeText(url).then(() => {
                 btn.textContent = 'Copied!';
                 btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
                 btn.classList.add('bg-green-600');
                 setTimeout(() => {
-                    btn.textContent = 'Copy ID';
+                    btn.textContent = 'Copy Link';
                     btn.classList.remove('bg-green-600');
                     btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
                 }, 2000);

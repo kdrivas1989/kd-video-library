@@ -39,7 +39,7 @@
             <div id="videoWrapper" style="max-width: 100%;">
             {% if video %}
             {% if video.is_direct_url %}
-            <video id="judgeScoringVideo" class="w-full rounded-lg" preload="auto"
+            <video id="judgeScoringVideo" class="w-full rounded-lg" preload="metadata"
                 controlsList="noplaybackrate nodownload">
                 {% if '.webm' in video.video_src|lower %}
                 <source src="{{ video.video_src }}" type="video/webm">
@@ -232,7 +232,7 @@
                         </select>
                     </div>
                 </div>
-                <div id="ejJudgeCards" class="space-y-3"></div>
+                <div id="ejJudgeCards" class="flex flex-wrap gap-2"></div>
             </div>
             <button onclick="resetScoresEJ()" class="w-full py-3 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm text-gray-300 mt-2">
                 Reset All Scores
@@ -458,7 +458,7 @@
                     const container = document.getElementById('videoContainer');
                     if (container) {
                         if (data.video.is_direct_url && data.video.video_src) {
-                            container.innerHTML = '<video id="judgeScoringVideo" class="w-full rounded-lg" preload="auto" controlsList="noplaybackrate nodownload"><source src="' + data.video.video_src + '" type="video/mp4"></video>';
+                            container.innerHTML = '<video id="judgeScoringVideo" class="w-full rounded-lg" preload="metadata" controlsList="noplaybackrate nodownload"><source src="' + data.video.video_src + '" type="video/mp4"></video>';
                         } else if (data.video.embed_url) {
                             container.innerHTML = '<iframe id="judgeScoringEmbed" src="' + data.video.embed_url + '" class="w-full aspect-video rounded-lg" frameborder="0" allowfullscreen></iframe>';
                         }
@@ -507,6 +507,17 @@
                 if (sel) sel.value = String(currentPanelSize);
                 if (isEventJudge) {
                     renderEJCards();
+                }
+            });
+
+            // Event judge requested all judges to re-announce
+            socket.on('ws_scoring_roll_call', (data) => {
+                if (!isEventJudge && myJudgeNum && myName) {
+                    socket.emit('ws_scoring_join', {
+                        room_code: roomCode,
+                        judge_num: myJudgeNum,
+                        judge_name: myName
+                    });
                 }
             });
 
@@ -593,12 +604,12 @@
 
             // Event judge attached a new video
             socket.on('ws_scoring_video_attached', (data) => {
-                const container = document.getElementById('videoContainer');
-                if (!container) return;
+                const wrapper = document.getElementById('videoWrapper');
+                if (!wrapper) return;
                 if (data.is_direct_url && data.video_src) {
-                    container.innerHTML = '<video id="judgeScoringVideo" class="w-full rounded-lg" preload="auto" controlsList="noplaybackrate nodownload"><source src="' + data.video_src + '" type="video/mp4"></video>';
+                    wrapper.innerHTML = '<video id="judgeScoringVideo" class="w-full rounded-lg" preload="metadata" controlsList="noplaybackrate nodownload"><source src="' + data.video_src + '" type="video/mp4"></video>';
                 } else if (data.embed_url) {
-                    container.innerHTML = '<iframe id="judgeScoringEmbed" src="' + data.embed_url + '" class="w-full aspect-video rounded-lg" frameborder="0" allowfullscreen></iframe>';
+                    wrapper.innerHTML = '<iframe id="judgeScoringEmbed" src="' + data.embed_url + '" class="w-full aspect-video rounded-lg" frameborder="0" allowfullscreen></iframe>';
                 }
                 addStatus('Video loaded by event judge', 'info');
             });
@@ -814,6 +825,10 @@
             renderEJCards();
         }
 
+        function reconnectJudge(judgeNum) {
+            socket.emit('ws_scoring_reconnect_judge', { room_code: roomCode, judge_num: judgeNum });
+        }
+
         function resetScoresEJ() {
             if (!socket || !isEventJudge) return;
             if (!confirm('Reset ALL scores? This cannot be undone.')) return;
@@ -831,33 +846,47 @@
                 const judge = allJudges[jStr];
                 const scores = allScores[jStr] || allScores[j] || {};
 
-                let statusText = 'Empty', statusColor = 'text-gray-500', borderColor = 'border-gray-700';
+                let dotColor = 'bg-gray-500';
                 if (judge) {
-                    if (judge.confirmed) {
-                        statusText = 'Confirmed'; statusColor = 'text-green-400'; borderColor = 'border-green-600';
-                    } else if (judge.connected) {
-                        statusText = 'Connected'; statusColor = 'text-blue-400'; borderColor = 'border-blue-600';
-                    } else {
-                        statusText = 'Disconnected'; statusColor = 'text-red-400'; borderColor = 'border-red-600';
-                    }
+                    if (judge.confirmed) dotColor = 'bg-green-500';
+                    else if (judge.connected) dotColor = 'bg-blue-500';
+                    else dotColor = 'bg-red-500';
                 }
 
                 let scoresHtml = '';
                 if (judge && judge.confirmed) {
+                    const vals = [];
                     for (const [field, range] of Object.entries(fields)) {
                         const val = scores[field];
-                        const label = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                        scoresHtml += '<div class="flex justify-between text-sm"><span class="text-gray-400">' + label + '</span><span class="font-mono font-bold text-white">' + (val !== undefined && val !== null ? val : '-') + '</span></div>';
+                        vals.push('<span class="font-mono font-bold text-white">' + (val !== undefined && val !== null ? val : '-') + '</span>');
                     }
+                    scoresHtml = vals.join('<span class="text-gray-600 mx-1">|</span>');
                 }
 
-                container.innerHTML += '<div class="bg-gray-700/50 rounded-lg p-3 border-l-4 ' + borderColor + '">' +
-                    '<div class="flex items-center justify-between mb-1">' +
-                    '<span class="font-bold text-white">J' + j + '</span>' +
-                    '<span class="' + statusColor + ' text-xs">' + statusText + '</span>' +
-                    '</div>' +
-                    '<p class="text-sm text-gray-400 mb-1">' + (judge ? judge.name : '—') + '</p>' +
-                    (scoresHtml ? '<div class="space-y-1 mt-2">' + scoresHtml + '</div>' : '') +
+                let reconnectBtn = '';
+                if (judge && !judge.connected && !judge.confirmed) {
+                    reconnectBtn = '<button onclick="reconnectJudge(' + j + ')" class="ml-1 px-1.5 py-0.5 text-xs bg-blue-600 hover:bg-blue-700 rounded text-white">↻</button>';
+                }
+
+                const name = judge ? judge.name : 'Empty';
+                const status = judge ? (judge.confirmed ? '' : (judge.connected ? 'connected' : 'offline')) : '';
+
+                // Show single combined score for confirmed judges
+                let scoreDisplay = '';
+                if (judge && judge.confirmed) {
+                    const vals = [];
+                    for (const [field, range] of Object.entries(fields)) {
+                        const val = scores[field];
+                        if (val !== undefined && val !== null) vals.push(val);
+                    }
+                    scoreDisplay = '<span class="font-mono font-bold text-white text-sm">' + vals.join(', ') + '</span>';
+                }
+
+                container.innerHTML += '<div class="flex items-center gap-1.5 py-1 px-2 rounded bg-gray-700/50">' +
+                    '<span class="w-2 h-2 rounded-full shrink-0 ' + dotColor + '"></span>' +
+                    '<span class="font-bold text-white text-sm">' + name + '</span>' +
+                    (scoreDisplay || '<span class="text-gray-500 text-xs">' + status + '</span>') +
+                    reconnectBtn +
                     '</div>';
             }
         }
