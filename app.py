@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """Video Library - Video database for skydiving disciplines."""
 
+# Gevent monkey-patch for production (Redis + gevent requires this)
+try:
+    from gevent import monkey
+    monkey.patch_all()
+except ImportError:
+    pass
+
 # Load environment variables from .env file (for local development)
 from dotenv import load_dotenv
 load_dotenv()

@@ -1,0 +1,2 @@
+[deploy]
+startCommand = "gunicorn -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker -w 2 --timeout 120 app:app"
