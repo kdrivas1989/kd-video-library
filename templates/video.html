@@ -210,7 +210,8 @@
                     </iframe>
                     {% endif %}
                 </div>
-                <!-- Scoring Timeline (directly below video) -->
+                <!-- Scoring Timeline (directly below video) - hidden for CP Freestyle -->
+                <div id="xcqScoringSection">
                 <div class="bg-gray-900 rounded-lg p-3 mt-1 min-h-[40px] font-mono text-xl tracking-widest" id="scoringTimeline">
                     <span class="text-gray-500">Press X, C, or Q to score...</span>
                 </div>
@@ -227,6 +228,7 @@
                         <span id="scoreComparison" class="text-cyan-400 text-sm hidden"></span>
                     </div>
                 </div>
+                </div> <!-- end xcqScoringSection -->
                 </div> <!-- end video flex:1 wrapper -->
                 <!-- Right Controls -->
                 <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
@@ -4364,6 +4366,10 @@
             document.getElementById('cpFreestyleSection').classList.add('hidden');
             document.getElementById('cpJudgeModeRow').classList.add('hidden');
 
+            // Hide x/c/q scoring for CP Freestyle
+            const xcqSection = document.getElementById('xcqScoringSection');
+            if (xcqSection) xcqSection.classList.toggle('hidden', isCpFreestyle);
+
             if (isCpFreestyle) {
                 document.getElementById('durationLabel').textContent = 'CP Freestyle';
                 document.getElementById('cpFreestyleSection').classList.remove('hidden');
@@ -6795,6 +6801,8 @@
                 document.getElementById('fsScoringControls').classList.add('hidden');
                 document.getElementById('formationsSection').classList.add('hidden');
                 document.getElementById('multiJudgePanel').classList.add('hidden');
+                const xcqS = document.getElementById('xcqScoringSection');
+                if (xcqS) xcqS.classList.add('hidden');
                 // Auto-select cp-freestyle in dropdown if not already
                 const select = document.getElementById('eventType');
                 if (select.value !== 'cp-freestyle') {
