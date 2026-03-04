@@ -144,6 +144,13 @@
                         <span style="font-size:10px;color:#9ca3af;">Start:</span>
                         <span id="startTimeDisplay" class="font-mono text-cyan-400" style="font-size:11px;">{{ video.start_time|default(0, true) }}s</span>
                     </div>
+                    <div style="margin-top:4px;text-align:center;">
+                        <span id="timerDisplay" class="font-mono font-bold text-gray-400" style="font-size:14px;">--:--</span>
+                        <span id="timerStatus" style="font-size:10px;color:#6b7280;display:block;"></span>
+                        <span id="flysightTimeCompare" class="hidden" style="font-size:10px;color:#6b7280;display:block;">
+                            FlySight: <span id="flysightTimeDisplay" class="text-cyan-400 font-mono">--.-s</span>
+                        </span>
+                    </div>
                 </div>
                 <!-- Video Player -->
                 <div style="flex:1;min-width:0;">
@@ -257,13 +264,7 @@
                             <span class="text-gray-400 text-sm">Frame:</span>
                             <button onclick="stepFrame(-1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Previous frame (,)">&lt;</button>
                             <button onclick="stepFrame(1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Next frame (.)">></button>
-                            <span class="text-gray-600 mx-2">|</span>
                             <span id="startTimeSaveStatus" class="text-xs text-gray-500"></span>
-                            <span id="timerDisplay" class="text-xl font-mono font-bold text-gray-400">--:--</span>
-                            <span id="timerStatus" class="text-sm text-gray-500"></span>
-                            <span id="flysightTimeCompare" class="text-sm text-gray-500 hidden ml-2">
-                                / FlySight: <span id="flysightTimeDisplay" class="text-cyan-400 font-mono">--.-s</span>
-                            </span>
                         </div>
                     </div>
 
