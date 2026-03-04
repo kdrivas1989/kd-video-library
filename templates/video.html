@@ -4146,17 +4146,17 @@
                         } else if (searchText.includes('4way') || searchText.includes('4-way') || searchText.includes('seq')) {
                             eventType = '4way-cf-seq';
                         }
-                    } else if (category === 'fs') {
-                        // FS: Check for VFS, MFS, 8way, etc
+                    } else if (category === 'fs' || category === 'indoor') {
+                        // FS/Indoor: Check for VFS, MFS, 8way, etc
                         if (searchText.includes('vfs') || searchText.includes('vertical')) {
                             eventType = '4way-vfs';
                         } else if (searchText.includes('mfs') || searchText.includes('2way') || searchText.includes('2-way')) {
                             eventType = '2way-mfs';
-                        } else if (searchText.includes('8way') || searchText.includes('8-way')) {
+                        } else if (searchText.includes('8way') || searchText.includes('8-way') || searchText.includes('8 way')) {
                             eventType = '8way';
-                        } else if (searchText.includes('16way') || searchText.includes('16-way')) {
+                        } else if (searchText.includes('16way') || searchText.includes('16-way') || searchText.includes('16 way')) {
                             eventType = '16way';
-                        } else if (searchText.includes('10way') || searchText.includes('10-way') || searchText.includes('speed')) {
+                        } else if (searchText.includes('10way') || searchText.includes('10-way') || searchText.includes('10 way') || searchText.includes('speed')) {
                             eventType = '10way';
                         }
                     } else if (category === 'ae') {
