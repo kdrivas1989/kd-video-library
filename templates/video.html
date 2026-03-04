@@ -231,20 +231,31 @@
                                 class="px-3 py-1 text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">Free</button>
                         </div>
                     </div>
-                    <div class="flex items-center flex-wrap gap-2">
-                        <span class="text-gray-400 text-sm">Frame:</span>
-                        <button onclick="stepFrame(-1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Previous frame (,)">&lt;</button>
-                        <button onclick="stepFrame(1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Next frame (.)">></button>
-                        <span class="text-gray-600 mx-2">|</span>
-                        <span class="text-gray-400 text-sm">Video Start:</span>
-                        <span id="startTimeDisplay" class="font-mono text-cyan-400">{{ video.start_time|default(0, true) }}s</span>
-                        <span id="startTimeSaveStatus" class="text-xs text-gray-500"></span>
-                        <span class="text-gray-600 mx-2">|</span>
-                        <span id="timerDisplay" class="text-xl font-mono font-bold text-gray-400">--:--</span>
-                        <span id="timerStatus" class="text-sm text-gray-500"></span>
-                        <span id="flysightTimeCompare" class="text-sm text-gray-500 hidden ml-2">
-                            / FlySight: <span id="flysightTimeDisplay" class="text-cyan-400 font-mono">--.-s</span>
-                        </span>
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-gray-400 text-sm">Frame:</span>
+                            <button onclick="stepFrame(-1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Previous frame (,)">&lt;</button>
+                            <button onclick="stepFrame(1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Next frame (.)">></button>
+                            <span class="text-gray-600 mx-2">|</span>
+                            <span class="text-gray-400 text-sm">Video Start:</span>
+                            <span id="startTimeDisplay" class="font-mono text-cyan-400">{{ video.start_time|default(0, true) }}s</span>
+                            <span id="startTimeSaveStatus" class="text-xs text-gray-500"></span>
+                            <span class="text-gray-600 mx-2">|</span>
+                            <span id="timerDisplay" class="text-xl font-mono font-bold text-gray-400">--:--</span>
+                            <span id="timerStatus" class="text-sm text-gray-500"></span>
+                            <span id="flysightTimeCompare" class="text-sm text-gray-500 hidden ml-2">
+                                / FlySight: <span id="flysightTimeDisplay" class="text-cyan-400 font-mono">--.-s</span>
+                            </span>
+                            <span class="text-gray-600 mx-2">|</span>
+                            <span class="text-gray-400 text-sm">Points (X): <span id="xCount2" class="text-green-400 font-bold">0</span></span>
+                            <span class="text-gray-400 text-sm">Busts (C): <span id="cCount2" class="text-red-400 font-bold">0</span></span>
+                            <span class="text-gray-400 text-sm">Omissions (Q): <span id="qCount2" class="text-orange-400 font-bold">0</span></span>
+                        </div>
+                        <div class="flex items-center gap-2 text-lg">
+                            <span id="nvIndicator2" class="text-red-500 font-bold hidden">NV</span>
+                            <span class="text-gray-400">Total:</span>
+                            <span id="totalScore2" class="text-yellow-400 font-bold">0</span>
+                        </div>
                     </div>
 
                     <!-- Confirm Score Button (appears after replay) -->
@@ -3463,6 +3474,18 @@
             const total = nvPenalty ? 0 : calculatedTotal;
             document.getElementById('totalScore').textContent = total;
 
+            // Mirror to top scoring bar
+            const xc2 = document.getElementById('xCount2');
+            if (xc2) xc2.textContent = xCount;
+            const cc2 = document.getElementById('cCount2');
+            if (cc2) cc2.textContent = cCount;
+            const qc2 = document.getElementById('qCount2');
+            if (qc2) qc2.textContent = qCount;
+            const ts2 = document.getElementById('totalScore2');
+            if (ts2) ts2.textContent = total;
+            const nv2 = document.getElementById('nvIndicator2');
+            if (nv2) { nvPenalty ? nv2.classList.remove('hidden') : nv2.classList.add('hidden'); }
+
             // Color the total based on value
             const totalEl = document.getElementById('totalScore');
             totalEl.classList.remove('text-yellow-400', 'text-green-400', 'text-red-400');
@@ -3474,6 +3497,11 @@
                 totalEl.classList.add('text-red-400');
             } else {
                 totalEl.classList.add('text-yellow-400');
+            }
+            // Mirror color to top bar total
+            if (ts2) {
+                ts2.classList.remove('text-yellow-400', 'text-green-400', 'text-red-400');
+                ts2.classList.add(totalEl.classList.contains('text-green-400') ? 'text-green-400' : totalEl.classList.contains('text-red-400') ? 'text-red-400' : 'text-yellow-400');
             }
 
             // Update score comparison with max points
