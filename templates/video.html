@@ -147,7 +147,7 @@
                     <div style="margin-top:4px;text-align:center;">
                         <span id="timerDisplay" class="font-mono font-bold text-gray-400" style="font-size:14px;">--:--</span>
                         <span id="timerStatus" style="font-size:10px;color:#6b7280;display:block;"></span>
-                        <span id="flysightTimeCompare" class="hidden" style="font-size:10px;color:#6b7280;display:block;">
+                        <span id="flysightTimeCompare" class="hidden" style="font-size:10px;color:#6b7280;">
                             FlySight: <span id="flysightTimeDisplay" class="text-cyan-400 font-mono">--.-s</span>
                         </span>
                     </div>
@@ -3665,6 +3665,7 @@
                 // Recalculate majority for this position
                 scoringTypes[position] = getMajorityVote(panelVotes[position]);
                 recalculatePanelCounts();
+                updateScoringDisplay();
             } else {
                 // Solo mode or majority row: cycle the final score
                 const current = scoringTypes[position];
@@ -3674,6 +3675,23 @@
             }
 
             generateScoreSummaryTable();
+
+            // Flash the edited cell for visual feedback
+            setTimeout(() => {
+                const table = document.getElementById('scoreSummaryContent');
+                if (!table) return;
+                const rows = table.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    cells.forEach(cell => {
+                        if (cell.dataset.justEdited === 'true') {
+                            cell.style.transition = 'box-shadow 0.3s';
+                            cell.style.boxShadow = '0 0 8px rgba(250, 204, 21, 0.7)';
+                            setTimeout(() => { cell.style.boxShadow = 'none'; }, 500);
+                        }
+                    });
+                });
+            }, 10);
         }
 
         function generateScoreSummaryTable() {
