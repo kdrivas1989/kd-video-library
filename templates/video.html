@@ -140,6 +140,10 @@
                         style="padding:4px 8px;border-radius:4px;font-size:12px;white-space:nowrap;background:#2563eb;color:white;border:none;cursor:pointer;">
                         Set Current
                     </button>
+                    <div style="margin-top:2px;text-align:center;">
+                        <span style="font-size:10px;color:#9ca3af;">Start:</span>
+                        <span id="startTimeDisplay" class="font-mono text-cyan-400" style="font-size:11px;">{{ video.start_time|default(0, true) }}s</span>
+                    </div>
                 </div>
                 <!-- Video Player -->
                 <div style="flex:1;min-width:0;">
@@ -199,6 +203,23 @@
                     </iframe>
                     {% endif %}
                 </div>
+                <!-- Scoring Timeline (directly below video) -->
+                <div class="bg-gray-900 rounded-lg p-3 mt-1 min-h-[40px] font-mono text-xl tracking-widest" id="scoringTimeline">
+                    <span class="text-gray-500">Press X, C, or Q to score...</span>
+                </div>
+                <div class="flex items-center justify-between text-sm mt-1">
+                    <div class="flex items-center gap-4">
+                        <span class="text-gray-400">Points (X): <span id="xCount" class="text-green-400 font-bold">0</span></span>
+                        <span class="text-gray-400">Busts (C): <span id="cCount" class="text-red-400 font-bold">0</span></span>
+                        <span class="text-gray-400">Omissions (Q): <span id="qCount" class="text-orange-400 font-bold">0</span></span>
+                    </div>
+                    <div class="text-lg flex items-center gap-3">
+                        <span id="nvIndicator" class="text-red-500 font-bold hidden">NV PENALTY</span>
+                        <span class="text-gray-400">Total:</span>
+                        <span id="totalScore" class="text-yellow-400 font-bold ml-2">0</span>
+                        <span id="scoreComparison" class="text-cyan-400 text-sm hidden"></span>
+                    </div>
+                </div>
                 </div> <!-- end video flex:1 wrapper -->
                 <!-- Right Controls -->
                 <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
@@ -237,10 +258,7 @@
                             <button onclick="stepFrame(-1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Previous frame (,)">&lt;</button>
                             <button onclick="stepFrame(1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-sm" title="Next frame (.)">></button>
                             <span class="text-gray-600 mx-2">|</span>
-                            <span class="text-gray-400 text-sm">Video Start:</span>
-                            <span id="startTimeDisplay" class="font-mono text-cyan-400">{{ video.start_time|default(0, true) }}s</span>
                             <span id="startTimeSaveStatus" class="text-xs text-gray-500"></span>
-                            <span class="text-gray-600 mx-2">|</span>
                             <span id="timerDisplay" class="text-xl font-mono font-bold text-gray-400">--:--</span>
                             <span id="timerStatus" class="text-sm text-gray-500"></span>
                             <span id="flysightTimeCompare" class="text-sm text-gray-500 hidden ml-2">
@@ -859,22 +877,6 @@
                                 </div>
                             </div>
                             <div id="syncStatus" class="text-xs text-green-400 mt-2 hidden"></div>
-                        </div>
-                        <div class="bg-gray-900 rounded-lg p-3 mb-3 min-h-[40px] font-mono text-xl tracking-widest" id="scoringTimeline">
-                            <span class="text-gray-500">Press X, C, or Q to score...</span>
-                        </div>
-                        <div class="flex items-center justify-between text-sm">
-                            <div class="flex items-center gap-4">
-                                <span class="text-gray-400">Points (X): <span id="xCount" class="text-green-400 font-bold">0</span></span>
-                                <span class="text-gray-400">Busts (C): <span id="cCount" class="text-red-400 font-bold">0</span></span>
-                                <span class="text-gray-400">Omissions (Q): <span id="qCount" class="text-orange-400 font-bold">0</span></span>
-                            </div>
-                            <div class="text-lg flex items-center gap-3">
-                                <span id="nvIndicator" class="text-red-500 font-bold hidden">NV PENALTY</span>
-                                <span class="text-gray-400">Total:</span>
-                                <span id="totalScore" class="text-yellow-400 font-bold ml-2">0</span>
-                                <span id="scoreComparison" class="text-cyan-400 text-sm hidden"></span>
-                            </div>
                         </div>
                         <!-- Save Score Button -->
                         <div id="saveScoreSection" class="hidden mt-3 pt-3 border-t border-gray-700">
