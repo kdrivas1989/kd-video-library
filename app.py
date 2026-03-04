@@ -180,27 +180,33 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
 
-# Database support - Supabase required for all environments
-try:
-    from supabase import create_client, Client
-    SUPABASE_URL = os.environ.get('SUPABASE_URL')
-    SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
-    if SUPABASE_URL and SUPABASE_KEY:
-        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        USE_SUPABASE = True
-        print(f"[STARTUP] Supabase connected: URL={SUPABASE_URL[:30]}...")
-    else:
+# Database support - Postgres (Railway) or Supabase
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    from postgres_client import PostgresClient
+    supabase = PostgresClient(DATABASE_URL)
+    USE_SUPABASE = True
+    print(f"[STARTUP] Postgres connected: {DATABASE_URL[:40]}...")
+else:
+    try:
+        from supabase import create_client, Client
+        SUPABASE_URL = os.environ.get('SUPABASE_URL')
+        SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
+        if SUPABASE_URL and SUPABASE_KEY:
+            supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            USE_SUPABASE = True
+            print(f"[STARTUP] Supabase connected: URL={SUPABASE_URL[:30]}...")
+        else:
+            USE_SUPABASE = False
+            supabase = None
+            print(f"[STARTUP] WARNING: No database configured!")
+            print(f"[STARTUP] Set DATABASE_URL or SUPABASE_URL+SUPABASE_KEY")
+            print(f"[STARTUP] Falling back to SQLite (data will NOT sync to production)")
+    except ImportError as e:
         USE_SUPABASE = False
         supabase = None
-        print(f"[STARTUP] WARNING: Supabase NOT configured!")
-        print(f"[STARTUP] Create a .env file with SUPABASE_URL and SUPABASE_KEY")
+        print(f"[STARTUP] Supabase import failed: {e}")
         print(f"[STARTUP] Falling back to SQLite (data will NOT sync to production)")
-except ImportError as e:
-    USE_SUPABASE = False
-    supabase = None
-    print(f"[STARTUP] Supabase import failed: {e}")
-    print(f"[STARTUP] Install with: pip install supabase")
-    print(f"[STARTUP] Falling back to SQLite (data will NOT sync to production)")
 
 # Supabase Storage bucket name
 SUPABASE_BUCKET = 'videos'
@@ -1421,11 +1427,184 @@ def close_db(exception):
     db = g.pop('db', None)
     if db is not None:
         db.close()
+    # Close Postgres connection if using PostgresClient
+    pg_conn = g.pop('_pg_conn', None)
+    if pg_conn is not None and not pg_conn.closed:
+        pg_conn.close()
+
+
+def init_postgres_schema():
+    """Create tables in Postgres if they don't exist (for Railway Postgres)."""
+    if not DATABASE_URL:
+        return
+    import psycopg2
+    conn = psycopg2.connect(DATABASE_URL)
+    conn.autocommit = True
+    cur = conn.cursor()
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS videos (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            url TEXT NOT NULL,
+            thumbnail TEXT,
+            category TEXT NOT NULL,
+            subcategory TEXT,
+            tags TEXT,
+            duration TEXT,
+            created_at TEXT NOT NULL,
+            views INTEGER DEFAULT 0,
+            video_type TEXT DEFAULT 'url',
+            local_file TEXT,
+            event TEXT,
+            team TEXT,
+            round_num TEXT,
+            jump_num TEXT,
+            start_time REAL DEFAULT 0,
+            draw TEXT,
+            trimmed BOOLEAN,
+            category_auto BOOLEAN
+        )
+    ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL,
+            name TEXT NOT NULL,
+            email TEXT,
+            must_change_password INTEGER DEFAULT 0,
+            signature_pin TEXT,
+            signature_data TEXT,
+            assigned_categories TEXT
+        )
+    ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS competitions (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            event_types TEXT,
+            total_rounds INTEGER DEFAULT 10,
+            created_at TEXT NOT NULL,
+            status TEXT DEFAULT 'active',
+            event_rounds TEXT,
+            chief_judge TEXT,
+            chief_judge_pin TEXT,
+            event_locations TEXT,
+            event_dates TEXT,
+            draws TEXT,
+            ws_reference_points TEXT,
+            ws_validation_window TEXT,
+            ws_competitor_ref_points TEXT,
+            ws_field_elevation REAL,
+            score_approvals TEXT,
+            artistic_difficulty_scores TEXT
+        )
+    ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS competition_teams (
+            id TEXT PRIMARY KEY,
+            competition_id TEXT NOT NULL REFERENCES competitions(id),
+            team_number TEXT NOT NULL,
+            team_name TEXT NOT NULL,
+            class TEXT NOT NULL,
+            members TEXT,
+            category TEXT,
+            event TEXT,
+            photo TEXT,
+            created_at TEXT NOT NULL,
+            display_order INTEGER DEFAULT 0
+        )
+    ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS competition_scores (
+            id TEXT PRIMARY KEY,
+            competition_id TEXT NOT NULL REFERENCES competitions(id),
+            team_id TEXT NOT NULL REFERENCES competition_teams(id),
+            round_num INTEGER NOT NULL,
+            score REAL,
+            score_data TEXT,
+            video_id TEXT,
+            scored_by TEXT,
+            created_at TEXT NOT NULL,
+            rejump INTEGER DEFAULT 0,
+            training_flag INTEGER DEFAULT 0,
+            exit_time_penalty INTEGER DEFAULT 0
+        )
+    ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS events (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            year INTEGER,
+            disciplines TEXT,
+            location TEXT,
+            start_date TEXT,
+            end_date TEXT,
+            status TEXT DEFAULT 'active',
+            created_at TEXT,
+            created_by TEXT
+        )
+    ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS video_assignments (
+            id TEXT PRIMARY KEY,
+            video_id TEXT NOT NULL REFERENCES videos(id),
+            assigned_to TEXT NOT NULL REFERENCES users(username),
+            assigned_by TEXT NOT NULL REFERENCES users(username),
+            status TEXT DEFAULT 'pending',
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            scored_at TEXT,
+            practice_score REAL,
+            practice_score_data TEXT
+        )
+    ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS category_mappings (
+            id SERIAL PRIMARY KEY,
+            pattern TEXT UNIQUE,
+            category TEXT,
+            subcategory TEXT
+        )
+    ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS event_folders (
+            id SERIAL PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL,
+            created_at TEXT
+        )
+    ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS conversion_jobs (
+            job_id TEXT PRIMARY KEY,
+            video_id TEXT,
+            filename TEXT,
+            title TEXT,
+            status TEXT DEFAULT 'queued',
+            progress INTEGER DEFAULT 0,
+            session_id TEXT,
+            created_at TEXT,
+            completed_at TEXT,
+            error TEXT,
+            input_path TEXT,
+            output_path TEXT,
+            video_data TEXT,
+            pid INTEGER
+        )
+    ''')
+    cur.close()
+    conn.close()
+    print("[STARTUP] Postgres schema initialized")
 
 
 def init_db():
     """Initialize the database."""
     if USE_SUPABASE:
+        # Create tables if using Railway Postgres (Supabase has them pre-created)
+        if DATABASE_URL:
+            init_postgres_schema()
         try:
             result = supabase.table('users').select('username').eq('username', 'admin').execute()
             if not result.data:
@@ -1436,7 +1615,7 @@ def init_db():
                     'name': 'Administrator'
                 }).execute()
         except Exception as e:
-            print(f"Supabase init error: {e}")
+            print(f"Database init error: {e}")
     else:
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
