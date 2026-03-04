@@ -2399,12 +2399,15 @@
 
             // Update button styles
             document.querySelectorAll('.speed-btn').forEach(btn => {
-                if (parseFloat(btn.dataset.speed) === speed) {
+                const isActive = parseFloat(btn.dataset.speed) === speed;
+                if (isActive) {
                     btn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
                     btn.classList.add('bg-blue-600');
+                    btn.style.background = '#2563eb';
                 } else {
                     btn.classList.remove('bg-blue-600');
                     btn.classList.add('bg-gray-700', 'hover:bg-gray-600');
+                    btn.style.background = '#374151';
                 }
             });
         }
