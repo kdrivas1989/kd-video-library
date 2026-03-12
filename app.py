@@ -30,7 +30,6 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory, g
 from werkzeug.utils import secure_filename
 from functools import wraps
-import sqlite3
 import logging
 from logging.handlers import RotatingFileHandler
 from io import BytesIO
@@ -81,29 +80,27 @@ MAX_CONCURRENT_CONVERSIONS = 1  # Limit to prevent server overload
 def save_conversion_job(job):
     """Save conversion job to database for persistence."""
     try:
-        db = get_db()
         video_data_json = json.dumps(job.get('video_data', {})) if job.get('video_data') else None
-        db.execute('''
-            INSERT OR REPLACE INTO conversion_jobs
-            (job_id, video_id, filename, title, status, progress, session_id, created_at, completed_at, error, input_path, output_path, video_data, pid)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            job.get('job_id'),
-            job.get('video_id'),
-            job.get('filename'),
-            job.get('title'),
-            job.get('status', 'queued'),
-            job.get('progress', 0),
-            job.get('session_id'),
-            job.get('created_at'),
-            job.get('completed_at'),
-            job.get('error'),
-            job.get('input_path'),
-            job.get('output_path'),
-            video_data_json,
-            job.get('pid')
-        ))
-        db.commit()
+        data = {
+            'job_id': job.get('job_id'),
+            'video_id': job.get('video_id'),
+            'filename': job.get('filename'),
+            'title': job.get('title'),
+            'status': job.get('status', 'queued'),
+            'progress': job.get('progress', 0),
+            'session_id': job.get('session_id'),
+            'created_at': job.get('created_at'),
+            'completed_at': job.get('completed_at'),
+            'error': job.get('error'),
+            'input_path': job.get('input_path'),
+            'output_path': job.get('output_path'),
+            'video_data': video_data_json,
+            'pid': job.get('pid')
+        }
+        # Try update first, then insert if no rows updated
+        result = supabase.table('conversion_jobs').update(data).eq('job_id', data['job_id']).execute()
+        if not result.data:
+            supabase.table('conversion_jobs').insert(data).execute()
     except Exception as e:
         print(f"Error saving conversion job: {e}")
 
@@ -116,11 +113,7 @@ def update_conversion_job(job_id, **updates):
         else:
             # Job not in memory, update database directly
             try:
-                db = get_db()
-                set_clauses = ', '.join([f'{k} = ?' for k in updates.keys()])
-                values = list(updates.values()) + [job_id]
-                db.execute(f'UPDATE conversion_jobs SET {set_clauses} WHERE job_id = ?', values)
-                db.commit()
+                supabase.table('conversion_jobs').update(updates).eq('job_id', job_id).execute()
             except Exception as e:
                 print(f"Error updating conversion job: {e}")
 
@@ -131,11 +124,9 @@ def get_conversion_job(job_id):
             return conversion_jobs[job_id]
     # Try database
     try:
-        db = get_db()
-        cursor = db.execute('SELECT * FROM conversion_jobs WHERE job_id = ?', (job_id,))
-        row = cursor.fetchone()
-        if row:
-            return dict(row)
+        result = supabase.table('conversion_jobs').select('*').eq('job_id', job_id).execute()
+        if result.data:
+            return result.data[0]
     except Exception as e:
         print(f"Error getting conversion job: {e}")
     return None
@@ -143,11 +134,9 @@ def get_conversion_job(job_id):
 def load_active_conversions():
     """Load incomplete conversions from database on startup."""
     try:
-        db = get_db()
-        cursor = db.execute("SELECT * FROM conversion_jobs WHERE status NOT IN ('completed', 'failed')")
-        rows = cursor.fetchall()
-        for row in rows:
-            job = dict(row)
+        result = supabase.table('conversion_jobs').select('*').execute()
+        active_rows = [r for r in (result.data or []) if r.get('status') not in ('completed', 'failed')]
+        for job in active_rows:
             if job.get('video_data'):
                 job['video_data'] = json.loads(job['video_data'])
             # Check if the process is still running
@@ -187,36 +176,12 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
 
-# Database support - Postgres (Railway) or Supabase
-DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
-    from postgres_client import PostgresClient
-    supabase = PostgresClient(DATABASE_URL)
-    USE_SUPABASE = True
-    print(f"[STARTUP] Postgres connected: {DATABASE_URL[:40]}...")
-else:
-    try:
-        from supabase import create_client, Client
-        SUPABASE_URL = os.environ.get('SUPABASE_URL')
-        SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
-        if SUPABASE_URL and SUPABASE_KEY:
-            supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-            USE_SUPABASE = True
-            print(f"[STARTUP] Supabase connected: URL={SUPABASE_URL[:30]}...")
-        else:
-            USE_SUPABASE = False
-            supabase = None
-            print(f"[STARTUP] WARNING: No database configured!")
-            print(f"[STARTUP] Set DATABASE_URL or SUPABASE_URL+SUPABASE_KEY")
-            print(f"[STARTUP] Falling back to SQLite (data will NOT sync to production)")
-    except ImportError as e:
-        USE_SUPABASE = False
-        supabase = None
-        print(f"[STARTUP] Supabase import failed: {e}")
-        print(f"[STARTUP] Falling back to SQLite (data will NOT sync to production)")
+# Database - Postgres via PostgresClient (Supabase-compatible query builder)
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+from postgres_client import PostgresClient
+supabase = PostgresClient(DATABASE_URL)
+print(f"[STARTUP] Postgres connected: {DATABASE_URL[:40]}...")
 
-# Supabase Storage bucket name
-SUPABASE_BUCKET = 'videos'
 
 # S3-Compatible Storage Configuration (Backblaze B2 or AWS S3)
 try:
@@ -466,65 +431,8 @@ def get_s3_presigned_upload_url(s3_key, content_type='video/mp4', expires_in=360
         print(f"S3 presigned upload URL error: {e}")
         return None
 
-def upload_to_supabase_storage(file_path, storage_path):
-    """Upload a file to Supabase Storage."""
-    if not USE_SUPABASE or not supabase:
-        return None
-    try:
-        with open(file_path, 'rb') as f:
-            file_data = f.read()
 
-        # Determine content type
-        ext = os.path.splitext(storage_path)[1].lower()
-        content_types = {
-            '.mp4': 'video/mp4',
-            '.webm': 'video/webm',
-            '.mov': 'video/quicktime',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.png': 'image/png',
-            '.csv': 'text/csv'
-        }
-        content_type = content_types.get(ext, 'application/octet-stream')
 
-        # Upload to Supabase Storage
-        result = supabase.storage.from_(SUPABASE_BUCKET).upload(
-            storage_path,
-            file_data,
-            file_options={"content-type": content_type, "upsert": "true"}
-        )
-
-        # Get public URL
-        public_url = supabase.storage.from_(SUPABASE_BUCKET).get_public_url(storage_path)
-        return public_url
-    except Exception as e:
-        log_upload_failure('supabase_storage_upload_failed',
-                          filename=os.path.basename(file_path),
-                          file_size=os.path.getsize(file_path) if os.path.exists(file_path) else None,
-                          extra={'storage_path': storage_path, 'error': str(e)})
-        print(f"Supabase Storage upload error: {e}")
-        return None
-
-def delete_from_supabase_storage(storage_path):
-    """Delete a file from Supabase Storage."""
-    if not USE_SUPABASE or not supabase:
-        return False
-    try:
-        supabase.storage.from_(SUPABASE_BUCKET).remove([storage_path])
-        return True
-    except Exception as e:
-        print(f"Supabase Storage delete error: {e}")
-        return False
-
-def get_supabase_storage_url(storage_path):
-    """Get public URL for a file in Supabase Storage."""
-    if not USE_SUPABASE or not supabase:
-        return None
-    try:
-        return supabase.storage.from_(SUPABASE_BUCKET).get_public_url(storage_path)
-    except Exception as e:
-        print(f"Supabase Storage URL error: {e}")
-        return None
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'uspa-video-library-secret-key')
@@ -1327,7 +1235,6 @@ CATEGORIES = {
     }
 }
 
-DATABASE = 'videos.db'
 
 # Role definitions with permissions
 # Users can have multiple roles stored as comma-separated values
@@ -1420,21 +1327,11 @@ def upload_required(f):
     return decorated_function
 
 
-def get_sqlite_db():
-    """Get SQLite database connection for local development."""
-    if 'db' not in g:
-        g.db = sqlite3.connect(DATABASE)
-        g.db.row_factory = sqlite3.Row
-    return g.db
 
 
 @app.teardown_appcontext
 def close_db(exception):
     """Close database connection at end of request."""
-    db = g.pop('db', None)
-    if db is not None:
-        db.close()
-    # Close Postgres connection if using PostgresClient
     pg_conn = g.pop('_pg_conn', None)
     if pg_conn is not None and not pg_conn.closed:
         pg_conn.close()
@@ -1608,531 +1505,133 @@ def init_postgres_schema():
 
 def init_db():
     """Initialize the database."""
-    if USE_SUPABASE:
-        # Create tables if using Railway Postgres (Supabase has them pre-created)
-        if DATABASE_URL:
-            init_postgres_schema()
-        try:
-            result = supabase.table('users').select('username').eq('username', 'admin').execute()
-            if not result.data:
-                supabase.table('users').insert({
-                    'username': 'admin',
-                    'password': 'admin123',
-                    'role': 'admin',
-                    'name': 'Administrator'
-                }).execute()
-        except Exception as e:
-            print(f"Database init error: {e}")
-    else:
-        conn = sqlite3.connect(DATABASE)
-        cursor = conn.cursor()
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS videos (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                description TEXT,
-                url TEXT NOT NULL,
-                thumbnail TEXT,
-                category TEXT NOT NULL,
-                subcategory TEXT,
-                tags TEXT,
-                duration TEXT,
-                created_at TEXT NOT NULL,
-                views INTEGER DEFAULT 0,
-                video_type TEXT DEFAULT 'url',
-                local_file TEXT,
-                event TEXT
-            )
-        ''')
-
-        try:
-            cursor.execute('ALTER TABLE videos ADD COLUMN video_type TEXT DEFAULT "url"')
-        except:
-            pass
-        try:
-            cursor.execute('ALTER TABLE videos ADD COLUMN local_file TEXT')
-        except:
-            pass
-        try:
-            cursor.execute('ALTER TABLE videos ADD COLUMN event TEXT')
-        except:
-            pass
-        try:
-            cursor.execute('ALTER TABLE videos ADD COLUMN team TEXT')
-        except:
-            pass
-        try:
-            cursor.execute('ALTER TABLE videos ADD COLUMN round_num TEXT')
-        except:
-            pass
-        try:
-            cursor.execute('ALTER TABLE videos ADD COLUMN jump_num TEXT')
-        except:
-            pass
-        try:
-            cursor.execute('ALTER TABLE videos ADD COLUMN start_time REAL DEFAULT 0')
-        except:
-            pass
-        try:
-            cursor.execute('ALTER TABLE videos ADD COLUMN draw TEXT')
-        except:
-            pass
-
-        # Competitions tables
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS competitions (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                event_types TEXT,
-                total_rounds INTEGER DEFAULT 10,
-                created_at TEXT NOT NULL,
-                status TEXT DEFAULT 'active'
-            )
-        ''')
-
-        # Add event_types column if it doesn't exist (for existing databases)
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN event_types TEXT')
-        except:
-            pass
-
-        # Add event_rounds column if it doesn't exist (rounds per event type)
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN event_rounds TEXT')
-        except:
-            pass
-
-        # Add chief_judge column if it doesn't exist
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN chief_judge TEXT')
-        except:
-            pass
-
-        # Add chief_judge_pin column if it doesn't exist
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN chief_judge_pin TEXT')
-        except:
-            pass
-
-        # Add event_locations column if it doesn't exist (JSON: event_type -> location)
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN event_locations TEXT')
-        except:
-            pass
-
-        # Add event_dates column if it doesn't exist (JSON: event_type -> date)
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN event_dates TEXT')
-        except:
-            pass
-
-        # Add draws column if it doesn't exist (JSON: event_type -> class -> rounds -> formations)
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN draws TEXT')
-        except:
-            pass
-
-        # Add WS Performance columns
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN ws_reference_points TEXT')
-        except:
-            pass
-
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN ws_validation_window TEXT')
-        except:
-            pass
-
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN ws_competitor_ref_points TEXT')
-        except:
-            pass
-
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN ws_field_elevation REAL')
-        except:
-            pass
-
-        # Add score_approvals column if it doesn't exist (JSON: event_type -> round -> {approved_at, approved_by})
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN score_approvals TEXT')
-        except:
-            pass
-
-        # Add artistic_difficulty_scores column if it doesn't exist (JSON: {"team_id:round_num": {"score": 7.5, "set_by": "user", "set_at": "timestamp"}})
-        try:
-            cursor.execute('ALTER TABLE competitions ADD COLUMN artistic_difficulty_scores TEXT')
-        except:
-            pass
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS competition_teams (
-                id TEXT PRIMARY KEY,
-                competition_id TEXT NOT NULL,
-                team_number TEXT NOT NULL,
-                team_name TEXT NOT NULL,
-                class TEXT NOT NULL,
-                members TEXT,
-                category TEXT,
-                event TEXT,
-                photo TEXT,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (competition_id) REFERENCES competitions(id)
-            )
-        ''')
-
-        # Add display_order column if it doesn't exist
-        try:
-            cursor.execute('ALTER TABLE competition_teams ADD COLUMN display_order INTEGER DEFAULT 0')
-        except:
-            pass
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS competition_scores (
-                id TEXT PRIMARY KEY,
-                competition_id TEXT NOT NULL,
-                team_id TEXT NOT NULL,
-                round_num INTEGER NOT NULL,
-                score REAL,
-                score_data TEXT,
-                video_id TEXT,
-                scored_by TEXT,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (competition_id) REFERENCES competitions(id),
-                FOREIGN KEY (team_id) REFERENCES competition_teams(id)
-            )
-        ''')
-
-        # Add scored_by column if it doesn't exist
-        try:
-            cursor.execute('ALTER TABLE competition_scores ADD COLUMN scored_by TEXT')
-        except:
-            pass
-
-        # Add rejump column if it doesn't exist
-        try:
-            cursor.execute('ALTER TABLE competition_scores ADD COLUMN rejump INTEGER DEFAULT 0')
-        except:
-            pass
-
-        # Add training_flag column if it doesn't exist (for flagging videos as training material)
-        try:
-            cursor.execute('ALTER TABLE competition_scores ADD COLUMN training_flag INTEGER DEFAULT 0')
-        except:
-            pass
-
-        # Add exit_time_penalty column for CF events (20% penalty when exit time not determined)
-        try:
-            cursor.execute('ALTER TABLE competition_scores ADD COLUMN exit_time_penalty INTEGER DEFAULT 0')
-        except:
-            pass
-
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                username TEXT PRIMARY KEY,
-                password TEXT NOT NULL,
-                role TEXT NOT NULL,
-                name TEXT NOT NULL,
-                email TEXT,
-                must_change_password INTEGER DEFAULT 0
-            )
-        ''')
-
-        # Add columns if they don't exist (for existing databases)
-        try:
-            cursor.execute('ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0')
-        except:
-            pass
-        try:
-            cursor.execute('ALTER TABLE users ADD COLUMN email TEXT')
-        except:
-            pass
-        try:
-            cursor.execute('ALTER TABLE users ADD COLUMN signature_pin TEXT')
-        except:
-            pass
-
-        # Add signature_data column if it doesn't exist (stores base64 PNG of signature)
-        try:
-            cursor.execute('ALTER TABLE users ADD COLUMN signature_data TEXT')
-        except:
-            pass
-
-        # Add assigned_categories column for judge category restrictions (JSON array)
-        try:
-            cursor.execute('ALTER TABLE users ADD COLUMN assigned_categories TEXT')
-        except:
-            pass
-
-        # Events table (structured competition events)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS events (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                year INTEGER,
-                disciplines TEXT,
-                location TEXT,
-                start_date TEXT,
-                end_date TEXT,
-                status TEXT DEFAULT 'active',
-                created_at TEXT,
-                created_by TEXT
-            )
-        ''')
-
-        # Conversion jobs table (for persistent tracking of video conversions)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS conversion_jobs (
-                job_id TEXT PRIMARY KEY,
-                video_id TEXT,
-                filename TEXT,
-                title TEXT,
-                status TEXT DEFAULT 'queued',
-                progress INTEGER DEFAULT 0,
-                session_id TEXT,
-                created_at TEXT,
-                completed_at TEXT,
-                error TEXT,
-                input_path TEXT,
-                output_path TEXT,
-                video_data TEXT,
-                pid INTEGER
-            )
-        ''')
-
-        # Video assignments table (for chief judge to assign videos to judges)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS video_assignments (
-                id TEXT PRIMARY KEY,
-                video_id TEXT NOT NULL,
-                assigned_to TEXT NOT NULL,
-                assigned_by TEXT NOT NULL,
-                status TEXT DEFAULT 'pending',
-                notes TEXT,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (video_id) REFERENCES videos(id),
-                FOREIGN KEY (assigned_to) REFERENCES users(username),
-                FOREIGN KEY (assigned_by) REFERENCES users(username)
-            )
-        ''')
-
-        try:
-            cursor.execute('ALTER TABLE video_assignments ADD COLUMN scored_at TEXT')
-        except:
-            pass
-
-        cursor.execute('SELECT username FROM users WHERE username = ?', ('admin',))
-        if not cursor.fetchone():
-            cursor.execute(
-                'INSERT INTO users (username, password, role, name, email, must_change_password) VALUES (?, ?, ?, ?, ?, ?)',
-                ('admin', 'admin123', 'admin', 'Administrator', '', 0)
-            )
-
-        conn.commit()
-        conn.close()
+    init_postgres_schema()
+    try:
+        result = supabase.table('users').select('username').eq('username', 'admin').execute()
+        if not result.data:
+            supabase.table('users').insert({
+                'username': 'admin',
+                'password': 'admin123',
+                'role': 'admin',
+                'name': 'Administrator'
+            }).execute()
+    except Exception as e:
+        print(f"Database init error: {e}")
 
 
 # Database helper functions
 def get_all_videos():
     """Get all videos from database."""
-    if USE_SUPABASE:
-        # Cursor-based pagination using id to bypass Supabase max_rows limit
-        all_videos = []
-        batch_size = 500
-        last_id = None
-        batch_num = 0
+    # Cursor-based pagination using id to bypass Supabase max_rows limit
+    all_videos = []
+    batch_size = 500
+    last_id = None
+    batch_num = 0
 
-        while True:
-            batch_num += 1
-            query = supabase.table('videos').select('*').order('id', desc=False).limit(batch_size)
-            if last_id is not None:
-                query = query.gt('id', last_id)
-            result = query.execute()
-            fetched = len(result.data) if result.data else 0
-            print(f"[get_all_videos] cursor batch {batch_num}: fetched {fetched}, last_id={last_id}")
-            if not result.data:
-                break
-            all_videos.extend(result.data)
-            last_id = result.data[-1]['id']
-            if fetched < batch_size:
-                break
+    while True:
+        batch_num += 1
+        query = supabase.table('videos').select('*').order('id', desc=False).limit(batch_size)
+        if last_id is not None:
+            query = query.gt('id', last_id)
+        result = query.execute()
+        fetched = len(result.data) if result.data else 0
+        print(f"[get_all_videos] cursor batch {batch_num}: fetched {fetched}, last_id={last_id}")
+        if not result.data:
+            break
+        all_videos.extend(result.data)
+        last_id = result.data[-1]['id']
+        if fetched < batch_size:
+            break
 
-        print(f"[get_all_videos] FINAL TOTAL: {len(all_videos)} videos fetched")
-        all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
-        return all_videos
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM videos ORDER BY created_at DESC')
-        return [dict(row) for row in cursor.fetchall()]
-
-
+    print(f"[get_all_videos] FINAL TOTAL: {len(all_videos)} videos fetched")
+    all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
+    return all_videos
 def get_videos_by_category(category, subcategory=None):
     """Get videos by category and optional subcategory."""
     valid_categories = list(CATEGORIES.keys())
 
-    if USE_SUPABASE:
-        batch_size = 500
+    batch_size = 500
 
-        # Special handling for uncategorized - include videos not in valid categories
-        if category == 'uncategorized':
-            # Cursor-based pagination through all videos, filtering client-side
-            all_videos = []
-            last_id = ''
-            while True:
-                result = supabase.table('videos').select('*').order('id').gt('id', last_id).limit(batch_size).execute()
-                if not result.data:
-                    break
-                for v in result.data:
-                    vid_cat = v.get('category', '')
-                    if vid_cat not in valid_categories or vid_cat == 'uncategorized':
-                        all_videos.append(normalize_video_urls(v))
-                last_id = result.data[-1]['id']
-                if len(result.data) < batch_size:
-                    break
-            all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
-            return all_videos
-
-        # Cursor-based pagination for specific category
+    # Special handling for uncategorized - include videos not in valid categories
+    if category == 'uncategorized':
+        # Cursor-based pagination through all videos, filtering client-side
         all_videos = []
         last_id = ''
         while True:
-            query = supabase.table('videos').select('*').eq('category', category).order('id').gt('id', last_id).limit(batch_size)
-            if subcategory:
-                query = query.eq('subcategory', subcategory)
-            result = query.execute()
+            result = supabase.table('videos').select('*').order('id').gt('id', last_id).limit(batch_size).execute()
             if not result.data:
                 break
-            all_videos.extend(normalize_video_urls(v) for v in result.data)
+            for v in result.data:
+                vid_cat = v.get('category', '')
+                if vid_cat not in valid_categories or vid_cat == 'uncategorized':
+                    all_videos.append(normalize_video_urls(v))
             last_id = result.data[-1]['id']
             if len(result.data) < batch_size:
                 break
         all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
         return all_videos
-    else:
-        db = get_sqlite_db()
-        if category == 'uncategorized':
-            # Get videos not in valid categories
-            placeholders = ','.join('?' * len(valid_categories))
-            cursor = db.execute(
-                f"SELECT * FROM videos WHERE category NOT IN ({placeholders}) OR category IS NULL ORDER BY created_at DESC",
-                valid_categories
-            )
-        elif subcategory:
-            cursor = db.execute(
-                'SELECT * FROM videos WHERE category = ? AND subcategory = ? ORDER BY created_at DESC',
-                (category, subcategory)
-            )
-        else:
-            cursor = db.execute(
-                'SELECT * FROM videos WHERE category = ? ORDER BY created_at DESC',
-                (category,)
-            )
-        return [normalize_video_urls(dict(row)) for row in cursor.fetchall()]
 
-
+    # Cursor-based pagination for specific category
+    all_videos = []
+    last_id = ''
+    while True:
+        query = supabase.table('videos').select('*').eq('category', category).order('id').gt('id', last_id).limit(batch_size)
+        if subcategory:
+            query = query.eq('subcategory', subcategory)
+        result = query.execute()
+        if not result.data:
+            break
+        all_videos.extend(normalize_video_urls(v) for v in result.data)
+        last_id = result.data[-1]['id']
+        if len(result.data) < batch_size:
+            break
+    all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
+    return all_videos
 def get_video(video_id):
     """Get a single video by ID."""
-    if USE_SUPABASE:
-        result = supabase.table('videos').select('*').eq('id', video_id).execute()
-        return normalize_video_urls(result.data[0]) if result.data else None
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM videos WHERE id = ?', (video_id,))
-        row = cursor.fetchone()
-        return normalize_video_urls(dict(row)) if row else None
-
-
+    result = supabase.table('videos').select('*').eq('id', video_id).execute()
+    return normalize_video_urls(result.data[0]) if result.data else None
 def find_duplicate_video(title, duration, url=None):
     """Check if a video with the same title and duration already exists.
     Returns the existing video if found, None otherwise."""
-    if USE_SUPABASE:
-        # First check by URL (exact match)
-        if url:
-            result = supabase.table('videos').select('*').eq('url', url).execute()
-            if result.data:
-                return result.data[0]
-
-        # Then check by title and duration
-        query = supabase.table('videos').select('*').eq('title', title)
-        if duration:
-            query = query.eq('duration', duration)
-        result = query.execute()
+    # First check by URL (exact match)
+    if url:
+        result = supabase.table('videos').select('*').eq('url', url).execute()
         if result.data:
             return result.data[0]
-    else:
-        db = get_sqlite_db()
-        # Check by URL first
-        if url:
-            cursor = db.execute('SELECT * FROM videos WHERE url = ?', (url,))
-            row = cursor.fetchone()
-            if row:
-                return dict(row)
 
-        # Check by title and duration
-        if duration:
-            cursor = db.execute('SELECT * FROM videos WHERE title = ? AND duration = ?', (title, duration))
-        else:
-            cursor = db.execute('SELECT * FROM videos WHERE title = ?', (title,))
-        row = cursor.fetchone()
-        if row:
-            return dict(row)
-
+    # Then check by title and duration
+    query = supabase.table('videos').select('*').eq('title', title)
+    if duration:
+        query = query.eq('duration', duration)
+    result = query.execute()
+    if result.data:
+        return result.data[0]
     return None
 
 
 def save_video(video_data):
     """Save a video to database."""
-    if USE_SUPABASE:
-        # Filter to only include core Supabase columns (start_time/draw handled separately)
-        known_columns = {'id', 'title', 'description', 'url', 'thumbnail', 'category',
-                        'subcategory', 'tags', 'duration', 'created_at', 'views',
-                        'video_type', 'local_file', 'event', 'team', 'round_num', 'jump_num'}
-        filtered_data = {k: v for k, v in video_data.items() if k in known_columns}
+    # Filter to only include core Supabase columns (start_time/draw handled separately)
+    known_columns = {'id', 'title', 'description', 'url', 'thumbnail', 'category',
+                    'subcategory', 'tags', 'duration', 'created_at', 'views',
+                    'video_type', 'local_file', 'event', 'team', 'round_num', 'jump_num'}
+    filtered_data = {k: v for k, v in video_data.items() if k in known_columns}
 
-        existing = supabase.table('videos').select('id').eq('id', video_data['id']).execute()
-        if existing.data:
-            supabase.table('videos').update(filtered_data).eq('id', video_data['id']).execute()
-        else:
-            supabase.table('videos').insert(filtered_data).execute()
+    existing = supabase.table('videos').select('id').eq('id', video_data['id']).execute()
+    if existing.data:
+        supabase.table('videos').update(filtered_data).eq('id', video_data['id']).execute()
     else:
-        db = get_sqlite_db()
-        db.execute('''
-            INSERT OR REPLACE INTO videos (id, title, description, url, thumbnail, category, subcategory, tags, duration, created_at, views, video_type, local_file, event, team, round_num, jump_num, start_time)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (video_data['id'], video_data['title'], video_data.get('description', ''),
-              video_data.get('url', ''), video_data.get('thumbnail'), video_data['category'],
-              video_data.get('subcategory', ''), video_data.get('tags', ''),
-              video_data.get('duration', ''), video_data['created_at'],
-              video_data.get('views', 0), video_data.get('video_type', 'url'),
-              video_data.get('local_file', ''), video_data.get('event', ''),
-              video_data.get('team', ''), video_data.get('round_num', ''),
-              video_data.get('jump_num', ''), video_data.get('start_time', 0)))
-        db.commit()
-
-
+        supabase.table('videos').insert(filtered_data).execute()
 def delete_video_db(video_id):
     """Delete a video from database."""
-    if USE_SUPABASE:
-        supabase.table('videos').delete().eq('id', video_id).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('DELETE FROM videos WHERE id = ?', (video_id,))
-        db.commit()
-
-
+    supabase.table('videos').delete().eq('id', video_id).execute()
 def increment_views(video_id):
     """Increment view count for a video."""
     try:
-        if USE_SUPABASE:
-            video = get_video(video_id)
-            if video:
-                supabase.table('videos').update({'views': (video.get('views') or 0) + 1}).eq('id', video_id).execute()
-        else:
-            db = get_sqlite_db()
-            db.execute('UPDATE videos SET views = views + 1 WHERE id = ?', (video_id,))
-            db.commit()
+        video = get_video(video_id)
+        if video:
+            supabase.table('videos').update({'views': (video.get('views') or 0) + 1}).eq('id', video_id).execute()
     except Exception as e:
         # Don't crash the page if view count fails to update
         print(f"Warning: Failed to increment views for {video_id}: {e}")
@@ -2140,80 +1639,50 @@ def increment_views(video_id):
 
 def get_video_count_by_category(category):
     """Get video count for a category."""
-    if USE_SUPABASE:
-        result = supabase.table('videos').select('id', count='exact').eq('category', category).execute()
-        return result.count or 0
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT COUNT(*) FROM videos WHERE category = ?', (category,))
-        return cursor.fetchone()[0]
-
-
+    result = supabase.table('videos').select('id', count='exact').eq('category', category).execute()
+    return result.count or 0
 def search_videos(query):
     """Search videos by title, description, or tags."""
-    if USE_SUPABASE:
-        all_videos = []
-        batch_size = 500
-        last_id = ''
-        while True:
-            result = supabase.table('videos').select('*').or_(
-                f"title.ilike.%{query}%,description.ilike.%{query}%,tags.ilike.%{query}%"
-            ).order('id').gt('id', last_id).limit(batch_size).execute()
-            if not result.data:
-                break
-            all_videos.extend(result.data)
-            last_id = result.data[-1]['id']
-            if len(result.data) < batch_size:
-                break
-        all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
-        return all_videos
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('''
-            SELECT * FROM videos
-            WHERE title LIKE ? OR description LIKE ? OR tags LIKE ?
-            ORDER BY created_at DESC
-        ''', (f'%{query}%', f'%{query}%', f'%{query}%'))
-        return [dict(row) for row in cursor.fetchall()]
-
-
+    all_videos = []
+    batch_size = 500
+    last_id = ''
+    while True:
+        result = supabase.table('videos').select('*').or_(
+            f"title.ilike.%{query}%,description.ilike.%{query}%,tags.ilike.%{query}%"
+        ).order('id').gt('id', last_id).limit(batch_size).execute()
+        if not result.data:
+            break
+        all_videos.extend(result.data)
+        last_id = result.data[-1]['id']
+        if len(result.data) < batch_size:
+            break
+    all_videos.sort(key=lambda v: v.get('created_at', ''), reverse=True)
+    return all_videos
 def get_all_events():
     """Get all unique events, including empty event folders."""
     try:
-        if USE_SUPABASE:
-            all_events = set()
-            batch_size = 500
-            last_id = ''
-            while True:
-                result = supabase.table('videos').select('id, event').order('id').gt('id', last_id).limit(batch_size).execute()
-                if not result.data:
-                    break
-                for v in result.data:
-                    if v.get('event'):
-                        all_events.add(v['event'])
-                last_id = result.data[-1]['id']
-                if len(result.data) < batch_size:
-                    break
-            # Also include event folders that may not have videos yet
-            try:
-                folders = supabase.table('event_folders').select('name').execute()
-                for f in (folders.data or []):
-                    if f.get('name'):
-                        all_events.add(f['name'])
-            except:
-                pass
-            return sorted(all_events)
-        else:
-            db = get_sqlite_db()
-            cursor = db.execute('SELECT DISTINCT event FROM videos WHERE event IS NOT NULL AND event != "" ORDER BY event')
-            events = set(row[0] for row in cursor.fetchall())
-            try:
-                cursor = db.execute('SELECT name FROM event_folders WHERE name IS NOT NULL AND name != ""')
-                for row in cursor.fetchall():
-                    events.add(row[0])
-            except:
-                pass
-            return sorted(events)
+        all_events = set()
+        batch_size = 500
+        last_id = ''
+        while True:
+            result = supabase.table('videos').select('id, event').order('id').gt('id', last_id).limit(batch_size).execute()
+            if not result.data:
+                break
+            for v in result.data:
+                if v.get('event'):
+                    all_events.add(v['event'])
+            last_id = result.data[-1]['id']
+            if len(result.data) < batch_size:
+                break
+        # Also include event folders that may not have videos yet
+        try:
+            folders = supabase.table('event_folders').select('name').execute()
+            for f in (folders.data or []):
+                if f.get('name'):
+                    all_events.add(f['name'])
+        except:
+            pass
+        return sorted(all_events)
     except Exception as e:
         print(f"Error getting events: {e}")
         return []
@@ -2221,37 +1690,25 @@ def get_all_events():
 
 def get_videos_by_event(event_name):
     """Get videos by event name."""
-    if USE_SUPABASE:
-        all_videos = []
-        batch_size = 500
-        last_id = ''
-        while True:
-            result = supabase.table('videos').select('*').eq('event', event_name).order('id').gt('id', last_id).limit(batch_size).execute()
-            if not result.data:
-                break
-            all_videos.extend(result.data)
-            last_id = result.data[-1]['id']
-            if len(result.data) < batch_size:
-                break
-        all_videos.sort(key=lambda v: v.get('title', ''))
-        return all_videos
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM videos WHERE event = ? ORDER BY title', (event_name,))
-        return [dict(row) for row in cursor.fetchall()]
-
-
+    all_videos = []
+    batch_size = 500
+    last_id = ''
+    while True:
+        result = supabase.table('videos').select('*').eq('event', event_name).order('id').gt('id', last_id).limit(batch_size).execute()
+        if not result.data:
+            break
+        all_videos.extend(result.data)
+        last_id = result.data[-1]['id']
+        if len(result.data) < batch_size:
+            break
+    all_videos.sort(key=lambda v: v.get('title', ''))
+    return all_videos
 # Structured Event Management Functions
 def get_structured_events():
     """Get all structured events from the events table."""
     try:
-        if USE_SUPABASE:
-            result = supabase.table('events').select('*').order('year', desc=True).execute()
-            return result.data or []
-        else:
-            db = get_sqlite_db()
-            cursor = db.execute('SELECT * FROM events ORDER BY year DESC, name')
-            return [dict(row) for row in cursor.fetchall()]
+        result = supabase.table('events').select('*').order('year', desc=True).execute()
+        return result.data or []
     except Exception as e:
         print(f"Error getting structured events: {e}")
         return []
@@ -2260,14 +1717,8 @@ def get_structured_events():
 def get_structured_event(event_id):
     """Get a single structured event by ID."""
     try:
-        if USE_SUPABASE:
-            result = supabase.table('events').select('*').eq('id', event_id).execute()
-            return result.data[0] if result.data else None
-        else:
-            db = get_sqlite_db()
-            cursor = db.execute('SELECT * FROM events WHERE id = ?', (event_id,))
-            row = cursor.fetchone()
-            return dict(row) if row else None
+        result = supabase.table('events').select('*').eq('id', event_id).execute()
+        return result.data[0] if result.data else None
     except Exception as e:
         print(f"Error getting structured event: {e}")
         return None
@@ -2280,19 +1731,7 @@ def create_structured_event(event_data):
     event_data['created_at'] = datetime.now().isoformat()
 
     try:
-        if USE_SUPABASE:
-            supabase.table('events').insert(event_data).execute()
-        else:
-            db = get_sqlite_db()
-            db.execute('''
-                INSERT INTO events (id, name, year, disciplines, location, start_date, end_date, status, created_at, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (event_data['id'], event_data.get('name'), event_data.get('year'),
-                  event_data.get('disciplines'), event_data.get('location'),
-                  event_data.get('start_date'), event_data.get('end_date'),
-                  event_data.get('status', 'active'), event_data['created_at'],
-                  event_data.get('created_by')))
-            db.commit()
+        supabase.table('events').insert(event_data).execute()
         return event_id
     except Exception as e:
         print(f"Error creating structured event: {e}")
@@ -2302,17 +1741,7 @@ def create_structured_event(event_data):
 def update_structured_event(event_id, event_data):
     """Update a structured event."""
     try:
-        if USE_SUPABASE:
-            supabase.table('events').update(event_data).eq('id', event_id).execute()
-        else:
-            db = get_sqlite_db()
-            db.execute('''
-                UPDATE events SET name = ?, year = ?, disciplines = ?, location = ?,
-                start_date = ?, end_date = ?, status = ? WHERE id = ?
-            ''', (event_data.get('name'), event_data.get('year'), event_data.get('disciplines'),
-                  event_data.get('location'), event_data.get('start_date'),
-                  event_data.get('end_date'), event_data.get('status'), event_id))
-            db.commit()
+        supabase.table('events').update(event_data).eq('id', event_id).execute()
     except Exception as e:
         print(f"Error updating structured event: {e}")
         raise e
@@ -2321,12 +1750,7 @@ def update_structured_event(event_id, event_data):
 def delete_structured_event(event_id):
     """Delete a structured event."""
     try:
-        if USE_SUPABASE:
-            supabase.table('events').delete().eq('id', event_id).execute()
-        else:
-            db = get_sqlite_db()
-            db.execute('DELETE FROM events WHERE id = ?', (event_id,))
-            db.commit()
+        supabase.table('events').delete().eq('id', event_id).execute()
     except Exception as e:
         print(f"Error deleting structured event: {e}")
         raise e
@@ -2334,81 +1758,41 @@ def delete_structured_event(event_id):
 
 def get_user(username):
     """Get user from database."""
-    if USE_SUPABASE:
-        result = supabase.table('users').select('*').eq('username', username).execute()
-        return result.data[0] if result.data else None
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM users WHERE username = ?', (username,))
-        row = cursor.fetchone()
-        return dict(row) if row else None
-
-
+    result = supabase.table('users').select('*').eq('username', username).execute()
+    return result.data[0] if result.data else None
 def get_all_users():
     """Get all users from database."""
-    if USE_SUPABASE:
-        result = supabase.table('users').select('*').order('username').execute()
-        return result.data
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM users ORDER BY username')
-        return [dict(row) for row in cursor.fetchall()]
-
-
+    result = supabase.table('users').select('*').order('username').execute()
+    return result.data
 def save_user(user_data):
     """Save or update a user."""
     must_change = user_data.get('must_change_password', 0)
     email = user_data.get('email', '')
     signature_pin = user_data.get('signature_pin', '')
     assigned_categories = user_data.get('assigned_categories', '')
-    if USE_SUPABASE:
-        # Only send fields that exist in Supabase users table
-        supabase_data = {
-            'username': user_data['username'],
-            'password': user_data['password'],
-            'role': user_data['role'],
-            'name': user_data['name'],
-            'email': email,
-            'must_change_password': must_change,
-            'signature_pin': signature_pin,
-            'assigned_categories': assigned_categories
-        }
-        existing = supabase.table('users').select('username').eq('username', user_data['username']).execute()
-        if existing.data:
-            supabase.table('users').update(supabase_data).eq('username', user_data['username']).execute()
-        else:
-            supabase.table('users').insert(supabase_data).execute()
+    # Only send fields that exist in Supabase users table
+    supabase_data = {
+        'username': user_data['username'],
+        'password': user_data['password'],
+        'role': user_data['role'],
+        'name': user_data['name'],
+        'email': email,
+        'must_change_password': must_change,
+        'signature_pin': signature_pin,
+        'assigned_categories': assigned_categories
+    }
+    existing = supabase.table('users').select('username').eq('username', user_data['username']).execute()
+    if existing.data:
+        supabase.table('users').update(supabase_data).eq('username', user_data['username']).execute()
     else:
-        db = get_sqlite_db()
-        db.execute('''
-            INSERT OR REPLACE INTO users (username, password, role, name, email, must_change_password, signature_pin, assigned_categories)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (user_data['username'], user_data['password'], user_data['role'], user_data['name'], email, must_change, signature_pin, assigned_categories))
-        db.commit()
-
-
+        supabase.table('users').insert(supabase_data).execute()
 def get_user_by_email(email):
     """Get user by email address."""
-    if USE_SUPABASE:
-        result = supabase.table('users').select('*').eq('email', email).execute()
-        return result.data[0] if result.data else None
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM users WHERE email = ?', (email,))
-        row = cursor.fetchone()
-        return dict(row) if row else None
-
-
+    result = supabase.table('users').select('*').eq('email', email).execute()
+    return result.data[0] if result.data else None
 def delete_user(username):
     """Delete a user."""
-    if USE_SUPABASE:
-        supabase.table('users').delete().eq('username', username).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('DELETE FROM users WHERE username = ?', (username,))
-        db.commit()
-
-
+    supabase.table('users').delete().eq('username', username).execute()
 # Video assignment functions
 def create_video_assignment(video_id, assigned_to, assigned_by, notes=''):
     """Create a video assignment."""
@@ -2422,77 +1806,42 @@ def create_video_assignment(video_id, assigned_to, assigned_by, notes=''):
         'notes': notes,
         'created_at': datetime.now().isoformat()
     }
-    if USE_SUPABASE:
-        supabase.table('video_assignments').insert(assignment).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('''
-            INSERT INTO video_assignments (id, video_id, assigned_to, assigned_by, status, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (assignment_id, video_id, assigned_to, assigned_by, 'pending', notes, assignment['created_at']))
-        db.commit()
+    supabase.table('video_assignments').insert(assignment).execute()
     return assignment_id
 
 
 def get_assignments_for_user(username):
     """Get all video assignments for a user."""
-    if USE_SUPABASE:
-        result = supabase.table('video_assignments').select('*').eq('assigned_to', username).order('created_at', desc=True).execute()
-        return result.data
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM video_assignments WHERE assigned_to = ? ORDER BY created_at DESC', (username,))
-        return [dict(row) for row in cursor.fetchall()]
-
-
+    result = supabase.table('video_assignments').select('*').eq('assigned_to', username).order('created_at', desc=True).execute()
+    return result.data
 def get_assignments_by_assigner(username):
     """Get all assignments created by a user (chief judge)."""
-    if USE_SUPABASE:
-        result = supabase.table('video_assignments').select('*').eq('assigned_by', username).order('created_at', desc=True).execute()
-        return result.data
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM video_assignments WHERE assigned_by = ? ORDER BY created_at DESC', (username,))
-        return [dict(row) for row in cursor.fetchall()]
-
-
+    result = supabase.table('video_assignments').select('*').eq('assigned_by', username).order('created_at', desc=True).execute()
+    return result.data
 def update_assignment_status(assignment_id, status):
     """Update assignment status (pending, in_progress, completed)."""
-    if USE_SUPABASE:
-        supabase.table('video_assignments').update({'status': status}).eq('id', assignment_id).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('UPDATE video_assignments SET status = ? WHERE id = ?', (status, assignment_id))
-        db.commit()
-
-
+    supabase.table('video_assignments').update({'status': status}).eq('id', assignment_id).execute()
 def delete_assignment(assignment_id):
     """Delete a video assignment."""
     try:
-        if USE_SUPABASE:
-            # First check if assignment exists
-            check = supabase.table('video_assignments').select('id').eq('id', assignment_id).execute()
-            if not check.data:
-                print(f"[DELETE] Assignment {assignment_id} not found (already deleted)")
-                return True
-
-            # Perform the delete
-            result = supabase.table('video_assignments').delete().eq('id', assignment_id).execute()
-            print(f"[DELETE] Supabase delete for {assignment_id}: returned {len(result.data) if result.data else 0} rows")
-
-            # Verify it was deleted
-            verify = supabase.table('video_assignments').select('id').eq('id', assignment_id).execute()
-            if verify.data:
-                print(f"[DELETE ERROR] Assignment {assignment_id} STILL EXISTS after delete! RLS may be blocking.")
-                return False
-
-            print(f"[DELETE SUCCESS] Assignment {assignment_id} confirmed deleted")
+        # First check if assignment exists
+        check = supabase.table('video_assignments').select('id').eq('id', assignment_id).execute()
+        if not check.data:
+            print(f"[DELETE] Assignment {assignment_id} not found (already deleted)")
             return True
-        else:
-            db = get_sqlite_db()
-            db.execute('DELETE FROM video_assignments WHERE id = ?', (assignment_id,))
-            db.commit()
-            return True
+
+        # Perform the delete
+        result = supabase.table('video_assignments').delete().eq('id', assignment_id).execute()
+        print(f"[DELETE] Supabase delete for {assignment_id}: returned {len(result.data) if result.data else 0} rows")
+
+        # Verify it was deleted
+        verify = supabase.table('video_assignments').select('id').eq('id', assignment_id).execute()
+        if verify.data:
+            print(f"[DELETE ERROR] Assignment {assignment_id} STILL EXISTS after delete! RLS may be blocking.")
+            return False
+
+        print(f"[DELETE SUCCESS] Assignment {assignment_id} confirmed deleted")
+        return True
     except Exception as e:
         print(f"[DELETE ERROR] Failed to delete assignment {assignment_id}: {e}")
         import traceback
@@ -2502,50 +1851,28 @@ def delete_assignment(assignment_id):
 
 def get_all_assignments(limit=1000):
     """Get all video assignments."""
-    if USE_SUPABASE:
-        result = supabase.table('video_assignments').select('*').order('created_at', desc=True).limit(limit).execute()
-        return result.data
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM video_assignments ORDER BY created_at DESC LIMIT ?', (limit,))
-        return [dict(row) for row in cursor.fetchall()]
-
-
+    result = supabase.table('video_assignments').select('*').order('created_at', desc=True).limit(limit).execute()
+    return result.data
 def get_assignment_count():
     """Get total count of video assignments."""
-    if USE_SUPABASE:
-        result = supabase.table('video_assignments').select('id', count='exact').execute()
-        return result.count or 0
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT COUNT(*) FROM video_assignments')
-        return cursor.fetchone()[0]
-
-
+    result = supabase.table('video_assignments').select('id', count='exact').execute()
+    return result.count or 0
 def delete_all_assignments():
     """Delete ALL video assignments. Use with caution!"""
     try:
-        if USE_SUPABASE:
-            # Delete in batches to avoid timeout
-            deleted = 0
-            while True:
-                # Get a batch of IDs
-                result = supabase.table('video_assignments').select('id').limit(500).execute()
-                if not result.data:
-                    break
-                for row in result.data:
-                    supabase.table('video_assignments').delete().eq('id', row['id']).execute()
-                    deleted += 1
-                print(f"[DELETE ALL] Deleted {deleted} assignments so far...")
-            print(f"[DELETE ALL] Total deleted: {deleted}")
-            return deleted
-        else:
-            db = get_sqlite_db()
-            cursor = db.execute('SELECT COUNT(*) FROM video_assignments')
-            count = cursor.fetchone()[0]
-            db.execute('DELETE FROM video_assignments')
-            db.commit()
-            return count
+        # Delete in batches to avoid timeout
+        deleted = 0
+        while True:
+            # Get a batch of IDs
+            result = supabase.table('video_assignments').select('id').limit(500).execute()
+            if not result.data:
+                break
+            for row in result.data:
+                supabase.table('video_assignments').delete().eq('id', row['id']).execute()
+                deleted += 1
+            print(f"[DELETE ALL] Deleted {deleted} assignments so far...")
+        print(f"[DELETE ALL] Total deleted: {deleted}")
+        return deleted
     except Exception as e:
         print(f"[DELETE ALL ERROR] {e}")
         return 0
@@ -2554,75 +1881,61 @@ def delete_all_assignments():
 def delete_duplicate_assignments():
     """Delete duplicate assignments (same video assigned to same judge multiple times)."""
     try:
-        if USE_SUPABASE:
-            # Get all assignments (cursor-based)
-            all_assignments = []
-            last_id = ''
-            while True:
-                result = supabase.table('video_assignments').select('id, video_id, assigned_to, created_at').order('id').gt('id', last_id).limit(500).execute()
-                if not result.data:
-                    break
-                all_assignments.extend(result.data)
-                last_id = result.data[-1]['id']
-                if len(result.data) < 500:
-                    break
-            all_assignments.sort(key=lambda a: a.get('created_at', ''))
+        # Get all assignments (cursor-based)
+        all_assignments = []
+        last_id = ''
+        while True:
+            result = supabase.table('video_assignments').select('id, video_id, assigned_to, created_at').order('id').gt('id', last_id).limit(500).execute()
+            if not result.data:
+                break
+            all_assignments.extend(result.data)
+            last_id = result.data[-1]['id']
+            if len(result.data) < 500:
+                break
+        all_assignments.sort(key=lambda a: a.get('created_at', ''))
 
-            print(f"[DEDUP] Found {len(all_assignments)} total assignments")
+        print(f"[DEDUP] Found {len(all_assignments)} total assignments")
 
-            # Find duplicates - keep the oldest (first) assignment for each video+judge combo
-            seen = {}  # key: (video_id, assigned_to) -> first assignment id
-            duplicates = []
+        # Find duplicates - keep the oldest (first) assignment for each video+judge combo
+        seen = {}  # key: (video_id, assigned_to) -> first assignment id
+        duplicates = []
 
-            for a in all_assignments:
-                key = (a['video_id'], a['assigned_to'])
-                if key in seen:
-                    # This is a duplicate - mark for deletion
-                    duplicates.append(a['id'])
-                else:
-                    seen[key] = a['id']
+        for a in all_assignments:
+            key = (a['video_id'], a['assigned_to'])
+            if key in seen:
+                # This is a duplicate - mark for deletion
+                duplicates.append(a['id'])
+            else:
+                seen[key] = a['id']
 
-            print(f"[DEDUP] Found {len(duplicates)} duplicates to remove")
+        print(f"[DEDUP] Found {len(duplicates)} duplicates to remove")
 
-            # Delete duplicates in batches of 20
-            import time
-            deleted = 0
-            batch_size = 20
-            total_batches = (len(duplicates) + batch_size - 1) // batch_size
+        # Delete duplicates in batches of 20
+        import time
+        deleted = 0
+        batch_size = 20
+        total_batches = (len(duplicates) + batch_size - 1) // batch_size
 
-            for batch_num in range(total_batches):
-                start_idx = batch_num * batch_size
-                end_idx = min(start_idx + batch_size, len(duplicates))
-                batch = duplicates[start_idx:end_idx]
+        for batch_num in range(total_batches):
+            start_idx = batch_num * batch_size
+            end_idx = min(start_idx + batch_size, len(duplicates))
+            batch = duplicates[start_idx:end_idx]
 
-                for dup_id in batch:
-                    try:
-                        supabase.table('video_assignments').delete().eq('id', dup_id).execute()
-                        deleted += 1
-                    except Exception as e:
-                        print(f"[DEDUP] Failed to delete {dup_id}: {e}")
+            for dup_id in batch:
+                try:
+                    supabase.table('video_assignments').delete().eq('id', dup_id).execute()
+                    deleted += 1
+                except Exception as e:
+                    print(f"[DEDUP] Failed to delete {dup_id}: {e}")
 
-                print(f"[DEDUP] Batch {batch_num + 1}/{total_batches} complete - {deleted} deleted so far")
+            print(f"[DEDUP] Batch {batch_num + 1}/{total_batches} complete - {deleted} deleted so far")
 
-                # Small delay between batches to avoid rate limiting
-                if batch_num < total_batches - 1:
-                    time.sleep(0.1)
+            # Small delay between batches to avoid rate limiting
+            if batch_num < total_batches - 1:
+                time.sleep(0.1)
 
-            print(f"[DEDUP] Total duplicates removed: {deleted}")
-            return deleted
-        else:
-            db = get_sqlite_db()
-            # SQLite: delete all but the oldest assignment for each video+judge combo
-            cursor = db.execute('''
-                DELETE FROM video_assignments
-                WHERE id NOT IN (
-                    SELECT MIN(id)
-                    FROM video_assignments
-                    GROUP BY video_id, assigned_to
-                )
-            ''')
-            db.commit()
-            return cursor.rowcount
+        print(f"[DEDUP] Total duplicates removed: {deleted}")
+        return deleted
     except Exception as e:
         print(f"[DEDUP ERROR] {e}")
         import traceback
@@ -2633,190 +1946,77 @@ def delete_duplicate_assignments():
 # Competition database functions
 def get_all_competitions():
     """Get all competitions."""
-    if USE_SUPABASE:
-        result = supabase.table('competitions').select('*').order('created_at', desc=True).execute()
-        return result.data
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM competitions ORDER BY created_at DESC')
-        return [dict(row) for row in cursor.fetchall()]
-
-
+    result = supabase.table('competitions').select('*').order('created_at', desc=True).execute()
+    return result.data
 def get_competition(comp_id):
     """Get a single competition."""
-    if USE_SUPABASE:
-        result = supabase.table('competitions').select('*').eq('id', comp_id).execute()
-        return result.data[0] if result.data else None
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM competitions WHERE id = ?', (comp_id,))
-        row = cursor.fetchone()
-        return dict(row) if row else None
-
-
+    result = supabase.table('competitions').select('*').eq('id', comp_id).execute()
+    return result.data[0] if result.data else None
 def save_competition(comp_data):
     """Save a competition."""
-    if USE_SUPABASE:
-        existing = supabase.table('competitions').select('id').eq('id', comp_data['id']).execute()
-        if existing.data:
-            supabase.table('competitions').update(comp_data).eq('id', comp_data['id']).execute()
-        else:
-            supabase.table('competitions').insert(comp_data).execute()
+    existing = supabase.table('competitions').select('id').eq('id', comp_data['id']).execute()
+    if existing.data:
+        supabase.table('competitions').update(comp_data).eq('id', comp_data['id']).execute()
     else:
-        db = get_sqlite_db()
-        db.execute('''
-            INSERT OR REPLACE INTO competitions (id, name, event_type, event_types, event_rounds, total_rounds, created_at, status, chief_judge, chief_judge_pin, event_locations, event_dates, draws, ws_reference_points, ws_validation_window, ws_competitor_ref_points, ws_field_elevation)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (comp_data['id'], comp_data['name'], comp_data['event_type'],
-              comp_data.get('event_types', ''), comp_data.get('event_rounds', '{}'),
-              comp_data.get('total_rounds', 10), comp_data['created_at'], comp_data.get('status', 'active'),
-              comp_data.get('chief_judge', ''), comp_data.get('chief_judge_pin', ''),
-              comp_data.get('event_locations', '{}'), comp_data.get('event_dates', '{}'),
-              comp_data.get('draws', '{}'),
-              comp_data.get('ws_reference_points'),
-              comp_data.get('ws_validation_window'),
-              comp_data.get('ws_competitor_ref_points'),
-              comp_data.get('ws_field_elevation', 0)))
-        db.commit()
-
-
+        supabase.table('competitions').insert(comp_data).execute()
 def delete_competition_db(comp_id):
     """Delete a competition and its teams/scores."""
-    if USE_SUPABASE:
-        supabase.table('competition_scores').delete().eq('competition_id', comp_id).execute()
-        supabase.table('competition_teams').delete().eq('competition_id', comp_id).execute()
-        supabase.table('competitions').delete().eq('id', comp_id).execute()
-    else:
-        db = get_sqlite_db()
-        try:
-            # Delete in correct order to avoid foreign key issues
-            db.execute('DELETE FROM competition_scores WHERE competition_id = ?', (comp_id,))
-            db.execute('DELETE FROM competition_teams WHERE competition_id = ?', (comp_id,))
-            db.execute('DELETE FROM competitions WHERE id = ?', (comp_id,))
-            db.commit()
-        except Exception as e:
-            db.rollback()
-            raise e
-
-
+    supabase.table('competition_scores').delete().eq('competition_id', comp_id).execute()
+    supabase.table('competition_teams').delete().eq('competition_id', comp_id).execute()
+    supabase.table('competitions').delete().eq('id', comp_id).execute()
 def get_competition_teams(comp_id, class_filter=None):
     """Get teams for a competition."""
-    if USE_SUPABASE:
-        query = supabase.table('competition_teams').select('*').eq('competition_id', comp_id)
-        if class_filter:
-            query = query.eq('class', class_filter)
-        result = query.order('team_number').execute()
-        return result.data
-    else:
-        db = get_sqlite_db()
-        if class_filter:
-            cursor = db.execute(
-                'SELECT * FROM competition_teams WHERE competition_id = ? AND class = ? ORDER BY team_number',
-                (comp_id, class_filter)
-            )
-        else:
-            cursor = db.execute(
-                'SELECT * FROM competition_teams WHERE competition_id = ? ORDER BY class, team_number',
-                (comp_id,)
-            )
-        return [dict(row) for row in cursor.fetchall()]
-
-
+    query = supabase.table('competition_teams').select('*').eq('competition_id', comp_id)
+    if class_filter:
+        query = query.eq('class', class_filter)
+    result = query.order('team_number').execute()
+    return result.data
 def get_team(team_id):
     """Get a single team."""
-    if USE_SUPABASE:
-        result = supabase.table('competition_teams').select('*').eq('id', team_id).execute()
-        return result.data[0] if result.data else None
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM competition_teams WHERE id = ?', (team_id,))
-        row = cursor.fetchone()
-        return dict(row) if row else None
-
-
+    result = supabase.table('competition_teams').select('*').eq('id', team_id).execute()
+    return result.data[0] if result.data else None
 def save_team(team_data):
     """Save a team."""
-    if USE_SUPABASE:
-        existing = supabase.table('competition_teams').select('id').eq('id', team_data['id']).execute()
-        if existing.data:
-            supabase.table('competition_teams').update(team_data).eq('id', team_data['id']).execute()
-        else:
-            supabase.table('competition_teams').insert(team_data).execute()
+    existing = supabase.table('competition_teams').select('id').eq('id', team_data['id']).execute()
+    if existing.data:
+        supabase.table('competition_teams').update(team_data).eq('id', team_data['id']).execute()
     else:
-        db = get_sqlite_db()
-        db.execute('''
-            INSERT OR REPLACE INTO competition_teams (id, competition_id, team_number, team_name, class, members, category, event, photo, created_at, display_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (team_data['id'], team_data['competition_id'], team_data['team_number'],
-              team_data['team_name'], team_data['class'], team_data.get('members', ''),
-              team_data.get('category', ''), team_data.get('event', ''),
-              team_data.get('photo', ''), team_data['created_at'], team_data.get('display_order', 0)))
-        db.commit()
-
-
+        supabase.table('competition_teams').insert(team_data).execute()
 def delete_team_db(team_id):
     """Delete a team and its scores."""
-    if USE_SUPABASE:
-        supabase.table('competition_scores').delete().eq('team_id', team_id).execute()
-        supabase.table('competition_teams').delete().eq('id', team_id).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('DELETE FROM competition_scores WHERE team_id = ?', (team_id,))
-        db.execute('DELETE FROM competition_teams WHERE id = ?', (team_id,))
-        db.commit()
-
-
+    supabase.table('competition_scores').delete().eq('team_id', team_id).execute()
+    supabase.table('competition_teams').delete().eq('id', team_id).execute()
 def get_team_scores(team_id):
     """Get all scores for a team."""
-    if USE_SUPABASE:
-        result = supabase.table('competition_scores').select('*').eq('team_id', team_id).order('round_num').execute()
-        return result.data
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM competition_scores WHERE team_id = ? ORDER BY round_num', (team_id,))
-        return [dict(row) for row in cursor.fetchall()]
-
-
+    result = supabase.table('competition_scores').select('*').eq('team_id', team_id).order('round_num').execute()
+    return result.data
 def save_score(score_data):
     """Save a score."""
-    if USE_SUPABASE:
-        # Only include columns that exist in Supabase
-        supabase_data = {
-            'id': score_data['id'],
-            'competition_id': score_data['competition_id'],
-            'team_id': score_data['team_id'],
-            'round_num': score_data['round_num'],
-            'score': score_data.get('score'),
-            'score_data': score_data.get('score_data', ''),
-            'video_id': score_data.get('video_id', ''),
-            'scored_by': score_data.get('scored_by', ''),
-            'rejump': score_data.get('rejump', 0),
-            'created_at': score_data['created_at']
-        }
-        # Add optional columns if they have values (these may not exist in all Supabase setups)
-        # training_flag and exit_time_penalty are newer columns
-        existing = supabase.table('competition_scores').select('id').eq('id', score_data['id']).execute()
-        if existing.data:
-            supabase.table('competition_scores').update(supabase_data).eq('id', score_data['id']).execute()
-        else:
-            supabase.table('competition_scores').insert(supabase_data).execute()
+    # Only include columns that exist in Supabase
+    supabase_data = {
+        'id': score_data['id'],
+        'competition_id': score_data['competition_id'],
+        'team_id': score_data['team_id'],
+        'round_num': score_data['round_num'],
+        'score': score_data.get('score'),
+        'score_data': score_data.get('score_data', ''),
+        'video_id': score_data.get('video_id', ''),
+        'scored_by': score_data.get('scored_by', ''),
+        'rejump': score_data.get('rejump', 0),
+        'created_at': score_data['created_at']
+    }
+    # Add optional columns if they have values (these may not exist in all Supabase setups)
+    # training_flag and exit_time_penalty are newer columns
+    existing = supabase.table('competition_scores').select('id').eq('id', score_data['id']).execute()
+    if existing.data:
+        supabase.table('competition_scores').update(supabase_data).eq('id', score_data['id']).execute()
     else:
-        db = get_sqlite_db()
-        db.execute('''
-            INSERT OR REPLACE INTO competition_scores (id, competition_id, team_id, round_num, score, score_data, video_id, scored_by, rejump, training_flag, exit_time_penalty, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (score_data['id'], score_data['competition_id'], score_data['team_id'],
-              score_data['round_num'], score_data.get('score'), score_data.get('score_data', ''),
-              score_data.get('video_id', ''), score_data.get('scored_by', ''), score_data.get('rejump', 0),
-              score_data.get('training_flag', 0), score_data.get('exit_time_penalty', 0), score_data['created_at']))
-        db.commit()
-
-
+        supabase.table('competition_scores').insert(supabase_data).execute()
 # Initialize database
 def safe_init_db():
     try:
         init_db()
-        print(f"Database initialized ({'Supabase' if USE_SUPABASE else 'SQLite'})")
+        print(f"Database initialized (PostgresClient)")
     except Exception as e:
         print(f"Warning: Database initialization failed: {e}")
 
@@ -3448,20 +2648,11 @@ def detect_category_from_filename(filename):
     # Check custom mappings (simple substring match for manually added patterns)
     try:
         custom_mappings = []
-        if USE_SUPABASE:
-            try:
-                result = supabase.table('category_mappings').select('*').execute()
-                custom_mappings = result.data or []
-            except:
-                pass
-        else:
-            db = get_sqlite_db()
-            try:
-                cursor = db.execute('SELECT pattern, category, subcategory FROM category_mappings')
-                custom_mappings = [{'pattern': r[0], 'category': r[1], 'subcategory': r[2]} for r in cursor.fetchall()]
-            except:
-                pass
-
+        try:
+            result = supabase.table('category_mappings').select('*').execute()
+            custom_mappings = result.data or []
+        except:
+            pass
         for mapping in custom_mappings:
             pattern = mapping.get('pattern', '').lower()
             # Skip patterns with placeholders (already handled by match_learned_patterns)
@@ -3780,34 +2971,6 @@ def background_convert_video(job_id, input_path, output_path, video_data, temp_f
                     video_data['thumbnail'] = thumb_url
                     os.remove(thumbnail_path)
 
-        elif USE_SUPABASE:
-            with conversion_lock:
-                conversion_jobs[job_id]['status'] = 'uploading'
-
-            # Upload video file to Supabase
-            video_filename = os.path.basename(output_path)
-            video_url = upload_to_supabase_storage(output_path, f"videos/{video_filename}")
-            if video_url:
-                video_data['url'] = video_url
-                video_data['video_type'] = 'url'
-                video_data['local_file'] = ''
-                # Clean up local file after upload
-                if os.path.exists(output_path):
-                    os.remove(output_path)
-            else:
-                # Fallback to local if upload fails
-                video_data['local_file'] = video_filename
-
-            # Upload thumbnail to Supabase
-            if os.path.exists(thumbnail_path):
-                thumb_url = upload_to_supabase_storage(thumbnail_path, f"thumbnails/{thumbnail_filename}")
-                if thumb_url:
-                    video_data['thumbnail'] = thumb_url
-                    os.remove(thumbnail_path)
-        else:
-            # Local storage
-            video_data['local_file'] = os.path.basename(output_path)
-
         # Save video to database
         save_video(video_data)
 
@@ -3884,31 +3047,6 @@ def background_upload_to_s3(job_id, file_path, video_data):
                 if thumb_url:
                     video_data['thumbnail'] = thumb_url
                     os.remove(thumbnail_path)
-
-        elif USE_SUPABASE:
-            with conversion_lock:
-                conversion_jobs[job_id]['status'] = 'uploading'
-                conversion_jobs[job_id]['progress'] = 60
-                save_conversion_job(conversion_jobs[job_id])
-
-            video_filename = os.path.basename(file_path)
-            video_url = upload_to_supabase_storage(file_path, f"videos/{video_filename}")
-            if video_url:
-                video_data['url'] = video_url
-                video_data['video_type'] = 'url'
-                video_data['local_file'] = ''
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-            else:
-                video_data['local_file'] = video_filename
-
-            if os.path.exists(thumbnail_path):
-                thumb_url = upload_to_supabase_storage(thumbnail_path, f"thumbnails/{thumbnail_filename}")
-                if thumb_url:
-                    video_data['thumbnail'] = thumb_url
-                    os.remove(thumbnail_path)
-        else:
-            video_data['local_file'] = os.path.basename(file_path)
 
         # Save to database
         with conversion_lock:
@@ -4094,14 +3232,9 @@ def active_conversions():
                 active[jid] = job
     # Also check database for any jobs not in memory
     try:
-        db = get_db()
-        cursor = db.execute(
-            "SELECT * FROM conversion_jobs WHERE session_id = ? AND status NOT IN ('completed', 'failed')",
-            (session_id,)
-        )
-        for row in cursor.fetchall():
-            job = dict(row)
-            if job['job_id'] not in active:
+        result = supabase.table('conversion_jobs').select('*').eq('session_id', session_id).execute()
+        for job in (result.data or []):
+            if job.get('status') not in ('completed', 'failed') and job['job_id'] not in active:
                 if job.get('video_data'):
                     job['video_data'] = json.loads(job['video_data'])
                 active[job['job_id']] = job
@@ -4141,39 +3274,31 @@ def debug_db_status():
     """Debug endpoint to check database connection status."""
     try:
         status = {
-            'use_supabase': USE_SUPABASE,
-            'supabase_url': SUPABASE_URL[:30] + '...' if SUPABASE_URL else None,
-            'supabase_key_set': bool(SUPABASE_KEY),
+            'use_supabase': True,
+            'database_url': DATABASE_URL[:30] + '...' if DATABASE_URL else None,
+            'database_url_set': bool(DATABASE_URL),
         }
 
-        if USE_SUPABASE:
-            # Cursor-based pagination to get all video categories
-            categories = {}
-            total_videos = 0
-            last_id = ''
-            while True:
-                result = supabase.table('videos').select('id, category').order('id').gt('id', last_id).limit(500).execute()
-                if not result.data:
-                    break
-                for v in result.data:
-                    cat = v.get('category', 'unknown')
-                    categories[cat] = categories.get(cat, 0) + 1
-                total_videos += len(result.data)
-                last_id = result.data[-1]['id']
-                if len(result.data) < 500:
-                    break
-            status['total_videos'] = total_videos
-            status['categories'] = categories
-        else:
-            db = get_sqlite_db()
-            cursor = db.execute('SELECT category, COUNT(*) FROM videos GROUP BY category')
-            categories = {row[0]: row[1] for row in cursor.fetchall()}
-            status['total_videos'] = sum(categories.values())
-            status['categories'] = categories
-
+        # Cursor-based pagination to get all video categories
+        categories = {}
+        total_videos = 0
+        last_id = ''
+        while True:
+            result = supabase.table('videos').select('id, category').order('id').gt('id', last_id).limit(500).execute()
+            if not result.data:
+                break
+            for v in result.data:
+                cat = v.get('category', 'unknown')
+                categories[cat] = categories.get(cat, 0) + 1
+            total_videos += len(result.data)
+            last_id = result.data[-1]['id']
+            if len(result.data) < 500:
+                break
+        status['total_videos'] = total_videos
+        status['categories'] = categories
         return jsonify(status)
     except Exception as e:
-        return jsonify({'error': str(e), 'use_supabase': USE_SUPABASE}), 500
+        return jsonify({'error': str(e), 'use_supabase': True}), 500
 
 
 @app.route('/favicon.ico')
@@ -4916,13 +4041,7 @@ def admin_assign_categories(username):
     assigned_categories = json.dumps(valid_categories) if valid_categories else ''
 
     # Update user with new category assignments
-    if USE_SUPABASE:
-        supabase.table('users').update({'assigned_categories': assigned_categories}).eq('username', username).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('UPDATE users SET assigned_categories = ? WHERE username = ?', (assigned_categories, username))
-        db.commit()
-
+    supabase.table('users').update({'assigned_categories': assigned_categories}).eq('username', username).execute()
     return jsonify({
         'success': True,
         'message': f'Assigned {len(valid_categories)} categories to {username}',
@@ -5011,14 +4130,7 @@ def admin_import_users_csv():
         }
 
         try:
-            if USE_SUPABASE:
-                supabase.table('users').insert(user_data).execute()
-            else:
-                db = get_sqlite_db()
-                db.execute('''INSERT INTO users (username, password, role, name, email, must_change_password, signature_pin)
-                             VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                          (username, password_hash, role, name, email, 1, signature_pin))
-                db.commit()
+            supabase.table('users').insert(user_data).execute()
             created += 1
         except Exception as e:
             errors.append(f"Failed to create user '{username}': {str(e)}")
@@ -5335,21 +4447,12 @@ def submit_assignment_score(assignment_id):
     score_data = data.get('score_data', '{}')
 
     try:
-        if USE_SUPABASE:
-            supabase.table('video_assignments').update({
-                'practice_score': score,
-                'practice_score_data': score_data,
-                'status': 'completed',
-                'scored_at': datetime.utcnow().isoformat()
-            }).eq('id', assignment_id).execute()
-        else:
-            db = get_sqlite_db()
-            db.execute(
-                'UPDATE video_assignments SET status = ?, notes = ?, scored_at = ? WHERE id = ?',
-                ('completed', score_data, datetime.utcnow().isoformat(), assignment_id)
-            )
-            db.commit()
-
+        supabase.table('video_assignments').update({
+            'practice_score': score,
+            'practice_score_data': score_data,
+            'status': 'completed',
+            'scored_at': datetime.utcnow().isoformat()
+        }).eq('id', assignment_id).execute()
         return jsonify({'success': True, 'message': f'Score {score} submitted'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -5445,30 +4548,7 @@ def add_video():
         url_lower = url.lower()
         needs_conversion = any(ext in url_lower for ext in CONVERSION_FORMATS)
 
-        if needs_conversion and not USE_SUPABASE:
-            # Local mode - download and convert
-            local_file, thumbnail, vid_duration = download_and_convert_video(url, video_id)
-            if local_file:
-                save_video({
-                    'id': video_id,
-                    'title': title,
-                    'description': description,
-                    'url': '',
-                    'thumbnail': thumbnail,
-                    'category': category,
-                    'subcategory': subcategory,
-                    'tags': tags,
-                    'duration': vid_duration or duration,
-                    'created_at': datetime.now().isoformat(),
-                    'views': 0,
-                    'video_type': 'local',
-                    'local_file': local_file,
-                    'event': event
-                })
-                return jsonify({'success': True, 'message': 'Video converted and added successfully', 'id': video_id})
-            else:
-                return jsonify({'success': False, 'error': 'Failed to convert video. Make sure ffmpeg is installed.'}), 400
-        elif needs_conversion and USE_SUPABASE:
+        if needs_conversion:
             return jsonify({'success': False, 'error': 'MTS/AVI/MKV files need to be converted to MP4 first. Convert locally or upload MP4 files to Dropbox.'}), 400
 
         # Regular URL video (MP4, YouTube, etc.)
@@ -6575,8 +5655,7 @@ def scan_video_durations_status():
 @admin_required
 def import_folder():
     """Import videos from a local folder (local development only)."""
-    if USE_SUPABASE:
-        return jsonify({'error': 'Local folder import not available in production. Use YouTube/Vimeo URLs instead.'}), 400
+    return jsonify({'error': 'Local folder import not available in production. Use YouTube/Vimeo URLs instead.'}), 400
 
     data = request.json
     folder_path = data.get('folder_path', '').strip()
@@ -6776,15 +5855,7 @@ def auto_categorize_videos():
         if changes:
             # Update the video
             video_id = video.get('id')
-            if USE_SUPABASE:
-                supabase.table('videos').update(changes).eq('id', video_id).execute()
-            else:
-                db = get_sqlite_db()
-                set_clause = ', '.join(f"{k} = ?" for k in changes.keys())
-                values = list(changes.values()) + [video_id]
-                db.execute(f"UPDATE videos SET {set_clause} WHERE id = ?", values)
-                db.commit()
-
+            supabase.table('videos').update(changes).eq('id', video_id).execute()
             updated += 1
             details.append({
                 'id': video_id,
@@ -6866,27 +5937,15 @@ def add_category_mapping():
         return jsonify({'error': f'Invalid category: {category}'}), 400
 
     # Store mapping in database (create table if needed)
-    if USE_SUPABASE:
-        try:
-            supabase.table('category_mappings').insert({
-                'pattern': pattern,
-                'category': category,
-                'subcategory': subcategory or None
-            }).execute()
-        except Exception as e:
-            # Table might not exist, try to provide helpful error
-            return jsonify({'error': f'Could not save mapping: {str(e)}. Table may need to be created.'}), 500
-    else:
-        db = get_sqlite_db()
-        db.execute('''CREATE TABLE IF NOT EXISTS category_mappings
-                      (id INTEGER PRIMARY KEY, pattern TEXT UNIQUE, category TEXT, subcategory TEXT)''')
-        try:
-            db.execute('INSERT INTO category_mappings (pattern, category, subcategory) VALUES (?, ?, ?)',
-                      (pattern, category, subcategory or None))
-            db.commit()
-        except Exception as e:
-            return jsonify({'error': f'Mapping already exists or error: {str(e)}'}), 400
-
+    try:
+        supabase.table('category_mappings').insert({
+            'pattern': pattern,
+            'category': category,
+            'subcategory': subcategory or None
+        }).execute()
+    except Exception as e:
+        # Table might not exist, try to provide helpful error
+        return jsonify({'error': f'Could not save mapping: {str(e)}. Table may need to be created.'}), 500
     return jsonify({
         'success': True,
         'message': f'Added mapping: "{pattern}" → {category}/{subcategory or "none"}'
@@ -6898,20 +5957,11 @@ def add_category_mapping():
 def get_category_mappings():
     """Get all custom category mappings."""
     mappings = []
-    if USE_SUPABASE:
-        try:
-            result = supabase.table('category_mappings').select('*').execute()
-            mappings = result.data
-        except:
-            pass  # Table might not exist
-    else:
-        db = get_sqlite_db()
-        try:
-            cursor = db.execute('SELECT * FROM category_mappings')
-            mappings = [dict(row) for row in cursor.fetchall()]
-        except:
-            pass  # Table might not exist
-
+    try:
+        result = supabase.table('category_mappings').select('*').execute()
+        mappings = result.data
+    except:
+        pass  # Table might not exist
     return jsonify({'success': True, 'mappings': mappings})
 
 
@@ -6919,13 +5969,7 @@ def get_category_mappings():
 @admin_required
 def delete_category_mapping(pattern):
     """Delete a custom category mapping."""
-    if USE_SUPABASE:
-        supabase.table('category_mappings').delete().eq('pattern', pattern).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('DELETE FROM category_mappings WHERE pattern = ?', (pattern,))
-        db.commit()
-
+    supabase.table('category_mappings').delete().eq('pattern', pattern).execute()
     return jsonify({'success': True, 'message': f'Deleted mapping for "{pattern}"'})
 
 
@@ -7106,12 +6150,11 @@ def debug_patterns():
     """Debug endpoint to view mappings and test pattern matching."""
     # Get all mappings
     mappings = []
-    if USE_SUPABASE:
-        try:
-            result = supabase.table('category_mappings').select('*').execute()
-            mappings = result.data or []
-        except Exception as e:
-            mappings = [{'error': str(e)}]
+    try:
+        result = supabase.table('category_mappings').select('*').execute()
+        mappings = result.data or []
+    except Exception as e:
+        mappings = [{'error': str(e)}]
 
     # If POST, test a filename
     test_result = None
@@ -7324,8 +6367,7 @@ def convert_dropbox_url_for_streaming(url):
 @admin_required
 def browse_folders():
     """Browse local folders (local development only)."""
-    if USE_SUPABASE:
-        return jsonify({'error': 'Folder browsing not available in production'}), 400
+    return jsonify({'error': 'Folder browsing not available in production'}), 400
 
     path = request.args.get('path', os.path.expanduser('~'))
 
@@ -7364,27 +6406,20 @@ def delete_vimeo_videos():
     """Delete all Vimeo videos from the database."""
     deleted = 0
     try:
-        if USE_SUPABASE:
-            # Get all Vimeo videos with cursor-based pagination
-            last_id = ''
-            while True:
-                result = supabase.table('videos').select('id, url').order('id').gt('id', last_id).limit(500).execute()
-                if not result.data:
-                    break
-                for video in result.data:
-                    if video.get('url') and 'vimeo.com' in video['url']:
-                        supabase.table('videos').delete().eq('id', video['id']).execute()
-                        deleted += 1
-                last_id = result.data[-1]['id']
-                if len(result.data) < 500:
-                    break
-                offset += batch_size
-        else:
-            db = get_sqlite_db()
-            cursor = db.execute("SELECT COUNT(*) FROM videos WHERE url LIKE '%vimeo.com%'")
-            deleted = cursor.fetchone()[0]
-            db.execute("DELETE FROM videos WHERE url LIKE '%vimeo.com%'")
-            db.commit()
+        # Get all Vimeo videos with cursor-based pagination
+        last_id = ''
+        while True:
+            result = supabase.table('videos').select('id, url').order('id').gt('id', last_id).limit(500).execute()
+            if not result.data:
+                break
+            for video in result.data:
+                if video.get('url') and 'vimeo.com' in video['url']:
+                    supabase.table('videos').delete().eq('id', video['id']).execute()
+                    deleted += 1
+            last_id = result.data[-1]['id']
+            if len(result.data) < 500:
+                break
+            offset += batch_size
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -7403,32 +6438,31 @@ def create_event_folder():
 
     # Event folders are stored in the 'event_folders' table or we can just
     # use them implicitly when assigning videos. Let's store explicitly.
-    if USE_SUPABASE:
+    try:
+        # Check if folder already exists (by checking videos or event_folders table)
+        existing = supabase.table('videos').select('id').eq('event', name).limit(1).execute()
+        if existing.data:
+            return jsonify({'success': False, 'error': 'Event folder already exists'}), 400
         try:
-            # Check if folder already exists (by checking videos or event_folders table)
-            existing = supabase.table('videos').select('id').eq('event', name).limit(1).execute()
-            if existing.data:
+            existing_folder = supabase.table('event_folders').select('name').eq('name', name).limit(1).execute()
+            if existing_folder.data:
                 return jsonify({'success': False, 'error': 'Event folder already exists'}), 400
-            try:
-                existing_folder = supabase.table('event_folders').select('name').eq('name', name).limit(1).execute()
-                if existing_folder.data:
-                    return jsonify({'success': False, 'error': 'Event folder already exists'}), 400
-            except:
-                pass
+        except:
+            pass
 
-            # Store in event_folders table (create if needed)
-            try:
-                supabase.table('event_folders').insert({
-                    'name': name,
-                    'created_at': datetime.now().isoformat()
-                }).execute()
-            except:
-                # Table might not exist - that's ok, folder will be created when videos are added
-                pass
+        # Store in event_folders table (create if needed)
+        try:
+            supabase.table('event_folders').insert({
+                'name': name,
+                'created_at': datetime.now().isoformat()
+            }).execute()
+        except:
+            # Table might not exist - that's ok, folder will be created when videos are added
+            pass
 
-            return jsonify({'success': True, 'name': name})
-        except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': True, 'name': name})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
     return jsonify({'success': True, 'name': name})
 
@@ -7439,23 +6473,17 @@ def fix_duplicates():
     """Remove duplicate videos (same URL or same title+duration)."""
     removed = 0
     try:
-        if USE_SUPABASE:
-            # Cursor-based pagination to get all videos
-            videos = []
-            last_id = ''
-            while True:
-                result = supabase.table('videos').select('*').order('id').gt('id', last_id).limit(500).execute()
-                if not result.data:
-                    break
-                videos.extend(result.data)
-                last_id = result.data[-1]['id']
-                if len(result.data) < 500:
-                    break
-        else:
-            db = get_sqlite_db()
-            cursor = db.execute('SELECT * FROM videos')
-            videos = [dict(row) for row in cursor.fetchall()]
-
+        # Cursor-based pagination to get all videos
+        videos = []
+        last_id = ''
+        while True:
+            result = supabase.table('videos').select('*').order('id').gt('id', last_id).limit(500).execute()
+            if not result.data:
+                break
+            videos.extend(result.data)
+            last_id = result.data[-1]['id']
+            if len(result.data) < 500:
+                break
         # Track seen videos by URL and by title+duration
         seen_urls = {}
         seen_title_duration = {}
@@ -7488,14 +6516,9 @@ def fix_duplicates():
 
         # Remove duplicates
         for video_id in duplicates_to_remove:
-            if USE_SUPABASE:
-                supabase.table('videos').delete().eq('id', video_id).execute()
-            else:
-                db.execute('DELETE FROM videos WHERE id = ?', (video_id,))
+            supabase.table('videos').delete().eq('id', video_id).execute()
             removed += 1
 
-        if not USE_SUPABASE:
-            db.commit()
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -7590,12 +6613,11 @@ def learn_category_pattern(title, category, subcategory=None, event=None):
 
         # Check if pattern already exists
         existing = None
-        if USE_SUPABASE:
-            try:
-                result = supabase.table('category_mappings').select('*').eq('pattern', pattern).execute()
-                existing = result.data[0] if result.data else None
-            except:
-                pass
+        try:
+            result = supabase.table('category_mappings').select('*').eq('pattern', pattern).execute()
+            existing = result.data[0] if result.data else None
+        except:
+            pass
 
         if not existing:
             # Save new pattern
@@ -7609,12 +6631,11 @@ def learn_category_pattern(title, category, subcategory=None, event=None):
                 'created_at': datetime.now().isoformat()
             }
 
-            if USE_SUPABASE:
-                try:
-                    supabase.table('category_mappings').insert(mapping_data).execute()
-                    learned_count += 1
-                except Exception as e:
-                    print(f"Failed to save learned pattern: {e}")
+            try:
+                supabase.table('category_mappings').insert(mapping_data).execute()
+                learned_count += 1
+            except Exception as e:
+                print(f"Failed to save learned pattern: {e}")
 
     return learned_count
 
@@ -7631,12 +6652,11 @@ def match_learned_patterns(title):
 
     # Get all learned patterns
     mappings = []
-    if USE_SUPABASE:
-        try:
-            result = supabase.table('category_mappings').select('*').execute()
-            mappings = result.data or []
-        except:
-            pass
+    try:
+        result = supabase.table('category_mappings').select('*').execute()
+        mappings = result.data or []
+    except:
+        pass
 
     if not mappings:
         return None
@@ -8009,18 +7029,17 @@ def save_pattern_template(template, example, category, subcategory=None):
         'created_at': datetime.now().isoformat()
     }
 
-    if USE_SUPABASE:
-        try:
-            # Check if similar template exists
-            existing = supabase.table('category_mappings').select('*').eq('pattern', template).execute()
-            if existing.data:
-                # Update existing
-                supabase.table('category_mappings').update(mapping_data).eq('pattern', template).execute()
-            else:
-                supabase.table('category_mappings').insert(mapping_data).execute()
-            return True, {'extracted': extracted, 'regex': regex_pattern}
-        except Exception as e:
-            return False, f"Database error: {e}"
+    try:
+        # Check if similar template exists
+        existing = supabase.table('category_mappings').select('*').eq('pattern', template).execute()
+        if existing.data:
+            # Update existing
+            supabase.table('category_mappings').update(mapping_data).eq('pattern', template).execute()
+        else:
+            supabase.table('category_mappings').insert(mapping_data).execute()
+        return True, {'extracted': extracted, 'regex': regex_pattern}
+    except Exception as e:
+        return False, f"Database error: {e}"
 
     return False, "Database not available"
 
@@ -8134,21 +7153,12 @@ def migrate_indoor():
         indoor_subcategories = ['indoor_4way_fs', 'indoor_4way_vfs', 'indoor_2way_vfs', 'indoor_8way']
         migrated = 0
 
-        if USE_SUPABASE:
-            for sub in indoor_subcategories:
-                result = supabase.table('videos').select('id').eq('category', 'fs').eq('subcategory', sub).execute()
-                if result.data:
-                    for video in result.data:
-                        supabase.table('videos').update({'category': 'indoor'}).eq('id', video['id']).execute()
-                        migrated += 1
-        else:
-            db = get_sqlite_db()
-            for sub in indoor_subcategories:
-                cursor = db.execute('UPDATE videos SET category = ? WHERE category = ? AND subcategory = ?',
-                                    ('indoor', 'fs', sub))
-                migrated += cursor.rowcount
-            db.commit()
-
+        for sub in indoor_subcategories:
+            result = supabase.table('videos').select('id').eq('category', 'fs').eq('subcategory', sub).execute()
+            if result.data:
+                for video in result.data:
+                    supabase.table('videos').update({'category': 'indoor'}).eq('id', video['id']).execute()
+                    migrated += 1
         return jsonify({'success': True, 'migrated': migrated})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -8348,19 +7358,11 @@ def bulk_move_videos():
         if len(video_ids) > 50:
             video_ids = video_ids[:50]
 
-        if USE_SUPABASE:
-            # Single batch update for all videos using IN filter
-            supabase.table('videos').update({
-                'category': new_category,
-                'subcategory': new_subcategory
-            }).in_('id', video_ids).execute()
-        else:
-            db = get_sqlite_db()
-            placeholders = ','.join('?' * len(video_ids))
-            db.execute(f'UPDATE videos SET category = ?, subcategory = ? WHERE id IN ({placeholders})',
-                      [new_category, new_subcategory] + video_ids)
-            db.commit()
-
+        # Single batch update for all videos using IN filter
+        supabase.table('videos').update({
+            'category': new_category,
+            'subcategory': new_subcategory
+        }).in_('id', video_ids).execute()
         return jsonify({
             'success': True,
             'message': f'Moved {len(video_ids)} video(s)',
@@ -8726,9 +7728,6 @@ def test_thumbnail():
 @admin_required
 def refresh_thumbnails():
     """Generate thumbnails for S3 videos that are missing them."""
-    if not USE_SUPABASE:
-        return jsonify({'error': 'This feature requires Supabase'}), 400
-
     if not USE_S3:
         return jsonify({'error': 'This feature requires S3 to be configured'}), 400
 
@@ -9055,13 +8054,7 @@ def set_video_start_time(video_id):
 
             # Update start_time to 0 and mark as trimmed
             saved_bytes = original_size - trimmed_size
-            if USE_SUPABASE:
-                supabase.table('videos').update({'start_time': 0, 'trimmed': True}).eq('id', video_id).execute()
-            else:
-                db = get_sqlite_db()
-                db.execute('UPDATE videos SET start_time = ?, trimmed = 1 WHERE id = ?', (0, video_id))
-                db.commit()
-
+            supabase.table('videos').update({'start_time': 0, 'trimmed': True}).eq('id', video_id).execute()
             print(f"[TRIM] Done! Saved {saved_bytes} bytes ({saved_bytes / 1024 / 1024:.1f} MB)")
             return jsonify({
                 'success': True,
@@ -9086,19 +8079,13 @@ def set_video_start_time(video_id):
                         pass
     else:
         # start_time == 0: just save it (clear start time)
-        if USE_SUPABASE:
-            try:
-                supabase.table('videos').update({'start_time': start_time}).eq('id', video_id).execute()
-            except Exception as e:
-                error_msg = str(e)
-                if 'start_time' in error_msg and 'column' in error_msg:
-                    return jsonify({'error': 'Please add start_time column (type: float8) to your Supabase videos table'}), 400
-                raise
-        else:
-            db = get_sqlite_db()
-            db.execute('UPDATE videos SET start_time = ? WHERE id = ?', (start_time, video_id))
-            db.commit()
-
+        try:
+            supabase.table('videos').update({'start_time': start_time}).eq('id', video_id).execute()
+        except Exception as e:
+            error_msg = str(e)
+            if 'start_time' in error_msg and 'column' in error_msg:
+                return jsonify({'error': 'Please add start_time column (type: float8) to your Supabase videos table'}), 400
+            raise
         return jsonify({'success': True, 'message': 'Start time saved', 'start_time': start_time})
 
 
@@ -9109,13 +8096,7 @@ def mark_video_trimmed(video_id):
     if not video:
         return jsonify({'error': 'Video not found'}), 404
 
-    if USE_SUPABASE:
-        supabase.table('videos').update({'trimmed': True}).eq('id', video_id).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('UPDATE videos SET trimmed = 1 WHERE id = ?', (video_id,))
-        db.commit()
-
+    supabase.table('videos').update({'trimmed': True}).eq('id', video_id).execute()
     return jsonify({'success': True, 'message': 'Marked as trimmed'})
 
 
@@ -9261,16 +8242,10 @@ def trim_video(video_id):
 
             if new_url:
                 # Update database with new URL
-                if USE_SUPABASE:
-                    supabase.table('videos').update({
-                        'video_src': new_url,
-                        'start_time': 0  # Reset start time since video is trimmed
-                    }).eq('id', video_id).execute()
-                else:
-                    db = get_sqlite_db()
-                    db.execute('UPDATE videos SET video_src = ?, start_time = 0 WHERE id = ?', (new_url, video_id))
-                    db.commit()
-
+                supabase.table('videos').update({
+                    'video_src': new_url,
+                    'start_time': 0  # Reset start time since video is trimmed
+                }).eq('id', video_id).execute()
                 return jsonify({'success': True, 'message': f'Video trimmed and re-uploaded. New size: {new_size // 1024}KB'})
             else:
                 return jsonify({'error': 'Failed to upload trimmed video to S3'}), 500
@@ -9280,13 +8255,7 @@ def trim_video(video_id):
             shutil.move(temp_output.name, local_path)
 
             # Reset start time in database
-            if USE_SUPABASE:
-                supabase.table('videos').update({'start_time': 0}).eq('id', video_id).execute()
-            else:
-                db = get_sqlite_db()
-                db.execute('UPDATE videos SET start_time = 0 WHERE id = ?', (video_id,))
-                db.commit()
-
+            supabase.table('videos').update({'start_time': 0}).eq('id', video_id).execute()
             saved = original_size - new_size
             return jsonify({
                 'success': True,
@@ -9353,19 +8322,13 @@ def save_video_draw(video_id):
     draw_json = json.dumps(draw)
 
     # Update draw directly in database
-    if USE_SUPABASE:
-        try:
-            supabase.table('videos').update({'draw': draw_json}).eq('id', video_id).execute()
-        except Exception as e:
-            error_msg = str(e)
-            if 'draw' in error_msg and 'column' in error_msg:
-                return jsonify({'error': 'Please add draw column (type: text) to your Supabase videos table'}), 400
-            raise
-    else:
-        db = get_sqlite_db()
-        db.execute('UPDATE videos SET draw = ? WHERE id = ?', (draw_json, video_id))
-        db.commit()
-
+    try:
+        supabase.table('videos').update({'draw': draw_json}).eq('id', video_id).execute()
+    except Exception as e:
+        error_msg = str(e)
+        if 'draw' in error_msg and 'column' in error_msg:
+            return jsonify({'error': 'Please add draw column (type: text) to your Supabase videos table'}), 400
+        raise
     return jsonify({'success': True, 'message': 'Draw saved'})
 
 
@@ -9649,14 +8612,8 @@ def competition_page(comp_id):
 
     # Check if any scores have been entered (to disable delete)
     has_scores = False
-    if USE_SUPABASE:
-        scores_check = supabase.table('competition_scores').select('id').eq('competition_id', comp_id).not_.is_('score', 'null').limit(1).execute()
-        has_scores = len(scores_check.data) > 0
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT id FROM competition_scores WHERE competition_id = ? AND score IS NOT NULL LIMIT 1', (comp_id,))
-        has_scores = cursor.fetchone() is not None
-
+    scores_check = supabase.table('competition_scores').select('id').eq('competition_id', comp_id).not_.is_('score', 'null').limit(1).execute()
+    has_scores = len(scores_check.data) > 0
     # For multi-event competitions, group by event first, then by class
     # For single-event, just group by class
     if is_multi_event:
@@ -10223,14 +9180,8 @@ def delete_competition(comp_id):
     """Delete a competition (only if no scores have been entered)."""
     try:
         # Check if any scores exist for this competition
-        if USE_SUPABASE:
-            scores = supabase.table('competition_scores').select('id').eq('competition_id', comp_id).limit(1).execute()
-            has_scores = len(scores.data) > 0
-        else:
-            db = get_sqlite_db()
-            cursor = db.execute('SELECT id FROM competition_scores WHERE competition_id = ? AND score IS NOT NULL LIMIT 1', (comp_id,))
-            has_scores = cursor.fetchone() is not None
-
+        scores = supabase.table('competition_scores').select('id').eq('competition_id', comp_id).limit(1).execute()
+        has_scores = len(scores.data) > 0
         if has_scores:
             return jsonify({'error': 'Cannot delete competition once scoring has started. Remove all scores first.'}), 400
 
@@ -10284,46 +9235,23 @@ def remove_event_from_competition(comp_id):
             del event_rounds[event_type]
 
         # Delete teams and scores for this event
-        if USE_SUPABASE:
-            # Get team IDs for this event
-            teams = supabase.table('competition_teams').select('id').eq('competition_id', comp_id).eq('event', event_type).execute()
-            team_ids = [t['id'] for t in teams.data]
+        # Get team IDs for this event
+        teams = supabase.table('competition_teams').select('id').eq('competition_id', comp_id).eq('event', event_type).execute()
+        team_ids = [t['id'] for t in teams.data]
 
-            # Delete scores for these teams
-            for team_id in team_ids:
-                supabase.table('competition_scores').delete().eq('team_id', team_id).execute()
+        # Delete scores for these teams
+        for team_id in team_ids:
+            supabase.table('competition_scores').delete().eq('team_id', team_id).execute()
 
-            # Delete teams
-            supabase.table('competition_teams').delete().eq('competition_id', comp_id).eq('event', event_type).execute()
+        # Delete teams
+        supabase.table('competition_teams').delete().eq('competition_id', comp_id).eq('event', event_type).execute()
 
-            # Update competition
-            supabase.table('competitions').update({
-                'event_types': json.dumps(event_types),
-                'event_rounds': json.dumps(event_rounds),
-                'event_type': event_types[0] if event_types else 'fs'
-            }).eq('id', comp_id).execute()
-        else:
-            db = get_sqlite_db()
-
-            # Get team IDs for this event
-            cursor = db.execute('SELECT id FROM competition_teams WHERE competition_id = ? AND event = ?', (comp_id, event_type))
-            team_ids = [row['id'] for row in cursor.fetchall()]
-
-            # Delete scores for these teams
-            for team_id in team_ids:
-                db.execute('DELETE FROM competition_scores WHERE team_id = ?', (team_id,))
-
-            # Delete teams
-            db.execute('DELETE FROM competition_teams WHERE competition_id = ? AND event = ?', (comp_id, event_type))
-
-            # Update competition
-            db.execute('''
-                UPDATE competitions SET event_types = ?, event_rounds = ?, event_type = ?
-                WHERE id = ?
-            ''', (json.dumps(event_types), json.dumps(event_rounds), event_types[0] if event_types else 'fs', comp_id))
-
-            db.commit()
-
+        # Update competition
+        supabase.table('competitions').update({
+            'event_types': json.dumps(event_types),
+            'event_rounds': json.dumps(event_rounds),
+            'event_type': event_types[0] if event_types else 'fs'
+        }).eq('id', comp_id).execute()
         return jsonify({
             'success': True,
             'message': f'Event {event_type.upper()} removed successfully',
@@ -10381,20 +9309,11 @@ def add_event_to_competition(comp_id):
         total_rounds = max(event_rounds.values()) if event_rounds else rounds
 
         # Update competition
-        if USE_SUPABASE:
-            supabase.table('competitions').update({
-                'event_types': json.dumps(event_types),
-                'event_rounds': json.dumps(event_rounds),
-                'total_rounds': total_rounds
-            }).eq('id', comp_id).execute()
-        else:
-            db = get_sqlite_db()
-            db.execute('''
-                UPDATE competitions SET event_types = ?, event_rounds = ?, total_rounds = ?
-                WHERE id = ?
-            ''', (json.dumps(event_types), json.dumps(event_rounds), total_rounds, comp_id))
-            db.commit()
-
+        supabase.table('competitions').update({
+            'event_types': json.dumps(event_types),
+            'event_rounds': json.dumps(event_rounds),
+            'total_rounds': total_rounds
+        }).eq('id', comp_id).execute()
         return jsonify({
             'success': True,
             'message': f'Event {event_type.upper()} added successfully ({rounds} rounds)',
@@ -10413,13 +9332,7 @@ def toggle_training_flag(score_id):
     data = request.json
     flag_value = data.get('training_flag', 0)
 
-    if USE_SUPABASE:
-        supabase.table('competition_scores').update({'training_flag': flag_value}).eq('id', score_id).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('UPDATE competition_scores SET training_flag = ? WHERE id = ?', (flag_value, score_id))
-        db.commit()
-
+    supabase.table('competition_scores').update({'training_flag': flag_value}).eq('id', score_id).execute()
     return jsonify({'success': True, 'training_flag': flag_value})
 
 
@@ -10435,14 +9348,8 @@ def training_report(comp_id):
         return "Competition not found", 404
 
     # Get all scores with training flag
-    if USE_SUPABASE:
-        result = supabase.table('competition_scores').select('*').eq('competition_id', comp_id).eq('training_flag', 1).execute()
-        flagged_scores = result.data
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM competition_scores WHERE competition_id = ? AND training_flag = 1', (comp_id,))
-        flagged_scores = [dict(row) for row in cursor.fetchall()]
-
+    result = supabase.table('competition_scores').select('*').eq('competition_id', comp_id).eq('training_flag', 1).execute()
+    flagged_scores = result.data
     # Build CSV data
     output = io.StringIO()
     writer = csv.writer(output)
@@ -10485,14 +9392,8 @@ def download_training_videos(comp_id):
         return "Competition not found", 404
 
     # Get all scores with training flag
-    if USE_SUPABASE:
-        result = supabase.table('competition_scores').select('*').eq('competition_id', comp_id).eq('training_flag', 1).execute()
-        flagged_scores = result.data
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM competition_scores WHERE competition_id = ? AND training_flag = 1', (comp_id,))
-        flagged_scores = [dict(row) for row in cursor.fetchall()]
-
+    result = supabase.table('competition_scores').select('*').eq('competition_id', comp_id).eq('training_flag', 1).execute()
+    flagged_scores = result.data
     if not flagged_scores:
         return jsonify({'error': 'No videos flagged for training'}), 404
 
@@ -10539,14 +9440,8 @@ def get_training_videos(comp_id):
         return jsonify({'error': 'Competition not found'}), 404
 
     # Get all scores with training flag
-    if USE_SUPABASE:
-        result = supabase.table('competition_scores').select('*').eq('competition_id', comp_id).eq('training_flag', 1).execute()
-        flagged_scores = result.data
-    else:
-        db = get_sqlite_db()
-        cursor = db.execute('SELECT * FROM competition_scores WHERE competition_id = ? AND training_flag = 1', (comp_id,))
-        flagged_scores = [dict(row) for row in cursor.fetchall()]
-
+    result = supabase.table('competition_scores').select('*').eq('competition_id', comp_id).eq('training_flag', 1).execute()
+    flagged_scores = result.data
     # Enrich with team and video info
     videos = []
     for score in flagged_scores:
@@ -10633,17 +9528,9 @@ def save_signature(username):
 
     # Update user with signature data
     try:
-        if USE_SUPABASE:
-            result = supabase.table('users').update({'signature_data': signature_data}).eq('username', username).execute()
-            if not result.data:
-                return jsonify({'error': 'Failed to update user. Make sure signature_data column exists in Supabase.'}), 500
-        else:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute('UPDATE users SET signature_data = ? WHERE username = ?', (signature_data, username))
-            conn.commit()
-            conn.close()
-
+        result = supabase.table('users').update({'signature_data': signature_data}).eq('username', username).execute()
+        if not result.data:
+            return jsonify({'error': 'Failed to update user. Make sure signature_data column exists in Supabase.'}), 500
         return jsonify({'success': True, 'message': 'Signature saved'})
     except Exception as e:
         print(f"Error saving signature: {e}")
@@ -12088,16 +10975,8 @@ def update_team_order(comp_id):
     data = request.json
     orders = data.get('orders', [])  # List of {team_id, display_order}
 
-    if USE_SUPABASE:
-        for item in orders:
-            supabase.table('competition_teams').update({'display_order': item['display_order']}).eq('id', item['team_id']).execute()
-    else:
-        db = get_sqlite_db()
-        for item in orders:
-            db.execute('UPDATE competition_teams SET display_order = ? WHERE id = ?',
-                      (item['display_order'], item['team_id']))
-        db.commit()
-
+    for item in orders:
+        supabase.table('competition_teams').update({'display_order': item['display_order']}).eq('id', item['team_id']).execute()
     return jsonify({'success': True, 'message': 'Order updated'})
 
 
@@ -12393,18 +11272,9 @@ def approve_scores(comp_id):
     }
 
     # Save to competition
-    if USE_SUPABASE:
-        supabase.table('competitions').update({
-            'score_approvals': json.dumps(approvals)
-        }).eq('id', comp_id).execute()
-    else:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('UPDATE competitions SET score_approvals = ? WHERE id = ?',
-                      (json.dumps(approvals), comp_id))
-        conn.commit()
-        conn.close()
-
+    supabase.table('competitions').update({
+        'score_approvals': json.dumps(approvals)
+    }).eq('id', comp_id).execute()
     return jsonify({
         'success': True,
         'message': f'Round {round_num} scores approved',
@@ -12633,24 +11503,6 @@ def videographer_upload_video():
             # Upload thumbnail to S3
             if thumbnail and os.path.exists(thumbnail_path):
                 thumb_url = upload_to_s3_from_path(thumbnail_path, folder='thumbnails')
-                if thumb_url:
-                    thumbnail = thumb_url
-                    os.remove(thumbnail_path)
-
-        elif USE_SUPABASE:
-            # Fallback to Supabase if S3 not configured
-            supabase_video_url = upload_to_supabase_storage(output_path, f"videos/{local_file}")
-            if supabase_video_url:
-                video_url = supabase_video_url
-                video_type = 'url'
-                final_local_file = ''
-                # Clean up local file after upload
-                if os.path.exists(output_path):
-                    os.remove(output_path)
-
-            # Upload thumbnail
-            if thumbnail and os.path.exists(thumbnail_path):
-                thumb_url = upload_to_supabase_storage(thumbnail_path, f"thumbnails/{thumbnail_filename}")
                 if thumb_url:
                     thumbnail = thumb_url
                     os.remove(thumbnail_path)
@@ -13439,7 +12291,7 @@ def debug_status():
     """Debug endpoint to check system status."""
     try:
         # Check database connection
-        db_status = "Supabase" if USE_SUPABASE else "SQLite"
+        db_status = "PostgresClient"
         competitions = get_all_competitions()
 
         # Check for event_types column
@@ -13450,7 +12302,7 @@ def debug_status():
         return jsonify({
             'status': 'ok',
             'database': db_status,
-            'supabase_connected': USE_SUPABASE,
+            'supabase_connected': True,
             'storage_provider': STORAGE_PROVIDER,
             's3_enabled': USE_S3,
             'competitions_count': len(competitions) if competitions else 0,
@@ -15011,16 +13863,9 @@ def set_artistic_difficulty(team_id):
     }
 
     # Save back to competition
-    if USE_SUPABASE:
-        supabase.table('competitions').update({
-            'artistic_difficulty_scores': json.dumps(difficulty_scores)
-        }).eq('id', competition['id']).execute()
-    else:
-        db = get_sqlite_db()
-        db.execute('UPDATE competitions SET artistic_difficulty_scores = ? WHERE id = ?',
-                   (json.dumps(difficulty_scores), competition['id']))
-        db.commit()
-
+    supabase.table('competitions').update({
+        'artistic_difficulty_scores': json.dumps(difficulty_scores)
+    }).eq('id', competition['id']).execute()
     return jsonify({'success': True, 'message': f'Difficulty {score} preset for round {round_num}'})
 
 
@@ -15169,7 +14014,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
     debug = os.environ.get('FLASK_ENV', 'development') == 'development'
     print("\n=== Video Library ===")
-    print(f"Database: {'Supabase' if USE_SUPABASE else 'SQLite'}")
+    print(f"Database: PostgresClient")
     print(f"SocketIO: {'Enabled' if SOCKETIO_ENABLED else 'Disabled'}")
     print(f"Open http://localhost:{port} in your browser")
     print("\nAdmin login: admin / admin123\n")
